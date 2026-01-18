@@ -5,7 +5,7 @@ import { jwtConfig } from './config/jwt.config'
 import { HealthModule } from './modules/health/health.module'
 import { AuthModule } from './modules/auth/auth.module'
 import { validateEnv } from './common/config/validate-env'
-import { PrismaService } from './prisma.service'
+import { PrismaModule } from './prisma.module'
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -15,8 +15,9 @@ import { PrismaService } from './prisma.service'
     }),
     HealthModule,
     AuthModule,
+    PrismaModule,
   ],
   controllers: [],
-  providers: [PrismaService],
+  providers: [],
 })
 export class AppModule {}
