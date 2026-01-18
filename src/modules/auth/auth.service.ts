@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common'
 import { RegisterDto } from './dto/register.dto'
 import { LoginDto } from './dto/login.dto'
+import { PrismaService } from 'src/prisma.service'
 export interface FakeUser {
   id: number
   email: string
@@ -14,6 +15,7 @@ export interface FakeUser {
 
 @Injectable()
 export class AuthService {
+  constructor(private readonly prismaService: PrismaService) {}
   // fake database
   private users: FakeUser[] = [
     {
@@ -26,7 +28,7 @@ export class AuthService {
   private idCounter = 1
 
   getAllUsers() {
-    return this.users
+    return this.prismaService.user.findMany()
   }
 
   register(dto: RegisterDto) {

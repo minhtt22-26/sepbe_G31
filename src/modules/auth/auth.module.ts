@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config'
 import { AuthService } from './auth.service'
 import { AuthController } from './auth.controller'
 import { JwtStrategy } from 'src/common/strategies/jwt.strategy'
+import { PrismaService } from 'src/prisma.service'
 @Module({
   imports: [
     PassportModule,
@@ -20,7 +21,7 @@ import { JwtStrategy } from 'src/common/strategies/jwt.strategy'
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, PrismaService],
   exports: [AuthService], // sau này module khác cần dùng
 })
 export class AuthModule {}
