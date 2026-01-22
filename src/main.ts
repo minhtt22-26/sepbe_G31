@@ -42,7 +42,15 @@ async function bootstrap() {
     .setTitle('SEP Backend API')
     .setDescription('API documentation for SEP Backend API')
     .setVersion('1.0')
-    .addBearerAuth() // 👈 nếu có JWT
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        in: 'header',
+      },
+      'access-token',
+    )
     .build()
 
   const document = SwaggerModule.createDocument(app, swaggerConfig, {

@@ -1,8 +1,10 @@
-import { Controller, Post, Body, Get } from '@nestjs/common'
+import { Controller, Post, Body, Get, UseGuards } from '@nestjs/common'
 import { AuthService } from './auth.service'
 import { RegisterDto } from './dto/register.dto'
 import { LoginDto } from './dto/login.dto'
-import { ApiBody, ApiTags } from '@nestjs/swagger'
+import { ApiBearerAuth, ApiBody, ApiTags } from '@nestjs/swagger'
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard'
+import { CurrentUser } from 'src/common/decorators/current-user.decorator'
 
 @Controller('auth')
 @ApiTags('Users')
@@ -20,13 +22,17 @@ export class AuthController {
     return this.authService.login(dto)
   }
 
-  @Get('me')
-  getProfile() {
-    // fake user id
-    return this.authService.getProfile(1)
-  }
   @Get('users')
   getAllUsers() {
     return this.authService.getAllUsers()
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  @ApiBearerAuth('access-token')
+  getProfile(@CurrentUser() user: any) {
+    console.log('current user', user)
+
+    return this.authService.getProfile(user.id)
   }
 }
