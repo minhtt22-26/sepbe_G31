@@ -96,10 +96,8 @@ enum ReviewReportStatus {
 }
 
 enum ReviewStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  FLAGGED
+  ACTIVE      
+  HIDDEN      
 }
 
 enum TokenType {
@@ -141,6 +139,7 @@ model User {
   status          EnumUserStatus
   email           String?        @unique
   password        String?
+  loginWith       EnumUserLoginWith?
   passwordExpired DateTime?
   passwordCreated DateTime?
   passwordAttempt Int            @default(0)
@@ -162,14 +161,12 @@ model User {
   companyReviews               CompanyReview[]
   sessions                     Session[]
   verificationTokens           VerificationToken[]
-  jobViews                     JobView[]
   paymentOrders                PaymentOrder[]
   companies                    Company[]             @relation("CompanyOwner")
   reviewedCompanies            Company[]             @relation("CompanyReviewer")
   reportedJobs                 JobReport[]           @relation("JobReporter")
   reviewedJobReports           JobReport[]           @relation("JobReportReviewer")
-  reportedReviews              CompanyReviewReport[] @relation("ReviewReporter")
-  reviewedCompanyReviewReports CompanyReviewReport[] @relation("ReviewReportReviewer")
+  reportedReviews    CompanyReviewReport[] @relation("ReviewReporter")
 
   @@index([email])
   @@index([role])
@@ -191,7 +188,6 @@ model Session {
 
   @@index([userId])
   @@index([expiresAt])
-  @@index([jti])
 }
 
 model VerificationToken {
@@ -206,7 +202,6 @@ model VerificationToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([token])
   @@index([expiresAt])
 }
 
@@ -283,7 +278,7 @@ model CompanyReview {
   overtimeRating    Int? // 1-5
   managementRating  Int? // 1-5
   isAnonymous       Boolean      @default(false)
-  status            ReviewStatus @default(PENDING)
+  status            ReviewStatus @default(ACTIVE)
   deletedAt         DateTime?
   deletedBy         Int?
   createdAt         DateTime     @default(now())
@@ -303,17 +298,15 @@ model CompanyReviewReport {
   id          Int                @id @default(autoincrement())
   reviewId    Int
   reporterId  Int
-  reason      String
+  reason      ReportReason
   description String?
   status      ReviewReportStatus @default(PENDING)
-  reviewedBy  Int?
   reviewedAt  DateTime?
   resolution  String?
   createdAt   DateTime           @default(now())
 
   review   CompanyReview @relation(fields: [reviewId], references: [id])
   reporter User          @relation("ReviewReporter", fields: [reporterId], references: [id])
-  reviewer User?         @relation("ReviewReportReviewer", fields: [reviewedBy], references: [id])
 
   @@index([reviewId])
   @@index([reporterId])
@@ -367,7 +360,7 @@ model Job {
   // AI Fields (pgvector)
   jobEmbedding       Unsupported("vector(768)")?
   embeddingUpdatedAt DateTime?
-  fraudScore         Float?                      @default(0)
+  fraudScore         Float                       @default(0)
   fraudCheckedAt     DateTime?
   isFlagged          Boolean                     @default(false)
 
@@ -384,7 +377,6 @@ model Job {
   applications JobApplication[]
   savedBy      SavedJob[]
   applyForms   JobApplyForm[]
-  views        JobView[]
   reports      JobReport[]
 
   @@index([companyId])
@@ -397,20 +389,6 @@ model Job {
   @@index([expiredAt])
   @@index([deletedAt])
   @@index([createdAt])
-}
-
-model JobView {
-  id       Int      @id @default(autoincrement())
-  jobId    Int
-  userId   Int? // Nullable for anonymous views
-  viewedAt DateTime @default(now())
-
-  job  Job   @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  user User? @relation(fields: [userId], references: [id])
-
-  @@index([jobId])
-  @@index([userId])
-  @@index([viewedAt])
 }
 
 model JobReport {
