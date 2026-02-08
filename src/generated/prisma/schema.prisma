@@ -3,11 +3,12 @@
 
 generator client {
   provider        = "prisma-client-js"
+  output          = "../src/generated/prisma"
   previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider     = "prisma-client"
+  provider   = "postgresql"
   extensions = [pgvector(map: "vector")]
 }
 
@@ -15,10 +16,10 @@ datasource db {
 // ENUMS
 // =====================
 
-enum CompanyStatus {F
-  PENDING       // Chờ duyệt
-  APPROVED      // Đã duyệt
-  REJECTED      // Bị từ chối
+enum CompanyStatus {
+  PENDING // Chờ duyệt
+  APPROVED // Đã duyệt
+  REJECTED // Bị từ chối
   NEED_MORE_INFO
 }
 
@@ -52,18 +53,18 @@ enum EnumShift {
 }
 
 enum JobStatus {
-  DRAFT      // tạo nhưng chưa public
-  PUBLISHED  // đang tuyển, worker thấy & apply được
-  PAUSED     // tạm dừng (đủ người, chờ xử lý)
-  CLOSED     // tuyển xong / ngừng hẳn
-  EXPIRED    // hết hạn tự động
+  DRAFT // tạo nhưng chưa public
+  PUBLISHED // đang tuyển, worker thấy & apply được
+  PAUSED // tạm dừng (đủ người, chờ xử lý)
+  CLOSED // tuyển xong / ngừng hẳn
+  EXPIRED // hết hạn tự động
 }
 
 enum JobApplicationStatus {
-  APPLIED   // worker vừa nộp hồ sơ
-  VIEWED    // employer đã xem
+  APPLIED // worker vừa nộp hồ sơ
+  VIEWED // employer đã xem
   INTERVIEW // mời phỏng vấn / test
-  REJECTED  // bị từ chối
+  REJECTED // bị từ chối
   CANCELLED // worker tự rút hồ sơ
 }
 
@@ -129,42 +130,42 @@ enum OrderType {
 // =====================
 
 model User {
-  id               Int            @id @default(autoincrement())
-  fullName         String
-  phone            String?
-  role             EnumUserRole
-  status           EnumUserStatus
-  email            String?        @unique
-  password         String?
-  passwordExpired  DateTime?
-  passwordCreated  DateTime?
-  passwordAttempt  Int            @default(0)
-  isVerified       Boolean        @default(false)
-  verifiedAt       DateTime?
-  lastLoginAt      DateTime?
-  deletedAt        DateTime?
-  deletedBy        Int?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  id              Int            @id @default(autoincrement())
+  fullName        String
+  phone           String?
+  role            EnumUserRole
+  status          EnumUserStatus
+  email           String?        @unique
+  password        String?
+  passwordExpired DateTime?
+  passwordCreated DateTime?
+  passwordAttempt Int            @default(0)
+  isVerified      Boolean        @default(false)
+  verifiedAt      DateTime?
+  lastLoginAt     DateTime?
+  deletedAt       DateTime?
+  deletedBy       Int?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   // Relations
-  workerProfile   WorkerProfile?
+  workerProfile WorkerProfile?
 
   // User activities
-  jobs                           Job[]                     @relation("JobCreator")
-  applications                   JobApplication[]
-  savedJobs                      SavedJob[]
-  companyReviews                 CompanyReview[]
-  sessions                       Session[]
-  verificationTokens             VerificationToken[]
-  jobViews                       JobView[]
-  paymentOrders                  PaymentOrder[]
-  companies                      Company[]                 @relation("CompanyOwner")
-  reviewedCompanies              Company[]                 @relation("CompanyReviewer") 
-  reportedJobs                   JobReport[]               @relation("JobReporter")
-  reviewedJobReports             JobReport[]               @relation("JobReportReviewer")
-  reportedReviews                CompanyReviewReport[]     @relation("ReviewReporter")
-  reviewedCompanyReviewReports   CompanyReviewReport[]     @relation("ReviewReportReviewer")
+  jobs                         Job[]                 @relation("JobCreator")
+  applications                 JobApplication[]
+  savedJobs                    SavedJob[]
+  companyReviews               CompanyReview[]
+  sessions                     Session[]
+  verificationTokens           VerificationToken[]
+  jobViews                     JobView[]
+  paymentOrders                PaymentOrder[]
+  companies                    Company[]             @relation("CompanyOwner")
+  reviewedCompanies            Company[]             @relation("CompanyReviewer")
+  reportedJobs                 JobReport[]           @relation("JobReporter")
+  reviewedJobReports           JobReport[]           @relation("JobReportReviewer")
+  reportedReviews              CompanyReviewReport[] @relation("ReviewReporter")
+  reviewedCompanyReviewReports CompanyReviewReport[] @relation("ReviewReportReviewer")
 
   @@index([email])
   @@index([role])
@@ -173,14 +174,14 @@ model User {
 }
 
 model Session {
-  id        Int      @id @default(autoincrement())
+  id        Int       @id @default(autoincrement())
   userId    Int
-  jti       String   @unique
+  jti       String    @unique
   ipAddress String?
   userAgent String?
   expiresAt DateTime
   revokedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -226,40 +227,40 @@ model WorkerProfile {
   @@index([preferredWorkLocation])
 }
 
-
 // =====================
 // COMPANY
 // =====================
 
 model Company {
-  id              Int           @id @default(autoincrement())
+  id              Int     @id @default(autoincrement())
   ownerId         Int
   name            String
-  taxCode         String?       @unique
+  taxCode         String? @unique
   address         String?
   description     String?
   website         String?
   logo            String?
   coverImage      String?
-  businessLicense String?       // Giấy phép kinh doanh
-  
+  businessLicense String? // Giấy phép kinh doanh
+
   // Approval flow
   status          CompanyStatus @default(PENDING)
   reviewedBy      Int?
   reviewedAt      DateTime?
   reviewNotes     String?
   rejectionReason String?
-  
-  isVerified      Boolean       @default(false)
-  verifiedAt      DateTime?
-  deletedAt       DateTime?
-  deletedBy       Int?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  owner    User            @relation("CompanyOwner", fields: [ownerId], references: [id])
-  reviewer User?           @relation("CompanyReviewer", fields: [reviewedBy], references: [id])
-  jobs     Job[]
-  reviews  CompanyReview[]
+
+  isVerified Boolean         @default(false)
+  verifiedAt DateTime?
+  deletedAt  DateTime?
+  deletedBy  Int?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  owner      User            @relation("CompanyOwner", fields: [ownerId], references: [id])
+  reviewer   User?           @relation("CompanyReviewer", fields: [reviewedBy], references: [id])
+  jobs       Job[]
+  reviews    CompanyReview[]
+
   @@index([ownerId])
   @@index([status])
   @@index([isVerified])
@@ -306,9 +307,9 @@ model CompanyReviewReport {
   resolution  String?
   createdAt   DateTime           @default(now())
 
-  review    CompanyReview @relation(fields: [reviewId], references: [id])
-  reporter  User          @relation("ReviewReporter", fields: [reporterId], references: [id])
-  reviewer  User?         @relation("ReviewReportReviewer", fields: [reviewedBy], references: [id])
+  review   CompanyReview @relation(fields: [reviewId], references: [id])
+  reporter User          @relation("ReviewReporter", fields: [reporterId], references: [id])
+  reviewer User?         @relation("ReviewReportReviewer", fields: [reviewedBy], references: [id])
 
   @@index([reviewId])
   @@index([reporterId])
@@ -320,12 +321,12 @@ model CompanyReviewReport {
 // =====================
 
 model Sector {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
   deletedAt DateTime?
   deletedBy Int?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   jobs Job[]
 
@@ -333,7 +334,7 @@ model Sector {
 }
 
 model Job {
-  id                Int       @id @default(autoincrement())
+  id                Int        @id @default(autoincrement())
   companyId         Int
   sectorId          Int
   creatorId         Int
@@ -351,7 +352,7 @@ model Job {
   ageMin            Int?
   ageMax            Int?
   expiredAt         DateTime?
-  viewCount         Int       @default(0)
+  viewCount         Int        @default(0)
 
   // Boost information
   isBoosted      Boolean   @default(false)
@@ -362,9 +363,9 @@ model Job {
   // AI Fields (pgvector)
   jobEmbedding       Unsupported("vector(768)")?
   embeddingUpdatedAt DateTime?
-  fraudScore         Float?   @default(0)
+  fraudScore         Float?                      @default(0)
   fraudCheckedAt     DateTime?
-  isFlagged          Boolean  @default(false)
+  isFlagged          Boolean                     @default(false)
 
   // Soft delete
   deletedAt DateTime?
@@ -444,12 +445,12 @@ model SavedJob {
 }
 
 model JobApplication {
-  id          Int                  @id @default(autoincrement())
-  jobId       Int
-  userId      Int
-  status      JobApplicationStatus @default(APPLIED)
-  appliedAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
+  id        Int                  @id @default(autoincrement())
+  jobId     Int
+  userId    Int
+  status    JobApplicationStatus @default(APPLIED)
+  appliedAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
 
   job     Job                    @relation(fields: [jobId], references: [id], onDelete: Cascade)
   user    User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -497,7 +498,7 @@ model JobApplicationAnswer {
   fieldId          Int
   value            String
 
-  application JobApplication  @relation(fields: [jobApplicationId], references: [id], onDelete: Cascade)
+  application JobApplication    @relation(fields: [jobApplicationId], references: [id], onDelete: Cascade)
   field       JobApplyFormField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
 
   @@index([jobApplicationId])
@@ -532,15 +533,14 @@ model PaymentOrder {
 }
 
 model TermsConditions {
-  id          Int      @id @default(autoincrement())
+  id          Int            @id @default(autoincrement())
   title       String
   targetRole  EnumUserRole[]
   content     String
   effectiveAt DateTime
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
   @@index([targetRole])
   @@index([effectiveAt])
 }
-
