@@ -1,0 +1,546 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [pgvector(map: "vector")]
+}
+
+// =====================
+// ENUMS
+// =====================
+
+enum CompanyStatus {
+  PENDING // Chờ duyệt
+  APPROVED // Đã duyệt
+  REJECTED // Bị từ chối
+  NEED_MORE_INFO
+}
+
+enum EnumUserGender {
+  MALE
+  FEMALE
+}
+
+enum EnumUserRole {
+  WORKER
+  EMPLOYER
+  ADMIN
+  MANAGER
+}
+
+enum EnumUserStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+enum EnumUserLoginWith {
+  CREDENTIAL
+  SOCIAL_GOOGLE
+}
+
+enum EnumShift {
+  MORNING
+  AFTERNOON
+  NIGHT
+}
+
+enum JobStatus {
+  DRAFT // tạo nhưng chưa public
+  PUBLISHED // đang tuyển, worker thấy & apply được
+  PAUSED // tạm dừng (đủ người, chờ xử lý)
+  CLOSED // tuyển xong / ngừng hẳn
+  EXPIRED // hết hạn tự động
+}
+
+enum JobApplicationStatus {
+  APPLIED // worker vừa nộp hồ sơ
+  VIEWED // employer đã xem
+  INTERVIEW // mời phỏng vấn / test
+  REJECTED // bị từ chối
+  CANCELLED // worker tự rút hồ sơ
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  REJECTED
+}
+
+enum ReportReason {
+  FRAUD
+  INAPPROPRIATE_CONTENT
+  SCAM
+  DUPLICATE
+  MISLEADING_INFO
+  OTHER
+}
+
+enum ReviewReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  REJECTED
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FLAGGED
+}
+
+enum TokenType {
+  PASSWORD_RESET
+  EMAIL_VERIFICATION
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  MOMO
+  VNPAY
+  ZALOPAY
+  BANK_TRANSFER
+  CREDIT_CARD
+}
+
+enum OrderType {
+  BOOST_JOB
+  PREMIUM_SUBSCRIPTION
+  FEATURE_LISTING
+}
+
+// =====================
+// USER & AUTH
+// =====================
+
+model User {
+  id              Int            @id @default(autoincrement())
+  fullName        String
+  phone           String?
+  role            EnumUserRole
+  status          EnumUserStatus
+  email           String?        @unique
+  password        String?
+  passwordExpired DateTime?
+  passwordCreated DateTime?
+  passwordAttempt Int            @default(0)
+  isVerified      Boolean        @default(false)
+  verifiedAt      DateTime?
+  lastLoginAt     DateTime?
+  deletedAt       DateTime?
+  deletedBy       Int?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  // Relations
+  workerProfile WorkerProfile?
+
+  // User activities
+  jobs                         Job[]                 @relation("JobCreator")
+  applications                 JobApplication[]
+  savedJobs                    SavedJob[]
+  companyReviews               CompanyReview[]
+  sessions                     Session[]
+  verificationTokens           VerificationToken[]
+  jobViews                     JobView[]
+  paymentOrders                PaymentOrder[]
+  companies                    Company[]             @relation("CompanyOwner")
+  reviewedCompanies            Company[]             @relation("CompanyReviewer")
+  reportedJobs                 JobReport[]           @relation("JobReporter")
+  reviewedJobReports           JobReport[]           @relation("JobReportReviewer")
+  reportedReviews              CompanyReviewReport[] @relation("ReviewReporter")
+  reviewedCompanyReviewReports CompanyReviewReport[] @relation("ReviewReportReviewer")
+
+  @@index([email])
+  @@index([role])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model Session {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  jti       String    @unique
+  ipAddress String?
+  userAgent String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([jti])
+}
+
+model VerificationToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  token     String    @unique
+  type      TokenType
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+model WorkerProfile {
+  id                    Int             @id @default(autoincrement())
+  userId                Int             @unique
+  shift                 EnumShift?
+  gender                EnumUserGender?
+  birthYear             Int?
+  expectedSalary        Int?
+  preferredWorkLocation String?
+  experienceYear        Int?
+  skills                String[]
+
+  // AI Embeddings for job matching (pgvector)
+  profileEmbedding   Unsupported("vector(768)")?
+  embeddingUpdatedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([shift])
+  @@index([preferredWorkLocation])
+}
+
+// =====================
+// COMPANY
+// =====================
+
+model Company {
+  id              Int     @id @default(autoincrement())
+  ownerId         Int
+  name            String
+  taxCode         String? @unique
+  address         String?
+  description     String?
+  website         String?
+  logo            String?
+  coverImage      String?
+  businessLicense String? // Giấy phép kinh doanh
+
+  // Approval flow
+  status          CompanyStatus @default(PENDING)
+  reviewedBy      Int?
+  reviewedAt      DateTime?
+  reviewNotes     String?
+  rejectionReason String?
+
+  isVerified Boolean         @default(false)
+  verifiedAt DateTime?
+  deletedAt  DateTime?
+  deletedBy  Int?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  owner      User            @relation("CompanyOwner", fields: [ownerId], references: [id])
+  reviewer   User?           @relation("CompanyReviewer", fields: [reviewedBy], references: [id])
+  jobs       Job[]
+  reviews    CompanyReview[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([isVerified])
+  @@index([deletedAt])
+}
+
+model CompanyReview {
+  id                Int          @id @default(autoincrement())
+  companyId         Int
+  userId            Int
+  rating            Int // Overall rating (1-5)
+  title             String?
+  content           String?
+  salaryRating      Int? // 1-5
+  environmentRating Int? // 1-5
+  overtimeRating    Int? // 1-5
+  managementRating  Int? // 1-5
+  isAnonymous       Boolean      @default(false)
+  status            ReviewStatus @default(PENDING)
+  deletedAt         DateTime?
+  deletedBy         Int?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  company Company               @relation(fields: [companyId], references: [id])
+  user    User                  @relation(fields: [userId], references: [id])
+  reports CompanyReviewReport[]
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model CompanyReviewReport {
+  id          Int                @id @default(autoincrement())
+  reviewId    Int
+  reporterId  Int
+  reason      String
+  description String?
+  status      ReviewReportStatus @default(PENDING)
+  reviewedBy  Int?
+  reviewedAt  DateTime?
+  resolution  String?
+  createdAt   DateTime           @default(now())
+
+  review   CompanyReview @relation(fields: [reviewId], references: [id])
+  reporter User          @relation("ReviewReporter", fields: [reporterId], references: [id])
+  reviewer User?         @relation("ReviewReportReviewer", fields: [reviewedBy], references: [id])
+
+  @@index([reviewId])
+  @@index([reporterId])
+  @@index([status])
+}
+
+// =====================
+// JOBS
+// =====================
+
+model Sector {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  deletedAt DateTime?
+  deletedBy Int?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  jobs Job[]
+
+  @@index([deletedAt])
+}
+
+model Job {
+  id                Int        @id @default(autoincrement())
+  companyId         Int
+  sectorId          Int
+  creatorId         Int
+  title             String
+  description       String
+  status            JobStatus
+  workAddress       String?
+  province          String?
+  district          String?
+  salaryMin         Int?
+  salaryMax         Int?
+  workingShift      EnumShift?
+  quantity          Int
+  genderRequirement String?
+  ageMin            Int?
+  ageMax            Int?
+  expiredAt         DateTime?
+  viewCount         Int        @default(0)
+
+  // Boost information
+  isBoosted      Boolean   @default(false)
+  boostExpiredAt DateTime?
+  boostStartedAt DateTime?
+  boostOrderId   Int?
+
+  // AI Fields (pgvector)
+  jobEmbedding       Unsupported("vector(768)")?
+  embeddingUpdatedAt DateTime?
+  fraudScore         Float?                      @default(0)
+  fraudCheckedAt     DateTime?
+  isFlagged          Boolean                     @default(false)
+
+  // Soft delete
+  deletedAt DateTime?
+  deletedBy Int?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  company      Company          @relation(fields: [companyId], references: [id])
+  sector       Sector           @relation(fields: [sectorId], references: [id])
+  creator      User             @relation("JobCreator", fields: [creatorId], references: [id])
+  boostOrder   PaymentOrder?    @relation("BoostedJob", fields: [boostOrderId], references: [id])
+  applications JobApplication[]
+  savedBy      SavedJob[]
+  applyForms   JobApplyForm[]
+  views        JobView[]
+  reports      JobReport[]
+
+  @@index([companyId])
+  @@index([sectorId])
+  @@index([creatorId])
+  @@index([status])
+  @@index([province])
+  @@index([district])
+  @@index([isBoosted])
+  @@index([expiredAt])
+  @@index([deletedAt])
+  @@index([createdAt])
+}
+
+model JobView {
+  id       Int      @id @default(autoincrement())
+  jobId    Int
+  userId   Int? // Nullable for anonymous views
+  viewedAt DateTime @default(now())
+
+  job  Job   @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([jobId])
+  @@index([userId])
+  @@index([viewedAt])
+}
+
+model JobReport {
+  id          Int          @id @default(autoincrement())
+  jobId       Int
+  reporterId  Int
+  reason      ReportReason
+  description String?
+  status      ReportStatus @default(PENDING)
+  reviewedBy  Int?
+  reviewedAt  DateTime?
+  resolution  String?
+  createdAt   DateTime     @default(now())
+
+  job      Job   @relation(fields: [jobId], references: [id])
+  reporter User  @relation("JobReporter", fields: [reporterId], references: [id])
+  reviewer User? @relation("JobReportReviewer", fields: [reviewedBy], references: [id])
+
+  @@index([jobId])
+  @@index([reporterId])
+  @@index([status])
+}
+
+model SavedJob {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  jobId     Int
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job  Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobId])
+  @@index([userId])
+  @@index([jobId])
+}
+
+model JobApplication {
+  id        Int                  @id @default(autoincrement())
+  jobId     Int
+  userId    Int
+  status    JobApplicationStatus @default(APPLIED)
+  appliedAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  job     Job                    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user    User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers JobApplicationAnswer[]
+
+  @@unique([jobId, userId])
+  @@index([userId])
+  @@index([jobId])
+  @@index([status])
+  @@index([appliedAt])
+}
+
+// =====================
+// APPLY FORMS
+// =====================
+
+model JobApplyForm {
+  id        Int      @id @default(autoincrement())
+  jobId     Int
+  createdAt DateTime @default(now())
+
+  job    Job                 @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  fields JobApplyFormField[]
+
+  @@index([jobId])
+}
+
+model JobApplyFormField {
+  id         Int     @id @default(autoincrement())
+  formId     Int
+  label      String
+  fieldType  String // e.g., "text", "textarea", "select", "radio", "checkbox"
+  isRequired Boolean @default(false)
+  options    String? // JSON string for select/radio/checkbox options
+
+  form    JobApplyForm           @relation(fields: [formId], references: [id], onDelete: Cascade)
+  answers JobApplicationAnswer[]
+
+  @@index([formId])
+}
+
+model JobApplicationAnswer {
+  id               Int    @id @default(autoincrement())
+  jobApplicationId Int
+  fieldId          Int
+  value            String
+
+  application JobApplication    @relation(fields: [jobApplicationId], references: [id], onDelete: Cascade)
+  field       JobApplyFormField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@index([jobApplicationId])
+  @@index([fieldId])
+}
+
+// =====================
+// PAYMENTS & TERMS
+// =====================
+
+model PaymentOrder {
+  id              Int           @id @default(autoincrement())
+  userId          Int
+  orderType       OrderType
+  targetId        Int? // ID of job being boosted, etc.
+  amount          Int
+  currency        String        @default("VND")
+  status          PaymentStatus @default(PENDING)
+  paymentMethod   PaymentMethod
+  transactionCode String?
+  createdAt       DateTime      @default(now())
+  paidAt          DateTime?
+  updatedAt       DateTime      @updatedAt
+
+  user        User  @relation(fields: [userId], references: [id])
+  boostedJobs Job[] @relation("BoostedJob")
+
+  @@index([userId])
+  @@index([status])
+  @@index([orderType])
+  @@index([createdAt])
+}
+
+model TermsConditions {
+  id          Int            @id @default(autoincrement())
+  title       String
+  targetRole  EnumUserRole[]
+  content     String
+  effectiveAt DateTime
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([targetRole])
+  @@index([effectiveAt])
+}
