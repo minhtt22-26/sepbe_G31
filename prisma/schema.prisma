@@ -24,6 +24,7 @@ enum CompanyStatus {
   PENDING // Chờ duyệt
   APPROVED // Đã duyệt
   REJECTED // Bị từ chối
+  DELETED      
   NEED_MORE_INFO
 }
 
@@ -43,6 +44,7 @@ enum EnumUserStatus {
   ACTIVE
   INACTIVE
   BLOCKED
+  DELETED      
 }
 
 enum EnumUserLoginWith {
@@ -62,6 +64,7 @@ enum JobStatus {
   PAUSED // tạm dừng (đủ người, chờ xử lý)
   CLOSED // tuyển xong / ngừng hẳn
   EXPIRED // hết hạn tự động
+  DELETED      
 }
 
 enum JobApplicationStatus {
@@ -97,7 +100,8 @@ enum ReviewReportStatus {
 
 enum ReviewStatus {
   ACTIVE      
-  HIDDEN      
+  HIDDEN   
+  DELETED         
 }
 
 enum TokenType {
@@ -146,8 +150,6 @@ model User {
   isVerified      Boolean        @default(false)
   verifiedAt      DateTime?
   lastLoginAt     DateTime?
-  deletedAt       DateTime?
-  deletedBy       Int?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
@@ -171,7 +173,6 @@ model User {
   @@index([email])
   @@index([role])
   @@index([status])
-  @@index([deletedAt])
 }
 
 model Session {
@@ -251,8 +252,6 @@ model Company {
 
   isVerified Boolean         @default(false)
   verifiedAt DateTime?
-  deletedAt  DateTime?
-  deletedBy  Int?
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
   owner      User            @relation("CompanyOwner", fields: [ownerId], references: [id])
@@ -263,7 +262,6 @@ model Company {
   @@index([ownerId])
   @@index([status])
   @@index([isVerified])
-  @@index([deletedAt])
 }
 
 model CompanyReview {
@@ -279,8 +277,6 @@ model CompanyReview {
   managementRating  Int? // 1-5
   isAnonymous       Boolean      @default(false)
   status            ReviewStatus @default(ACTIVE)
-  deletedAt         DateTime?
-  deletedBy         Int?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
@@ -291,7 +287,6 @@ model CompanyReview {
   @@index([companyId])
   @@index([userId])
   @@index([status])
-  @@index([deletedAt])
 }
 
 model CompanyReviewReport {
@@ -365,8 +360,6 @@ model Job {
   isFlagged          Boolean                     @default(false)
 
   // Soft delete
-  deletedAt DateTime?
-  deletedBy Int?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
@@ -387,7 +380,6 @@ model Job {
   @@index([district])
   @@index([isBoosted])
   @@index([expiredAt])
-  @@index([deletedAt])
   @@index([createdAt])
 }
 
