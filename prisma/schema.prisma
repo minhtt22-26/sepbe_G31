@@ -350,7 +350,6 @@ model Job {
   isBoosted      Boolean   @default(false)
   boostExpiredAt DateTime?
   boostStartedAt DateTime?
-  boostOrderId   Int?
 
   // AI Fields (pgvector)
   jobEmbedding       Unsupported("vector(768)")?
@@ -366,7 +365,6 @@ model Job {
   company      Company          @relation(fields: [companyId], references: [id])
   sector       Sector           @relation(fields: [sectorId], references: [id])
   creator      User             @relation("JobCreator", fields: [creatorId], references: [id])
-  boostOrder   PaymentOrder?    @relation("BoostedJob", fields: [boostOrderId], references: [id])
   applications JobApplication[]
   savedBy      SavedJob[]
   applyForms   JobApplyForm[]
@@ -498,7 +496,6 @@ model PaymentOrder {
   updatedAt       DateTime      @updatedAt
 
   user        User  @relation(fields: [userId], references: [id])
-  boostedJobs Job[] @relation("BoostedJob")
 
   @@index([userId])
   @@index([status])
