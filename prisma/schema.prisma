@@ -138,9 +138,10 @@ enum OrderType {
 model User {
   id              Int            @id @default(autoincrement())
   fullName        String
+  userName        String?         @unique
   phone           String?
   role            EnumUserRole
-  status          EnumUserStatus
+  status          EnumUserStatus @default(ACTIVE)
   email           String?        @unique
   password        String?
   loginWith       EnumUserLoginWith?
