@@ -10,6 +10,7 @@ export class SessionTestController {
     @Post('create')
     async testCreate() {
         const testData = {
+            id: "123",
             userId: 1,
             jti: 'test-jti' + Date.now(),
             ipAddress: '127.0.0.1',

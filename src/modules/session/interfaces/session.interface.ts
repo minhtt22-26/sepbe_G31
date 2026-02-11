@@ -1,4 +1,5 @@
 export interface ISessionCreate {
+    id: string,
     userId: number,
     jti: string,
     ipAddress?: string,
