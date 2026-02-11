@@ -25,7 +25,6 @@ enum CompanyStatus {
   APPROVED // Đã duyệt
   REJECTED // Bị từ chối
   DELETED
-  NEED_MORE_INFO
 }
 
 enum EnumUserGender {
@@ -53,11 +52,6 @@ enum EnumUserLoginWith {
   SOCIAL_GOOGLE
 }
 
-enum MediaOwnerType {
-  COMPANY
-  USER
-}
-
 enum EnumShift {
   MORNING
   AFTERNOON
@@ -72,10 +66,8 @@ enum SectorStatus {
 }
 
 enum JobStatus {
-  PENDING // tạo nhưng chưa public
+  WARNING // tạo nhưng chưa public
   PUBLISHED // đang tuyển, worker thấy & apply được
-  PAUSED // tạm dừng (đủ người, chờ xử lý)
-  CLOSED // tuyển xong / ngừng hẳn
   EXPIRED // hết hạn tự động
   DELETED
 }
@@ -83,16 +75,9 @@ enum JobStatus {
 enum JobApplicationStatus {
   APPLIED // worker vừa nộp hồ sơ
   VIEWED // employer đã xem
-  INTERVIEW // mời phỏng vấn / test
-  REJECTED // bị từ chối
+  SUITABLE // mời phỏng vấn / test
+  UNSUITABLE // bị từ chối
   CANCELLED // worker tự rút hồ sơ
-}
-
-enum ReportStatus {
-  PENDING
-  REVIEWED
-  RESOLVED
-  REJECTED
 }
 
 enum ReportReason {
@@ -104,16 +89,14 @@ enum ReportReason {
   OTHER
 }
 
-enum ReviewReportStatus {
+enum ReportStatus {
   PENDING
-  REVIEWED
   RESOLVED
   REJECTED
 }
 
 enum ReviewStatus {
   ACTIVE
-  HIDDEN
   DELETED
 }
 
@@ -136,19 +119,13 @@ enum PaymentMethod {
   ZALOPAY
   BANK_TRANSFER
   CREDIT_CARD
+  SPAY
 }
 
 enum OrderType {
   BOOST_JOB
   PREMIUM_SUBSCRIPTION
   FEATURE_LISTING
-}
-
-enum MediaType {
-  IMAGE
-  VIDEO
-  DOCUMENT
-  OTHER
 }
 
 // =====================
@@ -160,7 +137,7 @@ model User {
   avatar          String?
   fullName        String
   userName        String?            @unique
-  phone           String?
+  phone           String             @unique
   role            EnumUserRole
   status          EnumUserStatus     @default(ACTIVE)
   email           String?            @unique
@@ -200,6 +177,7 @@ model Session {
   jti       String    @unique
   ipAddress String?
   userAgent String?
+  isRevoked Boolean?
   expiredAt DateTime
   revokedAt DateTime?
   createdAt DateTime  @default(now())
@@ -230,7 +208,6 @@ model WorkerProfile {
   id     Int @id @default(autoincrement())
   userId Int @unique
 
-  sectorId     Int?
   occupationId Int?
 
   address  String?
@@ -248,8 +225,9 @@ model WorkerProfile {
   embeddingUpdatedAt DateTime?
 
   user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sector     Sector?     @relation(fields: [sectorId], references: [id])
   occupation Occupation? @relation(fields: [occupationId], references: [id])
+  sector     Sector?     @relation(fields: [sectorId], references: [id])
+  sectorId   Int?
 }
 
 // =====================
@@ -268,8 +246,6 @@ model Company {
   businessLicenseUrl String?
   // Approval flow
   status             CompanyStatus   @default(PENDING)
-  reviewedAt         DateTime?
-  reviewNotes        String?
   rejectionReason    String?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
@@ -307,15 +283,14 @@ model CompanyReview {
 }
 
 model CompanyReviewReport {
-  id          Int                @id @default(autoincrement())
+  id          Int          @id @default(autoincrement())
   reviewId    Int
   reporterId  Int
   reason      ReportReason
   description String?
-  status      ReviewReportStatus @default(PENDING)
-  reviewedAt  DateTime?
-  resolution  String?
-  createdAt   DateTime           @default(now())
+  status      ReportStatus @default(PENDING)
+  managerNote String?
+  createdAt   DateTime     @default(now())
 
   review   CompanyReview @relation(fields: [reviewId], references: [id])
   reporter User          @relation("ReviewReporter", fields: [reporterId], references: [id])
@@ -342,12 +317,12 @@ model Sector {
 }
 
 model Occupation {
-  id       Int    @id @default(autoincrement())
-  sectorId Int
-  name     String // Công nhân lắp ráp, Công nhân may, Đứng máy ép nhựa
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        Int          @id @default(autoincrement())
+  sectorId  Int
+  name      String // Công nhân lắp ráp, Công nhân may, Đứng máy ép nhựa
+  status    SectorStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
   sector  Sector          @relation(fields: [sectorId], references: [id])
   jobs    Job[]
@@ -445,7 +420,6 @@ model JobApplication {
   jobId     Int
   userId    Int
   status    JobApplicationStatus @default(APPLIED)
-  appliedAt DateTime             @default(now())
   updatedAt DateTime             @updatedAt
 
   job     Job                    @relation(fields: [jobId], references: [id], onDelete: Cascade)
@@ -455,7 +429,6 @@ model JobApplication {
   @@unique([jobId, userId])
   @@index([jobId])
   @@index([status])
-  @@index([appliedAt])
 }
 
 // =====================
@@ -526,27 +499,12 @@ model PaymentOrder {
 }
 
 model TermsConditions {
-  id          Int            @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   title       String
-  targetRole  EnumUserRole[]
   content     String
   effectiveAt DateTime
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  @@index([targetRole])
   @@index([effectiveAt])
 }
-
-// model Media {
-//   id        Int            @id @default(autoincrement())
-//   ownerType MediaOwnerType
-//   ownerId   Int
-//   url       String
-//   mediaType MediaType
-//   createdAt DateTime       @default(now())
-//   updatedAt DateTime       @updatedAt
-
-//   @@index([ownerType, ownerId])
-//   @@index([mediaType])
-// }
