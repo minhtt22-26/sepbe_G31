@@ -24,7 +24,7 @@ enum CompanyStatus {
   PENDING // Chờ duyệt
   APPROVED // Đã duyệt
   REJECTED // Bị từ chối
-  DELETED      
+  DELETED
   NEED_MORE_INFO
 }
 
@@ -45,7 +45,7 @@ enum EnumUserStatus {
   ACTIVE
   INACTIVE
   BLOCKED
-  DELETED      
+  DELETED
 }
 
 enum EnumUserLoginWith {
@@ -57,15 +57,22 @@ enum EnumShift {
   MORNING
   AFTERNOON
   NIGHT
+  FULL_DAY
+  FLEXIBLE
+}
+
+enum SectorStatus {
+  ACTIVE
+  DELETED
 }
 
 enum JobStatus {
-  DRAFT // tạo nhưng chưa public
+  PENDING // tạo nhưng chưa public
   PUBLISHED // đang tuyển, worker thấy & apply được
   PAUSED // tạm dừng (đủ người, chờ xử lý)
   CLOSED // tuyển xong / ngừng hẳn
   EXPIRED // hết hạn tự động
-  DELETED      
+  DELETED
 }
 
 enum JobApplicationStatus {
@@ -100,9 +107,9 @@ enum ReviewReportStatus {
 }
 
 enum ReviewStatus {
-  ACTIVE      
-  HIDDEN   
-  DELETED         
+  ACTIVE
+  HIDDEN
+  DELETED
 }
 
 enum TokenType {
@@ -139,57 +146,42 @@ enum MediaType {
   OTHER
 }
 
-enum EnumBenefit {
-  DORMITORY          // Có chỗ ở / Ký túc xá
-  TRANSPORTATION     // Có xe đưa đón
-  MEAL_ALLOWANCE     // Phụ cấp cơm trưa / Bao ăn
-  INSURANCE_FULL     // Đóng BHXH đầy đủ
-  ATTENDANCE_BONUS   // Thưởng chuyên cần
-  THIRTEENTH_SALARY  // Lương tháng 13
-  UNIFORM_PROVIDED   // Cấp phát đồng phục
-  TRAVEL_TRIP        // Du lịch hàng năm
-  TRAINING           // Được đào tạo nghề
-}
-
 // =====================
 // USER & AUTH
 // =====================
 
 model User {
-  id              Int            @id @default(autoincrement())
+  id              Int                @id @default(autoincrement())
   avatar          String?
   fullName        String
-  userName        String?         @unique
+  userName        String?            @unique
   phone           String?
   role            EnumUserRole
-  status          EnumUserStatus @default(ACTIVE)
-  email           String?        @unique
+  status          EnumUserStatus     @default(ACTIVE)
+  email           String?            @unique
   password        String?
   loginWith       EnumUserLoginWith?
   passwordExpired DateTime?
   passwordCreated DateTime?
-  passwordAttempt Int            @default(0)
-  isVerified      Boolean        @default(false)
+  passwordAttempt Int                @default(0)
+  isVerified      Boolean            @default(false)
   verifiedAt      DateTime?
   lastLoginAt     DateTime?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
 
   // Relations
   workerProfile WorkerProfile?
 
   // User activities
-  jobs                         Job[]                 @relation("JobCreator")
-  applications                 JobApplication[]
-  savedJobs                    SavedJob[]
-  companyReviews               CompanyReview[]
-  sessions                     Session[]
-  verificationTokens           VerificationToken[]
-  paymentOrders                PaymentOrder[]
-  companies                    Company[]             @relation("CompanyOwner")
-  reviewedCompanies            Company[]             @relation("CompanyReviewer")
-  reportedJobs                 JobReport[]           @relation("JobReporter")
-  reviewedJobReports           JobReport[]           @relation("JobReportReviewer")
+  applications       JobApplication[]
+  savedJobs          SavedJob[]
+  companyReviews     CompanyReview[]
+  sessions           Session[]
+  verificationTokens VerificationToken[]
+  paymentOrders      PaymentOrder[]
+  companies          Company[]             @relation("CompanyOwner")
+  reportedJobs       JobReport[]           @relation("JobReporter")
   reportedReviews    CompanyReviewReport[] @relation("ReviewReporter")
 
   @@index([email])
@@ -198,7 +190,7 @@ model User {
 }
 
 model Session {
-  id        String       @id 
+  id        String    @id
   userId    Int
   jti       String    @unique
   ipAddress String?
@@ -230,37 +222,29 @@ model VerificationToken {
 }
 
 model WorkerProfile {
-  id                    Int             @id @default(autoincrement())
-  userId                Int             @unique
+  id     Int @id @default(autoincrement())
+  userId Int @unique
 
-  sectorId              Int?
-  occupationId          Int?
+  sectorId     Int?
+  occupationId Int?
 
-  address               String?
-  province              String?
-  district              String?
+  address  String?
+  province String?
+  district String?
 
-  shift                 EnumShift[]
-  gender                EnumUserGender?
-  birthYear             Int?
-  expectedSalaryMin        Int?
-  expectedSalaryMax        Int?
-  experienceYear        Int?
-  desiredBenefits       EnumBenefit[]
+  gender            EnumUserGender?
+  birthYear         Int?
+  expectedSalaryMin Int?
+  expectedSalaryMax Int?
+  experienceYear    Int?
 
   // AI Embeddings for job matching (pgvector)
   profileEmbedding   Unsupported("vector(768)")?
   embeddingUpdatedAt DateTime?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sector       Sector?     @relation(fields: [sectorId], references: [id])
-  occupation   Occupation? @relation(fields: [occupationId], references: [id])  
-
-  @@index([shift])
-  @@index([province])
-  @@index([district])
-  @@index([expectedSalaryMin])
-  @@index([expectedSalaryMax])
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sector     Sector?     @relation(fields: [sectorId], references: [id])
+  occupation Occupation? @relation(fields: [occupationId], references: [id])
 }
 
 // =====================
@@ -268,36 +252,26 @@ model WorkerProfile {
 // =====================
 
 model Company {
-  id              Int     @id @default(autoincrement())
+  id              Int             @id @default(autoincrement())
   ownerId         Int
   name            String
-  taxCode         String? @unique
+  taxCode         String?         @unique
   address         String?
   description     String?
   website         String?
-  logo            String?
-  coverImage      String?
-  businessLicense String? // Giấy phép kinh doanh
-
   // Approval flow
-  status          CompanyStatus @default(PENDING)
-  reviewedBy      Int?
+  status          CompanyStatus   @default(PENDING)
   reviewedAt      DateTime?
   reviewNotes     String?
   rejectionReason String?
-
-  isVerified Boolean         @default(false)
-  verifiedAt DateTime?
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
-  owner      User            @relation("CompanyOwner", fields: [ownerId], references: [id])
-  reviewer   User?           @relation("CompanyReviewer", fields: [reviewedBy], references: [id])
-  jobs       Job[]
-  reviews    CompanyReview[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  owner           User            @relation("CompanyOwner", fields: [ownerId], references: [id])
+  jobs            Job[]
+  reviews         CompanyReview[]
 
   @@index([ownerId])
   @@index([status])
-  @@index([isVerified])
 }
 
 model CompanyReview {
@@ -323,7 +297,6 @@ model CompanyReview {
   @@unique([companyId, userId])
   @@index([companyId])
   @@index([userId])
-  @@index([status])
 }
 
 model CompanyReviewReport {
@@ -351,43 +324,36 @@ model CompanyReviewReport {
 // =====================
 
 model Sector {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique
-  deletedAt DateTime?
-  deletedBy Int?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id        Int          @id @default(autoincrement())
+  name      String       @unique
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  status    SectorStatus @default(ACTIVE)
 
-  jobs Job[]
   occupations Occupation[]
   workers     WorkerProfile[]
-
-  @@index([deletedAt])
 }
 
 model Occupation {
-  id        Int    @id @default(autoincrement())
-  sectorId  Int
-  name      String // Công nhân lắp ráp, Công nhân may, Đứng máy ép nhựa
-  deletedAt DateTime?
-  deletedBy Int?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id       Int    @id @default(autoincrement())
+  sectorId Int
+  name     String // Công nhân lắp ráp, Công nhân may, Đứng máy ép nhựa
 
-  sector    Sector @relation(fields: [sectorId], references: [id])
-  jobs      Job[]
-  workers   WorkerProfile[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sector  Sector          @relation(fields: [sectorId], references: [id])
+  jobs    Job[]
+  workers WorkerProfile[]
 
   @@index([sectorId])
 }
 
 model Job {
-  id                Int        @id @default(autoincrement())
-  companyId         Int
-  sectorId          Int
-  creatorId         Int
+  id        Int @id @default(autoincrement())
+  companyId Int
 
-  occupationId      Int
+  occupationId Int
 
   title             String
   description       String
@@ -397,19 +363,16 @@ model Job {
   district          String?
   salaryMin         Int?
   salaryMax         Int?
-  workingShift      EnumShift[]
+  workingShift      EnumShift
   quantity          Int
   genderRequirement EnumUserGender?
   ageMin            Int?
   ageMax            Int?
   expiredAt         DateTime?
-  viewCount         Int        @default(0)
-  benefits          EnumBenefit[]
 
   // Boost information
   isBoosted      Boolean   @default(false)
   boostExpiredAt DateTime?
-  boostStartedAt DateTime?
 
   // AI Fields (pgvector)
   jobEmbedding       Unsupported("vector(768)")?
@@ -418,30 +381,23 @@ model Job {
   fraudCheckedAt     DateTime?
   isFlagged          Boolean                     @default(false)
 
-  // Soft delete
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  company      Company          @relation(fields: [companyId], references: [id])
-  sector       Sector           @relation(fields: [sectorId], references: [id])
-  creator      User             @relation("JobCreator", fields: [creatorId], references: [id])
-  occupation   Occupation       @relation(fields: [occupationId], references: [id])
-  
+  company    Company    @relation(fields: [companyId], references: [id])
+  occupation Occupation @relation(fields: [occupationId], references: [id])
+
   applications JobApplication[]
   savedBy      SavedJob[]
   applyForms   JobApplyForm[]
   reports      JobReport[]
 
   @@index([companyId])
-  @@index([sectorId])
   @@index([occupationId])
-  @@index([creatorId])
   @@index([status])
   @@index([province])
   @@index([district])
   @@index([isBoosted])
-  @@index([expiredAt])
-  @@index([createdAt])
 }
 
 model JobReport {
@@ -451,14 +407,11 @@ model JobReport {
   reason      ReportReason
   description String?
   status      ReportStatus @default(PENDING)
-  reviewedBy  Int?
-  reviewedAt  DateTime?
-  resolution  String?
+  managerNote String?
   createdAt   DateTime     @default(now())
 
-  job      Job   @relation(fields: [jobId], references: [id])
-  reporter User  @relation("JobReporter", fields: [reporterId], references: [id])
-  reviewer User? @relation("JobReportReviewer", fields: [reviewedBy], references: [id])
+  job      Job  @relation(fields: [jobId], references: [id])
+  reporter User @relation("JobReporter", fields: [reporterId], references: [id])
 
   @@unique([jobId, reporterId])
   @@index([jobId])
@@ -493,7 +446,6 @@ model JobApplication {
   answers JobApplicationAnswer[]
 
   @@unique([jobId, userId])
-  @@index([userId])
   @@index([jobId])
   @@index([status])
   @@index([appliedAt])
@@ -556,10 +508,9 @@ model PaymentOrder {
   paymentMethod   PaymentMethod
   transactionCode String?
   createdAt       DateTime      @default(now())
-  paidAt          DateTime?
   updatedAt       DateTime      @updatedAt
 
-  user        User  @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([status])
@@ -581,14 +532,14 @@ model TermsConditions {
 }
 
 model Media {
-  id          Int       @id @default(autoincrement())
-  ownerType   String    
-  ownerId     Int
-  url         String
-  mediaType   MediaType 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id        Int       @id @default(autoincrement())
+  ownerType String
+  ownerId   Int
+  url       String
+  mediaType MediaType
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  @@index([ownerType, ownerId]) 
+  @@index([ownerType, ownerId])
   @@index([mediaType])
 }

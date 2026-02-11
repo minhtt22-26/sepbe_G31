@@ -1,6 +1,6 @@
 import { Type } from "class-transformer";
 import { IsArray, IsEnum, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
-import { EnumBenefit, EnumShift, EnumUserGender } from "src/generated/prisma/enums";
+import {  EnumShift, EnumUserGender } from "src/generated/prisma/enums";
 
 export class WorkerProfileRequestDto {
 
@@ -61,7 +61,4 @@ export class WorkerProfileRequestDto {
     @Max(80)
     experienceYear?: number
 
-    @IsArray()
-    @IsEnum(EnumBenefit, { each: true })
-    desiredBenefits: EnumBenefit[]
 }
