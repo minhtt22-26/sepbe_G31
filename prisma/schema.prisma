@@ -119,7 +119,7 @@ enum PaymentMethod {
   ZALOPAY
   BANK_TRANSFER
   CREDIT_CARD
-  SPAY
+  SEPAY
 }
 
 enum OrderType {
