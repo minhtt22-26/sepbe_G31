@@ -31,6 +31,7 @@ enum CompanyStatus {
 enum EnumUserGender {
   MALE
   FEMALE
+  OTHER
 }
 
 enum EnumUserRole {
@@ -131,12 +132,32 @@ enum OrderType {
   FEATURE_LISTING
 }
 
+enum MediaType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+  OTHER
+}
+
+enum EnumBenefit {
+  DORMITORY          // Có chỗ ở / Ký túc xá
+  TRANSPORTATION     // Có xe đưa đón
+  MEAL_ALLOWANCE     // Phụ cấp cơm trưa / Bao ăn
+  INSURANCE_FULL     // Đóng BHXH đầy đủ
+  ATTENDANCE_BONUS   // Thưởng chuyên cần
+  THIRTEENTH_SALARY  // Lương tháng 13
+  UNIFORM_PROVIDED   // Cấp phát đồng phục
+  TRAVEL_TRIP        // Du lịch hàng năm
+  TRAINING           // Được đào tạo nghề
+}
+
 // =====================
 // USER & AUTH
 // =====================
 
 model User {
   id              Int            @id @default(autoincrement())
+  avatar          String?
   fullName        String
   userName        String?         @unique
   phone           String?
@@ -204,28 +225,42 @@ model VerificationToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([token])
   @@index([expiredAt])
 }
 
 model WorkerProfile {
   id                    Int             @id @default(autoincrement())
   userId                Int             @unique
-  shift                 EnumShift?
+
+  sectorId              Int?
+  occupationId          Int?
+
+  address               String?
+  province              String?
+  district              String?
+
+  shift                 EnumShift[]
   gender                EnumUserGender?
   birthYear             Int?
-  expectedSalary        Int?
-  preferredWorkLocation String?
+  expectedSalaryMin        Int?
+  expectedSalaryMax        Int?
   experienceYear        Int?
-  skills                String[]
+  desiredBenefits       EnumBenefit[]
 
   // AI Embeddings for job matching (pgvector)
   profileEmbedding   Unsupported("vector(768)")?
   embeddingUpdatedAt DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sector       Sector?     @relation(fields: [sectorId], references: [id])
+  occupation   Occupation? @relation(fields: [occupationId], references: [id])  
 
   @@index([shift])
-  @@index([preferredWorkLocation])
+  @@index([province])
+  @@index([district])
+  @@index([expectedSalaryMin])
+  @@index([expectedSalaryMax])
 }
 
 // =====================
@@ -285,6 +320,7 @@ model CompanyReview {
   user    User                  @relation(fields: [userId], references: [id])
   reports CompanyReviewReport[]
 
+  @@unique([companyId, userId])
   @@index([companyId])
   @@index([userId])
   @@index([status])
@@ -304,6 +340,7 @@ model CompanyReviewReport {
   review   CompanyReview @relation(fields: [reviewId], references: [id])
   reporter User          @relation("ReviewReporter", fields: [reporterId], references: [id])
 
+  @@unique([reviewId, reporterId])
   @@index([reviewId])
   @@index([reporterId])
   @@index([status])
@@ -322,8 +359,26 @@ model Sector {
   updatedAt DateTime  @updatedAt
 
   jobs Job[]
+  occupations Occupation[]
+  workers     WorkerProfile[]
 
   @@index([deletedAt])
+}
+
+model Occupation {
+  id        Int    @id @default(autoincrement())
+  sectorId  Int
+  name      String // Công nhân lắp ráp, Công nhân may, Đứng máy ép nhựa
+  deletedAt DateTime?
+  deletedBy Int?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  sector    Sector @relation(fields: [sectorId], references: [id])
+  jobs      Job[]
+  workers   WorkerProfile[]
+
+  @@index([sectorId])
 }
 
 model Job {
@@ -331,21 +386,25 @@ model Job {
   companyId         Int
   sectorId          Int
   creatorId         Int
+
+  occupationId      Int
+
   title             String
   description       String
   status            JobStatus
-  workAddress       String?
+  address           String?
   province          String?
   district          String?
   salaryMin         Int?
   salaryMax         Int?
-  workingShift      EnumShift?
+  workingShift      EnumShift[]
   quantity          Int
-  genderRequirement String?
+  genderRequirement EnumUserGender?
   ageMin            Int?
   ageMax            Int?
   expiredAt         DateTime?
   viewCount         Int        @default(0)
+  benefits          EnumBenefit[]
 
   // Boost information
   isBoosted      Boolean   @default(false)
@@ -366,6 +425,8 @@ model Job {
   company      Company          @relation(fields: [companyId], references: [id])
   sector       Sector           @relation(fields: [sectorId], references: [id])
   creator      User             @relation("JobCreator", fields: [creatorId], references: [id])
+  occupation   Occupation       @relation(fields: [occupationId], references: [id])
+  
   applications JobApplication[]
   savedBy      SavedJob[]
   applyForms   JobApplyForm[]
@@ -373,6 +434,7 @@ model Job {
 
   @@index([companyId])
   @@index([sectorId])
+  @@index([occupationId])
   @@index([creatorId])
   @@index([status])
   @@index([province])
@@ -398,6 +460,7 @@ model JobReport {
   reporter User  @relation("JobReporter", fields: [reporterId], references: [id])
   reviewer User? @relation("JobReportReviewer", fields: [reviewedBy], references: [id])
 
+  @@unique([jobId, reporterId])
   @@index([jobId])
   @@index([reporterId])
   @@index([status])
@@ -515,4 +578,17 @@ model TermsConditions {
 
   @@index([targetRole])
   @@index([effectiveAt])
+}
+
+model Media {
+  id          Int       @id @default(autoincrement())
+  ownerType   String    
+  ownerId     Int
+  url         String
+  mediaType   MediaType 
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([ownerType, ownerId]) 
+  @@index([mediaType])
 }
