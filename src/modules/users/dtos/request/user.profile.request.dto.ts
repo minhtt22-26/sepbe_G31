@@ -1,5 +1,5 @@
 import { Type } from "class-transformer";
-import { IsArray, IsDate, IsEnum, IsInt, isInt, IsNumber, IsOptional, IsString, Max, Min } from "class-validator";
+import { IsArray, IsEnum, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
 import { EnumBenefit, EnumShift, EnumUserGender } from "src/generated/prisma/enums";
 
 export class WorkerProfileRequestDto {
