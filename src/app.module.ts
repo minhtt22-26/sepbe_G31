@@ -8,6 +8,7 @@ import { PrismaModule } from './prisma.module'
 import { SessionModule } from './modules/session/session.module'
 import authConfig from './config/auth.config'
 import { UserModule } from './modules/users/user.module'
+import { CompanyModule } from './modules/company/company.module'
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -19,7 +20,8 @@ import { UserModule } from './modules/users/user.module'
     AuthModule,
     PrismaModule,
     SessionModule,
-    UserModule
+    UserModule,
+    CompanyModule
   ],
   controllers: [],
   providers: [],

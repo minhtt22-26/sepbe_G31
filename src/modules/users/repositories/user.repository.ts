@@ -98,13 +98,11 @@ export class UserRepository {
                 address: profile.address,
                 province: profile.province,
                 district: profile.district,
-                shift: profile.shift,
                 gender: profile.gender,
                 birthYear: profile.birthYear,
                 expectedSalaryMin: profile.expectedSalaryMin,
                 expectedSalaryMax: profile.expectedSalaryMax,
                 experienceYear: profile.experienceYear,
-                desiredBenefits: profile.desiredBenefits,
             }
         })
     }
