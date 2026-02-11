@@ -166,7 +166,6 @@ export class UserService {
         {
             expectedSalaryMin,
             expectedSalaryMax,
-            ...profile
         }: WorkerProfileRequestDto
     ) {
         if (expectedSalaryMin !== undefined && expectedSalaryMax !== undefined
