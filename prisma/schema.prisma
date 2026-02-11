@@ -53,6 +53,11 @@ enum EnumUserLoginWith {
   SOCIAL_GOOGLE
 }
 
+enum MediaOwnerType {
+  COMPANY
+  USER
+}
+
 enum EnumShift {
   MORNING
   AFTERNOON
@@ -252,23 +257,25 @@ model WorkerProfile {
 // =====================
 
 model Company {
-  id              Int             @id @default(autoincrement())
-  ownerId         Int
-  name            String
-  taxCode         String?         @unique
-  address         String?
-  description     String?
-  website         String?
+  id                 Int             @id @default(autoincrement())
+  ownerId            Int
+  name               String
+  taxCode            String?         @unique
+  address            String?
+  description        String?
+  website            String?
+  logoUrl            String?
+  businessLicenseUrl String?
   // Approval flow
-  status          CompanyStatus   @default(PENDING)
-  reviewedAt      DateTime?
-  reviewNotes     String?
-  rejectionReason String?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  owner           User            @relation("CompanyOwner", fields: [ownerId], references: [id])
-  jobs            Job[]
-  reviews         CompanyReview[]
+  status             CompanyStatus   @default(PENDING)
+  reviewedAt         DateTime?
+  reviewNotes        String?
+  rejectionReason    String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  owner              User            @relation("CompanyOwner", fields: [ownerId], references: [id])
+  jobs               Job[]
+  reviews            CompanyReview[]
 
   @@index([ownerId])
   @@index([status])
@@ -531,15 +538,15 @@ model TermsConditions {
   @@index([effectiveAt])
 }
 
-model Media {
-  id        Int       @id @default(autoincrement())
-  ownerType String
-  ownerId   Int
-  url       String
-  mediaType MediaType
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+// model Media {
+//   id        Int            @id @default(autoincrement())
+//   ownerType MediaOwnerType
+//   ownerId   Int
+//   url       String
+//   mediaType MediaType
+//   createdAt DateTime       @default(now())
+//   updatedAt DateTime       @updatedAt
 
-  @@index([ownerType, ownerId])
-  @@index([mediaType])
-}
+//   @@index([ownerType, ownerId])
+//   @@index([mediaType])
+// }
