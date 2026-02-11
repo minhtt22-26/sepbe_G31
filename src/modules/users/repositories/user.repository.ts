@@ -4,6 +4,7 @@ import { PrismaService } from "src/prisma.service";
 import { UserSignUpRequestDto } from "../dtos/request/user.sign-up.request.dto";
 import { IAuthPassword } from "src/modules/auth/interfaces/auth.interface";
 import { HelperService } from "src/common/helper/service/helper.service";
+import { WorkerProfileRequestDto } from "../dtos/request/user.profile.request.dto";
 
 @Injectable()
 export class UserRepository {
@@ -79,6 +80,31 @@ export class UserRepository {
             where: { id: userId },
             data: {
                 passwordAttempt: { set: 0 }
+            }
+        })
+    }
+
+    async createProfile(
+        userId: number,
+        {
+            ...profile
+        }: WorkerProfileRequestDto
+    ): Promise<void> {
+        await this.prisma.workerProfile.create({
+            data: {
+                userId,
+                sectorId: profile.sectorId,
+                occupationId: profile.occupationId,
+                address: profile.address,
+                province: profile.province,
+                district: profile.district,
+                shift: profile.shift,
+                gender: profile.gender,
+                birthYear: profile.birthYear,
+                expectedSalaryMin: profile.expectedSalaryMin,
+                expectedSalaryMax: profile.expectedSalaryMax,
+                experienceYear: profile.experienceYear,
+                desiredBenefits: profile.desiredBenefits,
             }
         })
     }

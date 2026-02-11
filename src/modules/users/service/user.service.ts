@@ -10,6 +10,7 @@ import { AuthTokenResponseDto } from "src/modules/auth/dto/response/auth.respons
 import { AuthService } from "src/modules/auth/service/auth.service";
 import { HelperService } from "src/common/helper/service/helper.service";
 import { SessionService } from "src/modules/session/service/session.service";
+import { WorkerProfileRequestDto } from "../dtos/request/user.profile.request.dto";
 
 @Injectable()
 export class UserService {
@@ -159,6 +160,24 @@ export class UserService {
         ])
 
         return tokens
+    }
+
+    async WorkerProfile(
+        {
+            expectedSalaryMin,
+            expectedSalaryMax,
+            ...profile
+        }: WorkerProfileRequestDto
+    ) {
+        if (expectedSalaryMin !== undefined && expectedSalaryMax !== undefined
+            && expectedSalaryMin > expectedSalaryMax) {
+            throw new BadRequestException({
+                message: "The minimum expected salary must be less than maximum expected salary."
+            })
+        }
+
+        //        await this.userRepository.createProfile(user.id, { ...profile })
+
     }
 
 }
