@@ -15,17 +15,17 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { CompanyService } from '../service/company.service';
+import { CompanyRegisterDto } from '../dtos/request/company.register';
 
 @Controller('companies')
 @ApiTags('Companies')
 export class CompanyController {
   constructor(private readonly companyService: CompanyService) {}
 
-  @Post()
+  @Post('create')
   @ApiOperation({ summary: 'Create a company' })
-  @ApiBody({ schema: { type: 'object' } })
   @ApiResponse({ status: 201, description: 'Company created' })
-  create(@Body() body: any) {
+  create(@Body() body: CompanyRegisterDto) {
     return this.companyService.create(body);
   }
 

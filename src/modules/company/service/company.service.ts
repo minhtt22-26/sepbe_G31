@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
+import { CompanyRegisterDto } from '../dtos/request/company.register';
 
 @Injectable()
 export class CompanyService {
@@ -15,8 +16,17 @@ export class CompanyService {
     });
   }
 
-  create(data: any) {
-    return this.prisma.company.create({ data });
+  create(data: CompanyRegisterDto) {
+    return this.prisma.company.create({ 
+      data: {
+        ownerId: 3,
+        name: data.name,
+        taxCode: data.taxCode,
+        address: data.address,
+        description: data.description,
+        website: data.website,
+      }
+    });
   }
 
   update(id: number, data: any) {
