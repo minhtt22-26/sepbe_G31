@@ -3,11 +3,12 @@ import { SessionTestController } from "./controller/session.controller";
 import { SessionRepository } from "./repositories/session.repository";
 import { SessionService } from "./service/session.service";
 import { PrismaModule } from "src/prisma.module";
+import { SessionUtil } from "./utils/session.util";
 
 @Module({
     imports: [PrismaModule],
     controllers: [SessionTestController],
-    providers: [SessionRepository, SessionService],
+    providers: [SessionRepository, SessionService, SessionUtil],
     exports: [SessionService]
 })
 

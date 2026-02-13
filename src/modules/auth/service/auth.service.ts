@@ -1,8 +1,9 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { HelperService } from "src/common/helper/service/helper.service";
 import { EnumUserLoginWith, User } from "src/generated/prisma/client";
 import { AuthUtil } from "../utils/auth.utils";
-import { IAuthAccessTokenGenerate, IAuthAccessTokenPayload, IAuthRefreshTokenPayload } from "../interfaces/auth.interface";
+import { IAuthAccessTokenGenerate, IAuthAccessTokenPayload, IAuthRefreshTokenGenerate, IAuthRefreshTokenPayload } from "../interfaces/auth.interface";
+import { SessionService } from "src/modules/session/service/session.service";
 
 
 
@@ -11,6 +12,7 @@ export class AuthService {
   constructor(
     private readonly authUtil: AuthUtil,
     private readonly helperService: HelperService,
+    private readonly sessionService: SessionService,
   ) { }
 
   createTokens(
@@ -18,7 +20,7 @@ export class AuthService {
     loginWith: EnumUserLoginWith
   ): IAuthAccessTokenGenerate {
     const lastLoginAt = this.helperService.dateCreate()
-    const jti = this.helperService.randomString(32)
+    const jti = this.authUtil.generateJti()
     const sessionId = this.helperService.randomString(24)
 
     const accessTokenPayload: IAuthAccessTokenPayload =
@@ -42,4 +44,101 @@ export class AuthService {
       sessionId
     }
   }
+
+  refreshTokens(
+    user: User,
+    refreshTokenFromRequest: string
+  ) {
+
+    const {
+      sessionId,
+      loginWith,
+      lastLoginAt,
+      exp: oldExp,
+    } = this.authUtil.payloadToken<IAuthRefreshTokenPayload>(
+      refreshTokenFromRequest)
+
+    const jti = this.authUtil.generateJti()
+
+    const payloadAccessToken: IAuthAccessTokenPayload =
+      this.authUtil.createAccessTokenPayload(
+        user,
+        sessionId,
+        lastLoginAt,
+        loginWith,
+      )
+
+    const accessToken: string = this.authUtil.createAccessTokens(
+      jti,
+      payloadAccessToken
+    )
+
+    const newpayloadRefreshToken: IAuthRefreshTokenPayload =
+      this.authUtil.createRefreshTokenPayload(
+        payloadAccessToken
+      )
+
+    //Tính thời gian còn lại của refresh token cũ
+    const today = this.helperService.dateCreate()
+
+    const expiredAt = this.helperService.dateCreateFromTimestamp(
+      oldExp * 1000
+    )
+
+    //const newRefreshTokenExpired = this.helperService.d    
+
+
+  }
+
+  //Validate Strategy
+  async validateJwtAccessStrategy(
+    payload: IAuthAccessTokenPayload
+  ): Promise<IAuthAccessTokenPayload> {
+
+    const { userId, sessionId, jti } = payload
+
+    if (!userId || !sessionId || !jti) {
+      throw new UnauthorizedException({
+        message: "Invalid token payload"
+      })
+    }
+
+    const session = await this.sessionService.getLogin(
+      userId,
+      sessionId,
+    )
+
+
+    if (!session) {
+      throw new UnauthorizedException({
+        message: "Session not found or invalid"
+      })
+    }
+
+    if (session.jti !== payload.jti) {
+      throw new UnauthorizedException({
+        message: "Jti not match"
+      })
+    }
+
+    return payload
+  }
+
+  async validateJwtAccessGuard(
+    err: Error,
+    user: IAuthAccessTokenPayload,
+    info: Error,
+  ): Promise<IAuthAccessTokenPayload> {
+
+    console.log(err)
+    if (err || !user) {
+      throw new UnauthorizedException({
+        message: "Access token invalid",
+        error: err?.message || info?.message || "Unknow error"
+      })
+    }
+
+    return user
+  }
+
 }

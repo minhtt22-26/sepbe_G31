@@ -20,7 +20,7 @@ import { CompanyRegisterDto } from '../dtos/request/company.register';
 @Controller('companies')
 @ApiTags('Companies')
 export class CompanyController {
-  constructor(private readonly companyService: CompanyService) {}
+  constructor(private readonly companyService: CompanyService) { }
 
   @Post('create')
   @ApiOperation({ summary: 'Create a company' })

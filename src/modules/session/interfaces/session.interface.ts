@@ -6,3 +6,7 @@ export interface ISessionCreate {
     userAgent?: string,
     expiredAt: Date
 }
+
+export interface ISessionGetLogin {
+    jti: string
+}

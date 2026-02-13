@@ -25,6 +25,11 @@ export class HelperService {
         return options
     }
 
+    //
+    dateCreateFromTimestamp(timestamp: number): Date {
+        return new Date(timestamp)
+    }
+
 
     //Password
 

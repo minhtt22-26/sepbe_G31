@@ -27,7 +27,7 @@ export interface IAuthAccessTokenPayload {
 
     jti?: string,
     iat?: number,
-    epx?: number,
+    exp: number,
     aud?: string,
     iss?: string
 }
