@@ -194,7 +194,7 @@ model Session {
   jti       String    @unique
   ipAddress String?
   userAgent String?
-  isRevoked Boolean?
+  isRevoked Boolean?  @default(false)
   expiredAt DateTime
   revokedAt DateTime?
   createdAt DateTime  @default(now())
