@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
-import { CompanyController } from './controller/company.controller';
-import { CompanyService } from './service/company.service';
+import { CompanyController } from './company.controller';
+import { CompanyService } from './company.service';
+import { CloudinaryModule } from 'src/infrastructure/cloudinary/cloudinary.module';
 
 @Module({
-  imports: [],
+  imports: [CloudinaryModule],
   controllers: [CompanyController],
   providers: [CompanyService],
   exports: [CompanyService],

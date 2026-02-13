@@ -165,10 +165,27 @@ model User {
   companies          Company[]             @relation("CompanyOwner")
   reportedJobs       JobReport[]           @relation("JobReporter")
   reportedReviews    CompanyReviewReport[] @relation("ReviewReporter")
+  notifications      Notification[]
 
   @@index([email])
   @@index([role])
   @@index([status])
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  title     String
+  message   String?
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
 }
 
 model Session {
