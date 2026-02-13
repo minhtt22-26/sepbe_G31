@@ -81,9 +81,9 @@ export class AuthService {
     //Tính thời gian còn lại của refresh token cũ
     const today = this.helperService.dateCreate()
 
-    const expiredAt = this.helperService.dateCreateFromTimestamp(
-      oldExp * 1000
-    )
+    // const expiredAt = this.helperService.dateCreateFromTimestamp(
+    //   oldExp * 1000
+    // )
 
     //const newRefreshTokenExpired = this.helperService.d    
 
