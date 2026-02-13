@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
-import { CompanyController } from './controller/company.controller';
-import { CompanyService } from './service/company.service';
+import { CompanyController } from './company.controller';
+import { CompanyService } from './company.service';
+import { CloudinaryModule } from 'src/infrastructure/cloudinary/cloudinary.module';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [AuthModule],
+  imports: [CloudinaryModule,AuthModule],
   controllers: [CompanyController],
   providers: [CompanyService],
   exports: [CompanyService],

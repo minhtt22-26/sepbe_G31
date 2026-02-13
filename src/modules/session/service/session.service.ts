@@ -20,11 +20,6 @@ export class SessionService {
         sessionId: string
     ): Promise<ISessionGetLogin | null> {
         const userIdNum = this.sessionUtil.toNumberId(userId)
-
-        console.log(userId)
-        console.log(userIdNum)
-        console.log(sessionId)
-
         const session = await this.sessionRepository.findByUserAndSession(
             userIdNum,
             sessionId
