@@ -16,11 +16,13 @@ import {
 } from '@nestjs/swagger';
 import { CompanyService } from '../service/company.service';
 import { CompanyRegisterDto } from '../dtos/request/company.register';
+import { AuthJwtAccessProtected, AuthJwtPayload } from 'src/modules/auth/decorators/auth.jwt.decorator';
+import type { IAuthAccessTokenPayload } from 'src/modules/auth/interfaces/auth.interface';
 
 @Controller('companies')
 @ApiTags('Companies')
 export class CompanyController {
-  constructor(private readonly companyService: CompanyService) {}
+  constructor(private readonly companyService: CompanyService) { }
 
   @Post('create')
   @ApiOperation({ summary: 'Create a company' })
@@ -30,9 +32,14 @@ export class CompanyController {
   }
 
   @Get()
+  @AuthJwtAccessProtected()
   @ApiOperation({ summary: 'List companies' })
   @ApiResponse({ status: 200, description: 'Companies retrieved' })
-  findAll() {
+  findAll(
+    @AuthJwtPayload() user: IAuthAccessTokenPayload
+  ) {
+    console.log(user)
+
     return this.companyService.findAll();
   }
 

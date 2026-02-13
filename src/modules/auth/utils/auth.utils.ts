@@ -119,6 +119,13 @@ export class AuthUtil {
         } as JwtSignOptions)
     }
 
+    generateJti(): string {
+        return this.helperService.randomString(32)
+    }
+
+    payloadToken<T>(token: string): T {
+        return this.jwtService.decode<T>(token)
+    }
 
     //Password
 
