@@ -19,12 +19,50 @@ export class CompanyService {
       where: {
         status: CompanyStatus.APPROVED,
       },
+      include: {
+        owner: {
+          select: {
+            fullName: true,
+            phone: true,
+            email: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+  }
+
+  async findAllByStatus(status: CompanyStatus) {
+    return this.prisma.company.findMany({
+      where: {
+        status,
+      },
+      include: {
+        owner: {
+          select: {
+            fullName: true,
+            phone: true,
+            email: true,
+            avatar: true,
+          },
+        },
+      },
     });
   }
 
   async findOne(id: number) {
     const company = await this.prisma.company.findUnique({
       where: { id },
+      include: {
+        owner: {
+          select: {
+            fullName: true,
+            phone: true,
+            email: true,
+            avatar: true,
+          },
+        },
+      },
     });
 
     if (!company) {
@@ -34,7 +72,7 @@ export class CompanyService {
     return company;
   }
 
-  async review(id: number, body: CompanyReviewDto, reviewerId: number) {
+  async review(id: number, body: CompanyReviewDto) {
     const company = await this.prisma.company.findUnique({
       where: { id },
     });
@@ -205,10 +243,12 @@ export class CompanyService {
     businessLicenseUrl = uploadLicense.secure_url;
   }
 
+  const { logo, businessLicense, ...updateData } = body as any;
+
   return this.prisma.company.update({
     where: { id },
     data: {
-      ...body,
+      ...updateData,
       logoUrl: logoUrl,
       businessLicenseUrl: businessLicenseUrl,
     },

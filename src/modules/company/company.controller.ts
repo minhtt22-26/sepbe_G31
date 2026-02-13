@@ -5,11 +5,9 @@ import {
   Body,
   Param,
   Patch,
-  Delete,
-  UseGuards,
   UseInterceptors,
   UploadedFiles,
-  Req,
+  Put,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -22,10 +20,11 @@ import {
 } from '@nestjs/swagger';
 import { CompanyService } from './company.service';
 import { CompanyRegisterDto } from './dtos/request/company.register';
-import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { UpdateCompanyDto } from './dtos/request/company.update';
 import { CompanyReviewDto } from './dtos/request/company.review';
+import { CompanyStatus } from 'src/generated/prisma/enums';
+import { AuthJwtAccessProtected, AuthJwtPayload } from '../auth/decorators/auth.jwt.decorator';
 
 @Controller('company')
 @ApiTags('Company')
@@ -37,8 +36,7 @@ export class CompanyController {
   @ApiResponse({ status: 201, description: 'Company created successfully' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: CompanyRegisterDto })
-  // @ApiBearerAuth()
-  // @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
   @UseInterceptors(
     FileFieldsInterceptor(
       [
@@ -68,6 +66,7 @@ export class CompanyController {
       },
     ),
   )
+  @AuthJwtAccessProtected()
   async create(
     @Body() body: CompanyRegisterDto,
     @UploadedFiles()
@@ -75,10 +74,9 @@ export class CompanyController {
       logo?: Express.Multer.File[];
       businessLicense?: Express.Multer.File[];
     },
-    // @Req() req,
+    @AuthJwtPayload() user: any
   ) {
-    const ownerId = 1;
-
+    const ownerId = user.userId;
     return this.companyService.create(body, files, ownerId);
   }
 
@@ -87,6 +85,18 @@ export class CompanyController {
   @ApiResponse({ status: 200, description: 'Companies retrieved successfully' })
   findAll() {
     return this.companyService.findAll();
+  }
+
+  @Get('status/:status')
+  @ApiOperation({ summary: 'List companies by status' })
+  @ApiParam({
+    name: 'status',
+    enum: CompanyStatus,
+    description: 'Company status',
+  })
+  @ApiResponse({ status: 200, description: 'Companies retrieved successfully' })
+  findAllByStatus(@Param('status') status: CompanyStatus) {
+    return this.companyService.findAllByStatus(status);
   }
 
   @Get(':id')
@@ -109,12 +119,11 @@ export class CompanyController {
     @Param('id') id: string,
     @Body() body: CompanyReviewDto,
   ) {
-    const reviewerId = 1; // tạm thời fake user
 
-    return this.companyService.review(+id, body, reviewerId);
+    return this.companyService.review(+id, body );
   }
 
-@Patch('update/:id')
+@Put('update/:id')
 @ApiOperation({ summary: 'Update company' })
 @ApiConsumes('multipart/form-data')
 @ApiParam({
@@ -130,6 +139,9 @@ export class CompanyController {
     { name: 'businessLicense', maxCount: 1 },
   ]),
 )
+@AuthJwtAccessProtected()
+@ApiBearerAuth('access-token')
+
 async update(
   @Param('id') id: string,
   @Body() body: UpdateCompanyDto,
@@ -138,9 +150,9 @@ async update(
     logo?: Express.Multer.File[];
     businessLicense?: Express.Multer.File[];
   },
+  @AuthJwtPayload() user: any
 ) {
-  const ownerId = 1; // tạm thời fake user
-
+  const ownerId = user.userId;
   return this.companyService.update(+id, body, files, ownerId);
 }
 

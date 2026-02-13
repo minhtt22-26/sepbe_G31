@@ -1,7 +1,7 @@
-import { Controller, Get, Patch, Param, Req } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import type { Request } from 'express';
+import { Controller, Get, Patch, Param } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
+import { AuthJwtAccessProtected, AuthJwtPayload } from '../auth/decorators/auth.jwt.decorator';
 
 @Controller('notifications')
 @ApiTags('Notifications')
@@ -11,9 +11,10 @@ export class NotificationsController {
   @Get()
   @ApiOperation({ summary: 'Danh sách thông báo' })
   @ApiResponse({ status: 200, description: 'Lấy danh sách thông báo thành công' })
-  findAll(@Req() req: Request) {
-    const userId = (req as any).user?.id ?? 1; // tạm thời fake user
-
+  @ApiBearerAuth('access-token')
+    @AuthJwtAccessProtected()
+  async findAll(@AuthJwtPayload() user: any) {
+    const userId = user.userId;
     return this.notificationsService.findAllForUser(userId);
   }
 
@@ -22,8 +23,10 @@ export class NotificationsController {
   @ApiParam({ name: 'id', type: Number, description: 'Notification ID' })
   @ApiResponse({ status: 200, description: 'Đã đánh dấu thông báo là đã đọc' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy thông báo' })
-  markRead(@Param('id') id: string, @Req() req: Request) {
-    const userId = (req as any).user?.id ?? 1; // tạm thời fake user
+  @ApiBearerAuth('access-token')
+    @AuthJwtAccessProtected()
+  markRead(@Param('id') id: string, @AuthJwtPayload() user: any) {
+    const userId = user.userId;
 
     return this.notificationsService.markRead(+id, userId);
   }

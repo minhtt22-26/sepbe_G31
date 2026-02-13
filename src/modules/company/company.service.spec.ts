@@ -56,6 +56,38 @@ describe('CompanyService', () => {
     expect(result).toBe(expected);
     expect(prismaMock.company.findMany).toHaveBeenCalledWith({
       where: { status: CompanyStatus.APPROVED },
+      include: {
+        owner: {
+          select: {
+            fullName: true,
+            phone: true,
+            email: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+  });
+
+  it('findAllByStatus should return companies by status', async () => {
+    const expected = [{ id: 3 }];
+    prismaMock.company.findMany.mockResolvedValue(expected);
+
+    const result = await service.findAllByStatus(CompanyStatus.REJECTED);
+
+    expect(result).toBe(expected);
+    expect(prismaMock.company.findMany).toHaveBeenCalledWith({
+      where: { status: CompanyStatus.REJECTED },
+      include: {
+        owner: {
+          select: {
+            fullName: true,
+            phone: true,
+            email: true,
+            avatar: true,
+          },
+        },
+      },
     });
   });
 
@@ -72,13 +104,26 @@ describe('CompanyService', () => {
     const result = await service.findOne(1);
 
     expect(result).toBe(expected);
+    expect(prismaMock.company.findUnique).toHaveBeenCalledWith({
+      where: { id: 1 },
+      include: {
+        owner: {
+          select: {
+            fullName: true,
+            phone: true,
+            email: true,
+            avatar: true,
+          },
+        },
+      },
+    });
   });
 
   it('review should throw on invalid status', async () => {
     prismaMock.company.findUnique.mockResolvedValue({ id: 1 });
 
     await expect(
-      service.review(1, { status: CompanyStatus.PENDING } as any, 1),
+      service.review(1, { status: CompanyStatus.PENDING } as any),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -86,7 +131,7 @@ describe('CompanyService', () => {
     prismaMock.company.findUnique.mockResolvedValue({ id: 1 });
 
     await expect(
-      service.review(1, { status: CompanyStatus.REJECTED } as any, 1),
+      service.review(1, { status: CompanyStatus.REJECTED } as any),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -99,7 +144,6 @@ describe('CompanyService', () => {
     const result = await service.review(
       1,
       { status: CompanyStatus.APPROVED } as any,
-      1,
     );
 
     expect(result).toBe(expected);

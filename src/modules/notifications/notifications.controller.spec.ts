@@ -32,47 +32,23 @@ describe('NotificationsController', () => {
     jest.clearAllMocks();
   });
 
-  it('findAll should use user from request', async () => {
+  it('findAll should use user payload', async () => {
     const expected = [{ id: 1 }];
     notificationsServiceMock.findAllForUser.mockResolvedValue(expected);
 
-    const req = { user: { id: 7 } } as any;
-    const result = await controller.findAll(req);
+    const result = await controller.findAll({ userId: 7 } as any);
 
     expect(result).toBe(expected);
     expect(notificationsServiceMock.findAllForUser).toHaveBeenCalledWith(7);
   });
 
-  it('findAll should fallback to userId 1', async () => {
-    const expected = [{ id: 2 }];
-    notificationsServiceMock.findAllForUser.mockResolvedValue(expected);
-
-    const req = {} as any;
-    const result = await controller.findAll(req);
-
-    expect(result).toBe(expected);
-    expect(notificationsServiceMock.findAllForUser).toHaveBeenCalledWith(1);
-  });
-
-  it('markRead should use user from request', async () => {
+  it('markRead should use user payload', async () => {
     const expected = { updated: 1 };
     notificationsServiceMock.markRead.mockResolvedValue(expected);
 
-    const req = { user: { id: 8 } } as any;
-    const result = await controller.markRead('5', req);
+    const result = await controller.markRead('5', { userId: 8 } as any);
 
     expect(result).toBe(expected);
     expect(notificationsServiceMock.markRead).toHaveBeenCalledWith(5, 8);
-  });
-
-  it('markRead should fallback to userId 1', async () => {
-    const expected = { updated: 1 };
-    notificationsServiceMock.markRead.mockResolvedValue(expected);
-
-    const req = {} as any;
-    const result = await controller.markRead('9', req);
-
-    expect(result).toBe(expected);
-    expect(notificationsServiceMock.markRead).toHaveBeenCalledWith(9, 1);
   });
 });

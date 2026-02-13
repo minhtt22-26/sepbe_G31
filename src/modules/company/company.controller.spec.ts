@@ -10,6 +10,7 @@ jest.mock('src/prisma.service', () => ({
 const companyServiceMock = {
   create: jest.fn(),
   findAll: jest.fn(),
+  findAllByStatus: jest.fn(),
   findOne: jest.fn(),
   update: jest.fn(),
   review: jest.fn(),
@@ -46,7 +47,8 @@ describe('CompanyController', () => {
 
     companyServiceMock.create.mockResolvedValue(expected);
 
-    const result = await controller.create(body, files);
+    const user = { userId: 1 };
+    const result = await controller.create(body, files, user);
 
     expect(result).toBe(expected);
     expect(companyServiceMock.create).toHaveBeenCalledWith(body, files, 1);
@@ -60,6 +62,18 @@ describe('CompanyController', () => {
 
     expect(result).toBe(expected);
     expect(companyServiceMock.findAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('findAllByStatus() should call service.findAllByStatus', async () => {
+    const expected = [{ id: 3 }];
+    companyServiceMock.findAllByStatus.mockResolvedValue(expected);
+
+    const result = await controller.findAllByStatus(CompanyStatus.APPROVED);
+
+    expect(result).toBe(expected);
+    expect(companyServiceMock.findAllByStatus).toHaveBeenCalledWith(
+      CompanyStatus.APPROVED,
+    );
   });
 
   it('findOne() should call service.findOne with numeric id', async () => {
@@ -79,7 +93,7 @@ describe('CompanyController', () => {
 
     companyServiceMock.update.mockResolvedValue(expected);
 
-    const result = await controller.update('2', body, files);
+    const result = await controller.update('2', body, files, { userId: 1 } as any);
 
     expect(result).toBe(expected);
     expect(companyServiceMock.update).toHaveBeenCalledWith(2, body, files, 1);
@@ -96,6 +110,6 @@ describe('CompanyController', () => {
     const result = await controller.review('3', body);
 
     expect(result).toBe(expected);
-    expect(companyServiceMock.review).toHaveBeenCalledWith(3, body, 1);
+    expect(companyServiceMock.review).toHaveBeenCalledWith(3, body);
   });
 });
