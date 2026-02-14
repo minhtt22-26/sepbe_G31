@@ -106,4 +106,20 @@ export class UserRepository {
             }
         })
     }
+
+    async findOneById(userId: number): Promise<User | null> {
+        return this.prisma.user.findUnique({
+            where: { id: userId }
+        })
+    }
+
+    async updateLastActivity(userId: number): Promise<void> {
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+                lastLoginAt: this.helperService.dateCreate()
+            }
+        })
+    }
+
 }

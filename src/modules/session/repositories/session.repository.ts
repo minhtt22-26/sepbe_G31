@@ -24,6 +24,25 @@ export class SessionRepository {
                 userId,
                 isRevoked: false,
                 expiredAt: { gte: new Date() }
+            },
+            select: {
+                jti: true,
+                expiredAt: true
+            }
+        })
+    }
+
+    async updateLogin(data: ISessionCreate): Promise<void> {
+        await this.prisma.session.update({
+            where: {
+                id: data.id,
+                userId: data.userId,
+            },
+            data: {
+                jti: data.jti,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent,
+                expiredAt: data.expiredAt
             }
         })
     }

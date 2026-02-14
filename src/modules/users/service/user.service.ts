@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { UserRepository } from "../repositories/user.repository";
 import { UserSignUpRequestDto } from "../dtos/request/user.sign-up.request.dto";
 import { AuthUtil } from "src/modules/auth/utils/auth.utils";
@@ -11,6 +11,8 @@ import { AuthService } from "src/modules/auth/service/auth.service";
 import { HelperService } from "src/common/helper/service/helper.service";
 import { SessionService } from "src/modules/session/service/session.service";
 import { WorkerProfileRequestDto } from "../dtos/request/user.profile.request.dto";
+import { IAuthRefreshTokenPayload } from "src/modules/auth/interfaces/auth.interface";
+import { ISessionCreate } from "src/modules/session/interfaces/session.interface";
 
 @Injectable()
 export class UserService {
@@ -21,6 +23,10 @@ export class UserService {
         private readonly userRepository: UserRepository,
         private readonly sessionService: SessionService,
     ) { }
+
+    async findOneById(userId: number): Promise<User | null> {
+        return this.userRepository.findOneById(userId)
+    }
 
     async signUp(
         {
@@ -177,6 +183,59 @@ export class UserService {
 
         //        await this.userRepository.createProfile(user.id, { ...profile })
 
+    }
+
+    async refreshToken(
+        user: User,
+        refreshToken: string,
+        requestLog: {
+            ipAddress: string,
+            userAgent: string
+        }
+    ): Promise<AuthTokenResponseDto> {
+        const {
+            sessionId,
+            userId,
+            jti: oldJti,
+            loginWith,
+        } = this.authUtil.payloadToken<IAuthRefreshTokenPayload>(refreshToken)
+
+        // Validate session exists and jti matches
+        const session = await this.sessionService.getLogin(userId, sessionId)
+        if (!session) {
+            throw new UnauthorizedException({
+                message: "Session not found or expired"
+            })
+        }
+
+        if (session.jti !== oldJti) {
+            throw new UnauthorizedException({
+                message: "Refresh token invalid or tampered"
+            })
+        }
+
+        // Generate new tokens
+        const {
+            jti: newJti,
+            tokens,
+            expiredInMs,
+        } = this.authService.refreshTokens(user, refreshToken)
+
+        // Update session with new jti, ipAddress, userAgent in database
+        await Promise.all([
+            this.sessionService.updateLogin(
+                {
+                    userId,
+                    id: sessionId,
+                    jti: newJti,
+                    ipAddress: requestLog.ipAddress,
+                    userAgent: requestLog.userAgent
+                } as ISessionCreate
+            ),
+            this.userRepository.updateLastActivity(user.id)
+        ])
+
+        return tokens
     }
 
 }

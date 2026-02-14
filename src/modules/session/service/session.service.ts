@@ -29,6 +29,14 @@ export class SessionService {
             return null
         }
 
-        return { jti: session.jti }
+        return { 
+            jti: session.jti, 
+            expiredAt: session.expiredAt 
+        }
+    }
+
+    async updateLogin(data: ISessionCreate): Promise<void> {
+        const userIdNum = this.sessionUtil.toNumberId(data.userId)
+        await this.sessionRepository.updateLogin({ ...data, userId: userIdNum })
     }
 }

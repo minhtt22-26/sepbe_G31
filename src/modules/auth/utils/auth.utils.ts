@@ -107,11 +107,12 @@ export class AuthUtil {
 
     createRefreshTokens(
         jti: string,
-        payload: IAuthRefreshTokenPayload
+        payload: IAuthRefreshTokenPayload,
+        expiresIn?: number
     ): string {
         return this.jwtService.sign(payload, {
             secret: this.jwtRefreshTokenSecret,
-            expiresIn: this.jwtRefreshTokenExpirationTimeInSeconds,
+            expiresIn: expiresIn ?? this.jwtRefreshTokenExpirationTimeInSeconds,
             audience: this.jwtAudience,
             issuer: this.jwtIssuer,
             algorithm: this.jwtRefreshTokenAlgorithm,

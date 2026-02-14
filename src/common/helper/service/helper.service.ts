@@ -30,6 +30,20 @@ export class HelperService {
         return new Date(timestamp)
     }
 
+    //Tính driff giữa 2 date
+    dateDriff(
+        dateOne: Date,
+        dateTwo: Date
+    ): { seconds: number; miliseconds: number } {
+        const diffMs = dateOne.getTime() - dateTwo.getTime()
+        const diffSeconds = Math.floor(diffMs / 1000)
+
+        return {
+            seconds: diffSeconds,
+            miliseconds: diffMs
+        }
+    }
+
 
     //Password
 
