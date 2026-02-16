@@ -2,8 +2,9 @@ import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { HelperService } from "src/common/helper/service/helper.service";
 import { EnumUserLoginWith, User } from "src/generated/prisma/client";
 import { AuthUtil } from "../utils/auth.utils";
-import { IAuthAccessTokenGenerate, IAuthAccessTokenPayload, IAuthRefreshTokenGenerate, IAuthRefreshTokenPayload } from "../interfaces/auth.interface";
+import { IAuthAccessTokenGenerate, IAuthAccessTokenPayload, IAuthRefreshTokenGenerate, IAuthRefreshTokenPayload, IAuthSocialPayload } from "../interfaces/auth.interface";
 import { SessionService } from "src/modules/session/service/session.service";
+import { AuthTokenResponseDto } from "../dto/response/auth.response.token.dto";
 
 
 
@@ -48,7 +49,7 @@ export class AuthService {
   refreshTokens(
     user: User,
     refreshTokenFromRequest: string
-  ) {
+  ): IAuthRefreshTokenGenerate {
 
     const {
       sessionId,
@@ -81,12 +82,38 @@ export class AuthService {
     //Tính thời gian còn lại của refresh token cũ
     const today = this.helperService.dateCreate()
 
-    // const expiredAt = this.helperService.dateCreateFromTimestamp(
-    //   oldExp * 1000
-    // )
+    const expiredAt = this.helperService.dateCreateFromTimestamp(
+      oldExp! * 1000
+    )
 
-    //const newRefreshTokenExpired = this.helperService.d    
+    const newRefreshTokenExpired = this.helperService.dateDriff(
+      expiredAt,
+      today
+    )
 
+    const newRefreshTokenExpireInseconds =
+      newRefreshTokenExpired && newRefreshTokenExpired.seconds ?
+        newRefreshTokenExpired.seconds : Math.floor(newRefreshTokenExpired.miliseconds / 1000)
+
+    const newRefreshToken: string = this.authUtil.createRefreshTokens(
+      jti,
+      newpayloadRefreshToken,
+      newRefreshTokenExpireInseconds,
+    )
+
+    const tokens: AuthTokenResponseDto = {
+      tokenType: this.authUtil.jwtPrefix,
+      expiredIn: this.authUtil.jwtAccessTokenExpirationTimeInSeconds,
+      accessToken,
+      refreshToken: newRefreshToken
+    }
+
+    return {
+      tokens,
+      jti,
+      sessionId,
+      expiredInMs: newRefreshTokenExpired.miliseconds
+    }
 
   }
 
@@ -124,6 +151,39 @@ export class AuthService {
     return payload
   }
 
+  async validateJwtRefreshStrategy(
+    payload: IAuthRefreshTokenPayload
+  ): Promise<IAuthRefreshTokenPayload> {
+
+    const { userId, sessionId, jti } = payload
+
+    if (!userId || !sessionId || !jti) {
+      throw new UnauthorizedException({
+        message: "Invalid refresh token payload"
+      })
+    }
+
+    const session = await this.sessionService.getLogin(
+      userId,
+      sessionId,
+    )
+
+
+    if (!session) {
+      throw new UnauthorizedException({
+        message: "Refresh token invalid"
+      })
+    }
+
+    if (session.jti !== payload.jti) {
+      throw new UnauthorizedException({
+        message: "Refresh token tampered"
+      })
+    }
+
+    return payload
+  }
+
   async validateJwtAccessGuard(
     err: Error,
     user: IAuthAccessTokenPayload,
@@ -141,4 +201,46 @@ export class AuthService {
     return user
   }
 
+  async validateJwtRefreshGuard(
+    err: Error,
+    user: IAuthRefreshTokenPayload,
+    info: Error,
+  ): Promise<IAuthRefreshTokenPayload> {
+
+    console.log(err)
+    if (err || !user) {
+      throw new UnauthorizedException({
+        message: "Refresh token invalid",
+        error: err?.message || info?.message || "Unknow error"
+      })
+    }
+
+    return user
+  }
+
+  async validateOAuthGoogleGuard(request: any): Promise<boolean> {
+    const requestHeaders = this.authUtil.extractHeaderGoogle(request);
+
+    if (requestHeaders.length !== 2) {
+      throw new UnauthorizedException({
+        message: 'Google token required',
+      });
+    }
+
+    try {
+      const payload = await this.authUtil.verifyGoogle(requestHeaders[1]);
+
+      request.user = {
+        email: payload.email,
+        emailVerified: payload.email_verified,
+      } as IAuthSocialPayload;
+
+      return true;
+    } catch (err: unknown) {
+      console.log(err)
+      throw new UnauthorizedException({
+        message: 'Invalid Google token',
+      });
+    }
+  }
 }

@@ -9,4 +9,7 @@ export interface ISessionCreate {
 
 export interface ISessionGetLogin {
     jti: string
+    expiredAt: Date
+    ipAddress?: string
+    userAgent?: string
 }

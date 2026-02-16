@@ -1,10 +1,15 @@
 import { applyDecorators, createParamDecorator, ExecutionContext, UseGuards } from "@nestjs/common";
-import { AuthJwtAccessGuard } from "../guards/auth.jwt.access.guards";
+import { AuthJwtAccessGuard } from "../guards/jwt/auth.jwt.access.guards";
+import { AuthJwtRefreshGuard } from "../guards/jwt/auth.jwt.refresh.guards";
 
 
 //Bảo vệ route với access token
 export function AuthJwtAccessProtected(): MethodDecorator {
     return applyDecorators(UseGuards(AuthJwtAccessGuard))
+}
+
+export function AuthJwtRefreshProtected(): MethodDecorator {
+    return applyDecorators(UseGuards(AuthJwtRefreshGuard))
 }
 
 export const AuthJwtPayload = createParamDecorator(

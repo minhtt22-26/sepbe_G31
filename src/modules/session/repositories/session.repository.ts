@@ -24,10 +24,65 @@ export class SessionRepository {
                 userId,
                 isRevoked: false,
                 expiredAt: { gte: new Date() }
+            },
+            select: {
+                jti: true,
+                expiredAt: true
             }
         })
     }
 
+    async updateLogin(data: ISessionCreate): Promise<void> {
+        await this.prisma.session.update({
+            where: {
+                id: data.id,
+                userId: data.userId,
+            },
+            data: {
+                jti: data.jti,
+                ipAddress: data.ipAddress,
+                userAgent: data.userAgent,
+                expiredAt: data.expiredAt
+            }
+        })
+    }
+
+    async findAll(
+        userId: number
+    ): Promise<Session[]> {
+        return this.prisma.session.findMany({
+            where: {
+                userId,
+                isRevoked: false,
+                expiredAt: { gte: new Date() }
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        })
+    }
+
+    async revoke(
+      userId: number,
+      sessionId: string,
+      requestLog: {
+        ipAddress: string,
+        userAgent: string,
+      }  
+    ): Promise<Session> {
+        return this.prisma.session.update({
+            where: {
+                id: sessionId,
+                userId,
+            },
+            data: {
+                isRevoked: true,
+                revokedAt: new Date(),
+                ipAddress: requestLog.ipAddress,
+                userAgent: requestLog.userAgent, 
+            }
+        })
+    }
 }
 
 

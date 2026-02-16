@@ -14,10 +14,10 @@ export class UserSignUpRequestDto {
     @MaxLength(20)
     userName?: string
 
-    @IsNotEmpty()
+    @IsOptional()
     @IsString()
     @IsPhoneNumber()
-    phone: string
+    phone?: string
 
     @IsOptional()
     @IsString()

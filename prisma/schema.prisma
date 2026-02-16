@@ -137,7 +137,7 @@ model User {
   avatar          String?
   fullName        String
   userName        String?            @unique
-  phone           String             @unique
+  phone           String?             @unique
   role            EnumUserRole
   status          EnumUserStatus     @default(ACTIVE)
   email           String?            @unique
@@ -226,7 +226,8 @@ model WorkerProfile {
   userId Int @unique
 
   occupationId Int?
-
+  shift EnumShift?
+  
   address  String?
   province String?
   district String?

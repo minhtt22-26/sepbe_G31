@@ -45,3 +45,16 @@ export class IAuthPassword {
     passwordCreated: Date
     passwordPeriodExpired: Date
 }
+
+export interface IForgotPasswordCreate {
+  token: string;
+  expiredAt: Date;
+  link: string;
+  expiredInMinutes: number;
+  resendInMinutes: number;
+}
+
+export interface IAuthSocialPayload {
+    email: string;
+    emailVerified: boolean;
+}

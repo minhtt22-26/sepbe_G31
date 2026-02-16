@@ -29,6 +29,13 @@ export interface IAuthConfig {
         periodInSeconds: number; //không được tái sử dụng mật khẩu cũ"  khoảng tối thiểu giữa các lần thay mật khẩu
     }
 
+    forgotPassword: {
+        tokenLength: number,
+        expiredInMinutes: number,
+        resendInMinutes: number,
+        baseUrl: string,
+    }
+
     google: {
         header: string,
         prefix: string,
@@ -68,9 +75,18 @@ export default registerAs(
             periodInSeconds: ms('90d') / 1000 //90
         },
 
+        forgotPassword: {
+            tokenLength: 32,
+            expiredInMinutes: ms("15m") / 1000,
+            resendInMinutes: ms('5m') / 1000,
+            baseUrl: process.env.FORGOT_PASSWORD_BASE_URL as string,
+        },
+
         google: {
             header: "Authorization",
-            prefix: 'Bearer'
+            prefix: 'Bearer',
+            clientId: process.env.AUTH_SOCIAL_GOOGLE_CLIENT_ID,
+            clientSecret: process.env.AUTH_SOCIAL_GOOGLE_CLIENT_SECRET,
         }
     })
 ) 

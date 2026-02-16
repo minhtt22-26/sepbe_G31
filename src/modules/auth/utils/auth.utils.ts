@@ -1,10 +1,11 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { EnumUserLoginWith, User } from "src/generated/prisma/client";
-import { IAuthAccessTokenPayload, IAuthPassword, IAuthRefreshTokenPayload } from "../interfaces/auth.interface";
+import { IAuthAccessTokenPayload, IAuthPassword, IAuthRefreshTokenPayload, IForgotPasswordCreate } from "../interfaces/auth.interface";
 import { JwtService, JwtSignOptions } from "@nestjs/jwt";
 import { HelperService } from "src/common/helper/service/helper.service";
 import { Algorithm } from "jsonwebtoken";
+import { LoginTicket, OAuth2Client, TokenPayload } from "google-auth-library";
 
 @Injectable()
 export class AuthUtil {
@@ -31,7 +32,16 @@ export class AuthUtil {
     private readonly passwordExpiredTemporaryInSeconds: number;
     private readonly passwordPeriodInSeconds: number;
 
+    //Forgot password
+    private readonly forgotPasswordTokenLength: number;
+    private readonly forgotPasswordExpiredInSecond: number;
+    private readonly forgotPasswordResendInSecond: number;
+    private readonly forgotPasswordBaseUrl: string;
 
+    //Google
+    private readonly googleClient: OAuth2Client;
+    private readonly googleHeader: string;
+    private readonly googlePrefix: string;
 
     constructor(
         private readonly jwtService: JwtService,
@@ -56,6 +66,20 @@ export class AuthUtil {
         this.passwordExpiredInSeconds = this.configService.get<number>('auth.password.expiredSeconds')!
         this.passwordExpiredTemporaryInSeconds = this.configService.get<number>('auth.password.expiredTemporaryInSeconds')!
         this.passwordPeriodInSeconds = this.configService.get<number>('auth.password.periodInSeconds')!
+
+        //forgot password
+        this.forgotPasswordTokenLength = this.configService.get<number>('auth.forgotPassword.tokenLength')!
+        this.forgotPasswordExpiredInSecond = this.configService.get<number>('auth.forgotPassword.expiredInMinutes')!
+        this.forgotPasswordResendInSecond = this.configService.get<number>('auth.forgotPassword.resendInMinutes')!
+        this.forgotPasswordBaseUrl = this.configService.get<string>('auth.forgotPassword.baseUrl')!
+    
+        // Google
+        this.googleHeader = this.configService.get<string>('auth.google.header')!;
+        this.googlePrefix = this.configService.get<string>('auth.google.prefix')!;
+        this.googleClient = new OAuth2Client(
+            this.configService.get<string>('auth.google.clientId'),
+            this.configService.get<string>('auth.google.clientSecret')
+        );
     }
 
     //JWT
@@ -107,11 +131,12 @@ export class AuthUtil {
 
     createRefreshTokens(
         jti: string,
-        payload: IAuthRefreshTokenPayload
+        payload: IAuthRefreshTokenPayload,
+        expiresIn?: number
     ): string {
         return this.jwtService.sign(payload, {
             secret: this.jwtRefreshTokenSecret,
-            expiresIn: this.jwtRefreshTokenExpirationTimeInSeconds,
+            expiresIn: expiresIn ?? this.jwtRefreshTokenExpirationTimeInSeconds,
             audience: this.jwtAudience,
             issuer: this.jwtIssuer,
             algorithm: this.jwtRefreshTokenAlgorithm,
@@ -173,4 +198,44 @@ export class AuthUtil {
         return today > passwordExpired
     }
 
+    //Forgot password
+    createForgotPasswordToken(): string {
+        return this.helperService.randomString(this.forgotPasswordTokenLength);
+    }
+
+    createForgotPassword(): IForgotPasswordCreate {
+        const token = this.createForgotPasswordToken();
+        const today = this.helperService.dateCreate();
+        const expiredAt = this.helperService.dateForward(
+            today,
+            this.helperService.dateCreateDuration({ seconds: this.forgotPasswordExpiredInSecond })
+        );
+
+        return {
+            token,
+            expiredAt,
+            link: `${this.forgotPasswordBaseUrl}?token=${token}`,
+            expiredInMinutes: this.forgotPasswordExpiredInSecond,
+            resendInMinutes: this.forgotPasswordResendInSecond,
+        };
+    }
+
+    get forgotPasswordResendMinutes(): number {
+        return this.forgotPasswordResendInSecond;
+    }
+
+    extractHeaderGoogle(request: any): string[] {
+    return (
+        (request.headers[this.googleHeader?.toLowerCase()] as string)?.split(
+            `${this.googlePrefix} `
+        ) ?? []
+    );
+}
+
+    async verifyGoogle(token: string): Promise<TokenPayload> {
+        const login: LoginTicket = await this.googleClient.verifyIdToken({
+            idToken: token,
+        });
+        return login.getPayload()!;
+    }
 }

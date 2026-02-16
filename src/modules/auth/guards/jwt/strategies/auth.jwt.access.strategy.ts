@@ -2,9 +2,9 @@ import { Injectable } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { ConfigService } from "@nestjs/config";
 import { ExtractJwt, Strategy } from "passport-jwt";
-import { AuthJwtAccessGuardKey } from "../../constants/auth.constant";
-import { AuthService } from "../../service/auth.service";
-import { IAuthAccessTokenPayload } from "../../interfaces/auth.interface";
+import { AuthJwtAccessGuardKey } from "../../../constants/auth.constant";
+import { AuthService } from "../../../service/auth.service";
+import { IAuthAccessTokenPayload } from "../../../interfaces/auth.interface";
 
 @Injectable()
 export class AuthJwtAccessStrategy extends PassportStrategy(
@@ -17,9 +17,7 @@ export class AuthJwtAccessStrategy extends PassportStrategy(
         private readonly authService: AuthService,
     ) {
         super({
-            jwtFromRequest: ExtractJwt.fromAuthHeaderWithScheme(
-                configService.get<string>("auth.jwt.prefix")!
-            ),
+            jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
             ignoreExpiration: false,
             secretOrKey: configService.get<string>('auth.jwt.accessToken.secret')!,
             jsonWebTokenOptions: {

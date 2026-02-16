@@ -1,16 +1,21 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { UserRepository } from "../repositories/user.repository";
 import { UserSignUpRequestDto } from "../dtos/request/user.sign-up.request.dto";
 import { AuthUtil } from "src/modules/auth/utils/auth.utils";
 import { UserLoginRequestDto } from "../dtos/request/user.login.request.dto";
 import { UserLoginResponseDto } from "../dtos/response/user.login.response.dto";
-import { EnumUserLoginWith, EnumUserStatus } from "src/generated/prisma/enums";
+import { EnumUserLoginWith, EnumUserRole, EnumUserStatus } from "src/generated/prisma/enums";
 import { User } from "src/generated/prisma/client";
 import { AuthTokenResponseDto } from "src/modules/auth/dto/response/auth.response.token.dto";
 import { AuthService } from "src/modules/auth/service/auth.service";
 import { HelperService } from "src/common/helper/service/helper.service";
 import { SessionService } from "src/modules/session/service/session.service";
 import { WorkerProfileRequestDto } from "../dtos/request/user.profile.request.dto";
+import { IAuthRefreshTokenPayload } from "src/modules/auth/interfaces/auth.interface";
+import { ISessionCreate } from "src/modules/session/interfaces/session.interface";
+import { ForgotPasswordRequestDto } from "src/modules/auth/dto/request/forgot-password.request.dto";
+import { ResetPasswordRequestDto } from "src/modules/auth/dto/request/reset-password.request.dto";
+import { EmailService } from "src/modules/email/service/email.service";
 
 @Injectable()
 export class UserService {
@@ -20,7 +25,12 @@ export class UserService {
         private readonly helperService: HelperService,
         private readonly userRepository: UserRepository,
         private readonly sessionService: SessionService,
+        private readonly emailService: EmailService,
     ) { }
+
+    async findOneById(userId: number): Promise<User | null> {
+        return this.userRepository.findOneById(userId)
+    }
 
     async signUp(
         {
@@ -177,6 +187,169 @@ export class UserService {
 
         //        await this.userRepository.createProfile(user.id, { ...profile })
 
+    }
+
+    async refreshToken(
+        user: User,
+        refreshToken: string,
+        requestLog: {
+            ipAddress: string,
+            userAgent: string
+        }
+    ): Promise<AuthTokenResponseDto> {
+        const {
+            sessionId,
+            userId,
+            jti: oldJti,
+            //loginWith,
+        } = this.authUtil.payloadToken<IAuthRefreshTokenPayload>(refreshToken)
+
+        // Validate session exists and jti matches
+        const session = await this.sessionService.getLogin(userId, sessionId)
+        if (!session) {
+            throw new UnauthorizedException({
+                message: "Session not found or expired"
+            })
+        }
+
+        if (session.jti !== oldJti) {
+            throw new UnauthorizedException({
+                message: "Refresh token invalid or tampered"
+            })
+        }
+
+        // Generate new tokens
+        const {
+            jti: newJti,
+            tokens,
+            //expiredInMs,
+        } = this.authService.refreshTokens(user, refreshToken)
+
+        // Update session with new jti, ipAddress, userAgent in database
+        await Promise.all([
+            this.sessionService.updateLogin(
+                {
+                    userId,
+                    id: sessionId,
+                    jti: newJti,
+                    ipAddress: requestLog.ipAddress,
+                    userAgent: requestLog.userAgent
+                } as ISessionCreate
+            ),
+            this.userRepository.updateLastActivity(user.id)
+        ])
+
+        return tokens
+    }
+
+    async forgotPassword(
+        { email }: ForgotPasswordRequestDto,
+        requestLog: {
+            ipAddress: string;
+            userAgent: string
+        }
+    ): Promise<void> {
+        console.log(requestLog)
+        const user = await this.userRepository.findUserWithByEmail(email);
+
+        if (!user) {
+            throw new UnauthorizedException({
+                message: "User not found with this email"
+            })
+        }
+
+        const lastRequest = await this.userRepository.findLatestForgotPasswordRequest(user.id);
+        if (lastRequest) {
+            const now = this.helperService.dateCreate();
+            const canResendAt = this.helperService.dateForward(
+                lastRequest.createdAt,
+                this.helperService.dateCreateDuration({ seconds: this.authUtil.forgotPasswordResendMinutes })
+            );
+
+            if (now < canResendAt) {
+                throw new BadRequestException({
+                    message: 'Please wait before requesting another reset email',
+                });
+            }
+        }
+
+        const forgotPassword = this.authUtil.createForgotPassword();
+
+        await this.userRepository.createForgotPasswordToken(
+            user.id,
+            forgotPassword.token,
+            forgotPassword.expiredAt
+        );
+
+        // TODO: Gửi email chứa link reset password
+        await this.emailService.sendForgotPasswordEmail(
+            user.email!,
+            forgotPassword.link,
+            user.fullName
+        );
+
+    }
+
+    async resetPassword(
+        { token, newPassword }: ResetPasswordRequestDto,
+        requestLog: { ipAddress: string; userAgent: string }
+    ): Promise<void> {
+        console.log(requestLog)
+        const tokenRecord = await this.userRepository.findValidForgotPasswordToken(token);
+
+        if (!tokenRecord) {
+            throw new BadRequestException({
+                message: 'Invalid or expired reset token',
+            });
+        }
+
+        // Hash password mới
+        const password = this.authUtil.createPassword(newPassword);
+
+        // Update password
+        await this.userRepository.updatePassword(
+            tokenRecord.userId,
+            password.passwordHash,
+            password.passwordExpired,
+            password.passwordCreated
+        );
+
+        // Mark token là đã sử dụng
+        await this.userRepository.markForgotPasswordTokenUsed(tokenRecord.id);
+
+        // Revoke tất cả sessions (logout tất cả devices)
+        // await this.sessionService.revokeAllByUser(tokenRecord.userId);
+    }
+
+    async loginWithSocial(
+        email: string,
+        loginWith: EnumUserLoginWith,
+        body: {
+            fullName?: string,
+            role: EnumUserRole
+        },
+        requestLog: { ipAddress: string; userAgent: string }
+    ): Promise<UserLoginResponseDto> {
+        let user = await this.userRepository.findUserWithByEmail(email);
+
+        // Nếu user không tồn tại, tạo mới
+        if (!user) {
+            user = await this.userRepository.createBySocial(
+                email,
+                body.fullName,
+                loginWith,
+                this.helperService.dateCreate(),
+                body.role,
+            );
+        }
+
+        if (user.status !== EnumUserStatus.ACTIVE) {
+            throw new ForbiddenException({
+                message: 'Inactive account',
+            });
+        }
+
+        return this.handleLogin(user, loginWith, requestLog);
     }
 
 }
