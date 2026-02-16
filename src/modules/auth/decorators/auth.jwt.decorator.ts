@@ -1,6 +1,6 @@
 import { applyDecorators, createParamDecorator, ExecutionContext, UseGuards } from "@nestjs/common";
-import { AuthJwtAccessGuard } from "../guards/auth.jwt.access.guards";
-import { AuthJwtRefreshGuard } from "../guards/auth.jwt.refresh.guards";
+import { AuthJwtAccessGuard } from "../guards/jwt/auth.jwt.access.guards";
+import { AuthJwtRefreshGuard } from "../guards/jwt/auth.jwt.refresh.guards";
 
 
 //Bảo vệ route với access token

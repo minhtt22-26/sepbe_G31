@@ -2,14 +2,14 @@ import { Injectable } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { ConfigService } from "@nestjs/config";
 import { ExtractJwt, Strategy } from "passport-jwt";
-import { AuthJwtAccessGuardKey } from "../../constants/auth.constant";
-import { AuthService } from "../../service/auth.service";
-import { IAuthAccessTokenPayload } from "../../interfaces/auth.interface";
+import { AuthJwtRefreshGuardKey } from "../../../constants/auth.constant";
+import { AuthService } from "../../../service/auth.service";
+import { IAuthAccessTokenPayload, IAuthRefreshTokenPayload } from "../../../interfaces/auth.interface";
 
 @Injectable()
-export class AuthJwtAccessStrategy extends PassportStrategy(
+export class AuthJwtRefreshStrategy extends PassportStrategy(
     Strategy,
-    AuthJwtAccessGuardKey
+    AuthJwtRefreshGuardKey
 ) {
 
     constructor(
@@ -19,7 +19,7 @@ export class AuthJwtAccessStrategy extends PassportStrategy(
         super({
             jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
             ignoreExpiration: false,
-            secretOrKey: configService.get<string>('auth.jwt.accessToken.secret')!,
+            secretOrKey: configService.get<string>('auth.jwt.refreshToken.secret')!,
             jsonWebTokenOptions: {
                 ignoreNotBefore: false,
                 audience: configService.get<string>("auth.jwt.audience"),
@@ -28,8 +28,8 @@ export class AuthJwtAccessStrategy extends PassportStrategy(
         })
     }
 
-    validate(payload: IAuthAccessTokenPayload): Promise<IAuthAccessTokenPayload> {
-        return this.authService.validateJwtAccessStrategy(payload)
+    validate(payload: IAuthRefreshTokenPayload): Promise<IAuthRefreshTokenPayload> {
+        return this.authService.validateJwtRefreshStrategy(payload)
     }
 
 }

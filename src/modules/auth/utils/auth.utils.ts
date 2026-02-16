@@ -5,6 +5,7 @@ import { IAuthAccessTokenPayload, IAuthPassword, IAuthRefreshTokenPayload, IForg
 import { JwtService, JwtSignOptions } from "@nestjs/jwt";
 import { HelperService } from "src/common/helper/service/helper.service";
 import { Algorithm } from "jsonwebtoken";
+import { LoginTicket, OAuth2Client, TokenPayload } from "google-auth-library";
 
 @Injectable()
 export class AuthUtil {
@@ -37,6 +38,10 @@ export class AuthUtil {
     private readonly forgotPasswordResendInSecond: number;
     private readonly forgotPasswordBaseUrl: string;
 
+    //Google
+    private readonly googleClient: OAuth2Client;
+    private readonly googleHeader: string;
+    private readonly googlePrefix: string;
 
     constructor(
         private readonly jwtService: JwtService,
@@ -67,6 +72,14 @@ export class AuthUtil {
         this.forgotPasswordExpiredInSecond = this.configService.get<number>('auth.forgotPassword.expiredInMinutes')!
         this.forgotPasswordResendInSecond = this.configService.get<number>('auth.forgotPassword.resendInMinutes')!
         this.forgotPasswordBaseUrl = this.configService.get<string>('auth.forgotPassword.baseUrl')!
+    
+        // Google
+        this.googleHeader = this.configService.get<string>('auth.google.header')!;
+        this.googlePrefix = this.configService.get<string>('auth.google.prefix')!;
+        this.googleClient = new OAuth2Client(
+            this.configService.get<string>('auth.google.clientId'),
+            this.configService.get<string>('auth.google.clientSecret')
+        );
     }
 
     //JWT
@@ -209,5 +222,20 @@ export class AuthUtil {
 
     get forgotPasswordResendMinutes(): number {
         return this.forgotPasswordResendInSecond;
+    }
+
+    extractHeaderGoogle(request: any): string[] {
+    return (
+        (request.headers[this.googleHeader?.toLowerCase()] as string)?.split(
+            `${this.googlePrefix} `
+        ) ?? []
+    );
+}
+
+    async verifyGoogle(token: string): Promise<TokenPayload> {
+        const login: LoginTicket = await this.googleClient.verifyIdToken({
+            idToken: token,
+        });
+        return login.getPayload()!;
     }
 }

@@ -4,7 +4,7 @@ import { UserSignUpRequestDto } from "../dtos/request/user.sign-up.request.dto";
 import { AuthUtil } from "src/modules/auth/utils/auth.utils";
 import { UserLoginRequestDto } from "../dtos/request/user.login.request.dto";
 import { UserLoginResponseDto } from "../dtos/response/user.login.response.dto";
-import { EnumUserLoginWith, EnumUserStatus } from "src/generated/prisma/enums";
+import { EnumUserLoginWith, EnumUserRole, EnumUserStatus } from "src/generated/prisma/enums";
 import { User } from "src/generated/prisma/client";
 import { AuthTokenResponseDto } from "src/modules/auth/dto/response/auth.response.token.dto";
 import { AuthService } from "src/modules/auth/service/auth.service";
@@ -317,6 +317,37 @@ export class UserService {
 
         // Revoke tất cả sessions (logout tất cả devices)
         // await this.sessionService.revokeAllByUser(tokenRecord.userId);
+    }
+
+    async loginWithSocial(
+        email: string,
+        loginWith: EnumUserLoginWith,
+        body: {
+            fullName?: string,
+            role: EnumUserRole
+        },
+        requestLog: { ipAddress: string; userAgent: string }
+    ): Promise<UserLoginResponseDto> {
+        let user = await this.userRepository.findUserWithByEmail(email);
+
+        // Nếu user không tồn tại, tạo mới
+        if (!user) {
+            user = await this.userRepository.createBySocial(
+                email,
+                body.fullName,
+                loginWith,
+                this.helperService.dateCreate(),
+                body.role,
+            );
+        }
+
+        if (user.status !== EnumUserStatus.ACTIVE) {
+            throw new ForbiddenException({
+                message: 'Inactive account',
+            });
+        }
+
+        return this.handleLogin(user, loginWith, requestLog);
     }
 
 }

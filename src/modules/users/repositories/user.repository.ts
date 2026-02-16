@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { EnumUserLoginWith, Prisma, TokenType, User } from "src/generated/prisma/client";
+import { EnumUserLoginWith, EnumUserRole, EnumUserStatus, Prisma, TokenType, User } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma.service";
 import { UserSignUpRequestDto } from "../dtos/request/user.sign-up.request.dto";
 import { IAuthPassword } from "src/modules/auth/interfaces/auth.interface";
@@ -154,7 +154,7 @@ export class UserRepository {
         });
 
         console.log('Token expiredAt:', tokenRecord?.expiredAt?.toISOString());
-    console.log('Is expired?:', tokenRecord?.expiredAt ? tokenRecord.expiredAt < today : 'no token');
+        console.log('Is expired?:', tokenRecord?.expiredAt ? tokenRecord.expiredAt < today : 'no token');
         return tokenRecord;
     }
 
@@ -194,5 +194,22 @@ export class UserRepository {
         });
     }
 
-
+    async createBySocial(
+        email: string,
+        fullName: string | undefined,
+        loginWith: EnumUserLoginWith,
+        lastLoginAt: Date,
+        role: EnumUserRole,
+    ): Promise<User> {
+        return this.prisma.user.create({
+            data: {
+                email,
+                fullName: fullName || email.split('@')[0],
+                status: EnumUserStatus.ACTIVE,
+                loginWith,
+                lastLoginAt,
+                role,
+            },
+        });
+    }
 }

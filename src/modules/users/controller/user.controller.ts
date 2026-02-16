@@ -9,6 +9,9 @@ import type { IAuthRefreshTokenPayload } from "src/modules/auth/interfaces/auth.
 import { AuthTokenResponseDto } from "src/modules/auth/dto/response/auth.response.token.dto";
 import { ResetPasswordRequestDto } from "src/modules/auth/dto/request/reset-password.request.dto";
 import { ForgotPasswordRequestDto } from "src/modules/auth/dto/request/forgot-password.request.dto";
+import { AuthSocialGoogleProtected } from "src/modules/auth/decorators/auth.social.decorator";
+import { UserCreateSocialRequestDto } from "../dtos/request/user.create-social.request.dto";
+import { EnumUserLoginWith } from "src/generated/prisma/enums";
 
 @Controller('user')
 export class UserController {
@@ -90,6 +93,24 @@ export class UserController {
         return {
             message: 'Password has been reset successfully.',
         };
+    }
+
+    @Post('login/social/google')
+    @AuthSocialGoogleProtected()
+    async loginWithGoogle(
+        @AuthJwtPayload('email') email: string,
+        @Body() body: UserCreateSocialRequestDto,
+        @Req() req: Request,
+    ): Promise<UserLoginResponseDto> {
+        return this.userService.loginWithSocial(
+            email,
+            EnumUserLoginWith.SOCIAL_GOOGLE,
+            body,
+            {
+                ipAddress: req.ip ?? 'unknown',
+                userAgent: req.headers['user-agent'] ?? 'unknown',
+            }
+        );
     }
 
 }

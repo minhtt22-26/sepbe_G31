@@ -84,7 +84,9 @@ export default registerAs(
 
         google: {
             header: "Authorization",
-            prefix: 'Bearer'
+            prefix: 'Bearer',
+            clientId: process.env.AUTH_SOCIAL_GOOGLE_CLIENT_ID,
+            clientSecret: process.env.AUTH_SOCIAL_GOOGLE_CLIENT_SECRET,
         }
     })
 ) 

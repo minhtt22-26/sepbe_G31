@@ -53,3 +53,8 @@ export interface IForgotPasswordCreate {
   expiredInMinutes: number;
   resendInMinutes: number;
 }
+
+export interface IAuthSocialPayload {
+    email: string;
+    emailVerified: boolean;
+}
