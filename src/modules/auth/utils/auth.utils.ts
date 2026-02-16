@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { EnumUserLoginWith, User } from "src/generated/prisma/client";
-import { IAuthAccessTokenPayload, IAuthPassword, IAuthRefreshTokenPayload } from "../interfaces/auth.interface";
+import { IAuthAccessTokenPayload, IAuthPassword, IAuthRefreshTokenPayload, IForgotPasswordCreate } from "../interfaces/auth.interface";
 import { JwtService, JwtSignOptions } from "@nestjs/jwt";
 import { HelperService } from "src/common/helper/service/helper.service";
 import { Algorithm } from "jsonwebtoken";
@@ -31,6 +31,11 @@ export class AuthUtil {
     private readonly passwordExpiredTemporaryInSeconds: number;
     private readonly passwordPeriodInSeconds: number;
 
+    //Forgot password
+    private readonly forgotPasswordTokenLength: number;
+    private readonly forgotPasswordExpiredInSecond: number;
+    private readonly forgotPasswordResendInSecond: number;
+    private readonly forgotPasswordBaseUrl: string;
 
 
     constructor(
@@ -56,6 +61,12 @@ export class AuthUtil {
         this.passwordExpiredInSeconds = this.configService.get<number>('auth.password.expiredSeconds')!
         this.passwordExpiredTemporaryInSeconds = this.configService.get<number>('auth.password.expiredTemporaryInSeconds')!
         this.passwordPeriodInSeconds = this.configService.get<number>('auth.password.periodInSeconds')!
+
+        //forgot password
+        this.forgotPasswordTokenLength = this.configService.get<number>('auth.forgotPassword.tokenLength')!
+        this.forgotPasswordExpiredInSecond = this.configService.get<number>('auth.forgotPassword.expiredInMinutes')!
+        this.forgotPasswordResendInSecond = this.configService.get<number>('auth.forgotPassword.resendInMinutes')!
+        this.forgotPasswordBaseUrl = this.configService.get<string>('auth.forgotPassword.baseUrl')!
     }
 
     //JWT
@@ -174,4 +185,29 @@ export class AuthUtil {
         return today > passwordExpired
     }
 
+    //Forgot password
+    createForgotPasswordToken(): string {
+        return this.helperService.randomString(this.forgotPasswordTokenLength);
+    }
+
+    createForgotPassword(): IForgotPasswordCreate {
+        const token = this.createForgotPasswordToken();
+        const today = this.helperService.dateCreate();
+        const expiredAt = this.helperService.dateForward(
+            today,
+            this.helperService.dateCreateDuration({ seconds: this.forgotPasswordExpiredInSecond })
+        );
+
+        return {
+            token,
+            expiredAt,
+            link: `${this.forgotPasswordBaseUrl}?token=${token}`,
+            expiredInMinutes: this.forgotPasswordExpiredInSecond,
+            resendInMinutes: this.forgotPasswordResendInSecond,
+        };
+    }
+
+    get forgotPasswordResendMinutes(): number {
+        return this.forgotPasswordResendInSecond;
+    }
 }

@@ -10,11 +10,13 @@ import authConfig from './config/auth.config'
 import { UserModule } from './modules/users/user.module'
 import { CompanyModule } from './modules/company/company.module'
 import { NotificationsModule } from './modules/notifications/notifications.module'
+import { EmailModule } from './modules/email/email.module'
+import emailConfig from './config/email.config'
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, authConfig],
+      load: [appConfig, authConfig, emailConfig],
       validate: validateEnv,
     }),
     HealthModule,
@@ -23,7 +25,8 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     SessionModule,
     UserModule,
     CompanyModule,
-    NotificationsModule
+    NotificationsModule,
+    EmailModule,
   ],
   controllers: [],
   providers: [],

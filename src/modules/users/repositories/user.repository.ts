@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { EnumUserLoginWith, Prisma, User } from "src/generated/prisma/client";
+import { EnumUserLoginWith, Prisma, TokenType, User } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma.service";
 import { UserSignUpRequestDto } from "../dtos/request/user.sign-up.request.dto";
 import { IAuthPassword } from "src/modules/auth/interfaces/auth.interface";
@@ -121,5 +121,78 @@ export class UserRepository {
             }
         })
     }
+
+    async createForgotPasswordToken(
+        userId: number,
+        token: string,
+        expiredAt: Date
+    ): Promise<void> {
+        await this.prisma.verificationToken.create({
+            data: {
+                userId,
+                token,
+                type: TokenType.PASSWORD_RESET,
+                expiredAt,
+            },
+        });
+    }
+
+    async findValidForgotPasswordToken(token: string) {
+        const today = this.helperService.dateCreate();
+        console.log('Today:', today.toISOString());
+
+        const tokenRecord = await this.prisma.verificationToken.findFirst({
+            where: {
+                token,
+                type: TokenType.PASSWORD_RESET,
+                expiredAt: { gt: today },
+                usedAt: null,
+            },
+            include: {
+                user: true,
+            },
+        });
+
+        console.log('Token expiredAt:', tokenRecord?.expiredAt?.toISOString());
+    console.log('Is expired?:', tokenRecord?.expiredAt ? tokenRecord.expiredAt < today : 'no token');
+        return tokenRecord;
+    }
+
+    async findLatestForgotPasswordRequest(userId: number) {
+        return this.prisma.verificationToken.findFirst({
+            where: {
+                userId,
+                type: TokenType.PASSWORD_RESET,
+            },
+            orderBy: {
+                createdAt: 'desc',
+            },
+        });
+    }
+
+    async markForgotPasswordTokenUsed(tokenId: number): Promise<void> {
+        await this.prisma.verificationToken.update({
+            where: { id: tokenId },
+            data: { usedAt: new Date() },
+        });
+    }
+
+    async updatePassword(
+        userId: number,
+        passwordHash: string,
+        passwordExpired: Date,
+        passwordCreated: Date
+    ): Promise<void> {
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+                password: passwordHash,
+                passwordExpired,
+                passwordCreated,
+                passwordAttempt: 0,
+            },
+        });
+    }
+
 
 }

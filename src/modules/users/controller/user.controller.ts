@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req, UnauthorizedException } from "@nestjs/common";
+import { Body, Controller, Post, Put, Req, UnauthorizedException } from "@nestjs/common";
 import { UserService } from "../service/user.service";
 import { UserSignUpRequestDto } from "../dtos/request/user.sign-up.request.dto";
 import { UserLoginResponseDto } from "../dtos/response/user.login.response.dto";
@@ -7,6 +7,8 @@ import type { Request } from 'express';
 import { AuthJwtRefreshProtected, AuthJwtPayload, AuthJwtToken } from "src/modules/auth/decorators/auth.jwt.decorator";
 import type { IAuthRefreshTokenPayload } from "src/modules/auth/interfaces/auth.interface";
 import { AuthTokenResponseDto } from "src/modules/auth/dto/response/auth.response.token.dto";
+import { ResetPasswordRequestDto } from "src/modules/auth/dto/request/reset-password.request.dto";
+import { ForgotPasswordRequestDto } from "src/modules/auth/dto/request/forgot-password.request.dto";
 
 @Controller('user')
 export class UserController {
@@ -59,4 +61,35 @@ export class UserController {
         )
 
     }
+
+    @Post('forgot-password')
+    async forgotPassword(
+        @Body() body: ForgotPasswordRequestDto,
+        @Req() req: Request,
+    ): Promise<{ message: string }> {
+        await this.userService.forgotPassword(body, {
+            ipAddress: req.ip ?? 'unknown',
+            userAgent: req.headers['user-agent'] ?? 'unknown',
+        });
+
+        return {
+            message: 'If an account exists with this email, a reset link has been sent.',
+        };
+    }
+
+    @Put('reset-password')
+    async resetPassword(
+        @Body() body: ResetPasswordRequestDto,
+        @Req() req: Request,
+    ): Promise<{ message: string }> {
+        await this.userService.resetPassword(body, {
+            ipAddress: req.ip ?? 'unknown',
+            userAgent: req.headers['user-agent'] ?? 'unknown',
+        });
+
+        return {
+            message: 'Password has been reset successfully.',
+        };
+    }
+
 }

@@ -5,9 +5,10 @@ import { UserRepository } from "./repositories/user.repository";
 import { AuthModule } from "../auth/auth.module";
 import { HelperModule } from "src/common/helper/helper.module";
 import { SessionModule } from "../session/session.module";
+import { EmailModule } from "../email/email.module";
 
 @Module({
-    imports: [AuthModule, HelperModule, SessionModule],
+    imports: [AuthModule, HelperModule, SessionModule, EmailModule],
     controllers: [UserController],
     providers: [UserService, UserRepository],
     exports: [UserModule]

@@ -13,6 +13,9 @@ import { SessionService } from "src/modules/session/service/session.service";
 import { WorkerProfileRequestDto } from "../dtos/request/user.profile.request.dto";
 import { IAuthRefreshTokenPayload } from "src/modules/auth/interfaces/auth.interface";
 import { ISessionCreate } from "src/modules/session/interfaces/session.interface";
+import { ForgotPasswordRequestDto } from "src/modules/auth/dto/request/forgot-password.request.dto";
+import { ResetPasswordRequestDto } from "src/modules/auth/dto/request/reset-password.request.dto";
+import { EmailService } from "src/modules/email/service/email.service";
 
 @Injectable()
 export class UserService {
@@ -22,6 +25,7 @@ export class UserService {
         private readonly helperService: HelperService,
         private readonly userRepository: UserRepository,
         private readonly sessionService: SessionService,
+        private readonly emailService: EmailService,
     ) { }
 
     async findOneById(userId: number): Promise<User | null> {
@@ -236,6 +240,83 @@ export class UserService {
         ])
 
         return tokens
+    }
+
+    async forgotPassword(
+        { email }: ForgotPasswordRequestDto,
+        requestLog: {
+            ipAddress: string;
+            userAgent: string
+        }
+    ): Promise<void> {
+        const user = await this.userRepository.findUserWithByEmail(email);
+
+        if (!user) {
+            throw new UnauthorizedException({
+                message: "User not found with this email"
+            })
+        }
+
+        const lastRequest = await this.userRepository.findLatestForgotPasswordRequest(user.id);
+        if (lastRequest) {
+            const now = this.helperService.dateCreate();
+            const canResendAt = this.helperService.dateForward(
+                lastRequest.createdAt,
+                this.helperService.dateCreateDuration({ seconds: this.authUtil.forgotPasswordResendMinutes })
+            );
+
+            if (now < canResendAt) {
+                throw new BadRequestException({
+                    message: 'Please wait before requesting another reset email',
+                });
+            }
+        }
+
+        const forgotPassword = this.authUtil.createForgotPassword();
+
+        await this.userRepository.createForgotPasswordToken(
+            user.id,
+            forgotPassword.token,
+            forgotPassword.expiredAt
+        );
+
+        // TODO: Gửi email chứa link reset password
+        await this.emailService.sendForgotPasswordEmail(
+            user.email!,
+            forgotPassword.link,
+            user.fullName
+        );
+
+    }
+
+    async resetPassword(
+        { token, newPassword }: ResetPasswordRequestDto,
+        requestLog: { ipAddress: string; userAgent: string }
+    ): Promise<void> {
+        const tokenRecord = await this.userRepository.findValidForgotPasswordToken(token);
+
+        if (!tokenRecord) {
+            throw new BadRequestException({
+                message: 'Invalid or expired reset token',
+            });
+        }
+
+        // Hash password mới
+        const password = this.authUtil.createPassword(newPassword);
+
+        // Update password
+        await this.userRepository.updatePassword(
+            tokenRecord.userId,
+            password.passwordHash,
+            password.passwordExpired,
+            password.passwordCreated
+        );
+
+        // Mark token là đã sử dụng
+        await this.userRepository.markForgotPasswordTokenUsed(tokenRecord.id);
+
+        // Revoke tất cả sessions (logout tất cả devices)
+        // await this.sessionService.revokeAllByUser(tokenRecord.userId);
     }
 
 }
