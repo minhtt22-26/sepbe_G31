@@ -12,7 +12,7 @@ export class CompanyService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cloudinary: CloudinaryService,
-  ) {}
+  ) { }
 
   async findAll() {
     return this.prisma.company.findMany({
@@ -208,51 +208,51 @@ export class CompanyService {
     }
   }
   async update(
-  id: number,
-  body: UpdateCompanyDto,
-  files: any,
-  ownerId: number,
-) {
+    id: number,
+    body: UpdateCompanyDto,
+    files: any,
+    ownerId: number,
+  ) {
 
-  const company = await this.prisma.company.findUnique({
-    where: { id },
-  });
+    const company = await this.prisma.company.findUnique({
+      where: { id },
+    });
 
-  if (!company) {
-    throw new NotFoundException('Company not found');
+    if (!company) {
+      throw new NotFoundException('Company not found');
+    }
+
+    if (company.ownerId !== ownerId) {
+      throw new ForbiddenException('You are not allowed');
+    }
+
+    let logoUrl = company.logoUrl;
+    let businessLicenseUrl = company.businessLicenseUrl;
+
+    // nếu có upload file mới
+    if (files?.logo?.length) {
+      const uploadLogo = await this.cloudinary.uploadFile(files.logo[0], 'company/logo') as { secure_url: string };
+      logoUrl = uploadLogo.secure_url;
+    }
+
+    if (files?.businessLicense?.length) {
+      const uploadLicense = await this.cloudinary.uploadFile(
+        files.businessLicense[0],
+        'company/license',
+      ) as { secure_url: string };
+      businessLicenseUrl = uploadLicense.secure_url;
+    }
+
+    const { ...updateData } = body as any;
+
+    return this.prisma.company.update({
+      where: { id },
+      data: {
+        ...updateData,
+        logoUrl: logoUrl,
+        businessLicenseUrl: businessLicenseUrl,
+      },
+    });
   }
-
-  if (company.ownerId !== ownerId) {
-    throw new ForbiddenException('You are not allowed');
-  }
-
-  let logoUrl = company.logoUrl;
-  let businessLicenseUrl = company.businessLicenseUrl;
-
-  // nếu có upload file mới
-  if (files?.logo?.length) {
-    const uploadLogo = await this.cloudinary.uploadFile(files.logo[0], 'company/logo') as { secure_url: string };
-    logoUrl = uploadLogo.secure_url;
-  }
-
-  if (files?.businessLicense?.length) {
-    const uploadLicense = await this.cloudinary.uploadFile(
-      files.businessLicense[0],
-      'company/license',
-    ) as { secure_url: string };
-    businessLicenseUrl = uploadLicense.secure_url;
-  }
-
-  const { logo, businessLicense, ...updateData } = body as any;
-
-  return this.prisma.company.update({
-    where: { id },
-    data: {
-      ...updateData,
-      logoUrl: logoUrl,
-      businessLicenseUrl: businessLicenseUrl,
-    },
-  });
-}
 
 }

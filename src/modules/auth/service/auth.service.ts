@@ -237,6 +237,7 @@ export class AuthService {
 
       return true;
     } catch (err: unknown) {
+      console.log(err)
       throw new UnauthorizedException({
         message: 'Invalid Google token',
       });

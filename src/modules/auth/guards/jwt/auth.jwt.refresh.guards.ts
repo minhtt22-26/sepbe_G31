@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { AuthJwtRefreshGuardKey } from "../../constants/auth.constant";
 import { AuthService } from "../../service/auth.service";
-import { IAuthAccessTokenPayload, IAuthRefreshTokenPayload } from "../../interfaces/auth.interface";
+import { IAuthRefreshTokenPayload } from "../../interfaces/auth.interface";
 
 @Injectable()
 export class AuthJwtRefreshGuard extends

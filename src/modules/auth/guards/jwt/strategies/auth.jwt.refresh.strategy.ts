@@ -4,7 +4,7 @@ import { ConfigService } from "@nestjs/config";
 import { ExtractJwt, Strategy } from "passport-jwt";
 import { AuthJwtRefreshGuardKey } from "../../../constants/auth.constant";
 import { AuthService } from "../../../service/auth.service";
-import { IAuthAccessTokenPayload, IAuthRefreshTokenPayload } from "../../../interfaces/auth.interface";
+import { IAuthRefreshTokenPayload } from "../../../interfaces/auth.interface";
 
 @Injectable()
 export class AuthJwtRefreshStrategy extends PassportStrategy(

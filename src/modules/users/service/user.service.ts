@@ -201,7 +201,7 @@ export class UserService {
             sessionId,
             userId,
             jti: oldJti,
-            loginWith,
+            //loginWith,
         } = this.authUtil.payloadToken<IAuthRefreshTokenPayload>(refreshToken)
 
         // Validate session exists and jti matches
@@ -222,7 +222,7 @@ export class UserService {
         const {
             jti: newJti,
             tokens,
-            expiredInMs,
+            //expiredInMs,
         } = this.authService.refreshTokens(user, refreshToken)
 
         // Update session with new jti, ipAddress, userAgent in database
@@ -249,6 +249,7 @@ export class UserService {
             userAgent: string
         }
     ): Promise<void> {
+        console.log(requestLog)
         const user = await this.userRepository.findUserWithByEmail(email);
 
         if (!user) {
@@ -293,6 +294,7 @@ export class UserService {
         { token, newPassword }: ResetPasswordRequestDto,
         requestLog: { ipAddress: string; userAgent: string }
     ): Promise<void> {
+        console.log(requestLog)
         const tokenRecord = await this.userRepository.findValidForgotPasswordToken(token);
 
         if (!tokenRecord) {
