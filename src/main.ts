@@ -17,7 +17,8 @@ async function bootstrap() {
 
   const config = app.get(ConfigService)
 
-  const port = process.env.PORT || 4000
+  const port = Number(process.env.PORT) || 4000;
+
 
   const apiPrefix = config.get<string>('app.apiPrefix', 'api')
 
