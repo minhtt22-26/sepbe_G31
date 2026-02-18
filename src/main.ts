@@ -60,6 +60,6 @@ async function bootstrap() {
   SwaggerModule.setup(`${apiPrefix}/docs`, app, document)
   Logger.log(`🚀 API: http://localhost:${port}/${apiPrefix}`)
   Logger.log(`📘 Swagger: http://localhost:${port}/${apiPrefix}/docs`)
-  await app.listen(port)
+  await app.listen(port, '0.0.0.0');
 }
 bootstrap()
