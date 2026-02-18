@@ -17,8 +17,9 @@ class EnvironmentVariables {
   @IsEnum(NodeEnv)
   NODE_ENV: NodeEnv
 
+  @IsOptional()
   @IsNumber()
-  APP_PORT: number
+  APP_PORT?: number
 
   @IsString()
   APP_API_PREFIX: string
@@ -31,6 +32,7 @@ class EnvironmentVariables {
   @IsString()
   JWT_SECRET?: string
 }
+
 
 export function validateEnv(config: Record<string, unknown>) {
   const validatedConfig = plainToInstance(EnvironmentVariables, config, {
