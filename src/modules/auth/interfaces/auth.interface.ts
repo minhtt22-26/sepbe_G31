@@ -6,6 +6,7 @@ export interface IAuthAccessTokenGenerate {
         expiredIn: number,
         accessToken: string,
         refreshToken: string,
+        role ?: EnumUserRole
     }
     jti: string,
     sessionId: string,

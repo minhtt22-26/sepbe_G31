@@ -39,7 +39,8 @@ export class AuthService {
         tokenType: this.authUtil.jwtPrefix,
         expiredIn: this.authUtil.jwtAccessTokenExpirationTimeInSeconds,
         accessToken,
-        refreshToken
+        refreshToken,
+        role: user.role,
       },
       jti,
       sessionId

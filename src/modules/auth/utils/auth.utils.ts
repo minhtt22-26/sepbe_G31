@@ -225,12 +225,12 @@ export class AuthUtil {
     }
 
     extractHeaderGoogle(request: any): string[] {
-    return (
-        (request.headers[this.googleHeader?.toLowerCase()] as string)?.split(
-            `${this.googlePrefix} `
-        ) ?? []
-    );
-}
+        return (
+            (request.headers[this.googleHeader?.toLowerCase()] as string)?.split(
+                `${this.googlePrefix} `
+            ) ?? []
+        );
+    }
 
     async verifyGoogle(token: string): Promise<TokenPayload> {
         const login: LoginTicket = await this.googleClient.verifyIdToken({
