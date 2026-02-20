@@ -3,13 +3,24 @@ import { PrismaService } from 'src/prisma.service';
 
 @Injectable()
 export class RepositoryService {
-    constructor(private readonly prisma: PrismaService){}
+    constructor(private readonly prisma: PrismaService) { }
 
-    async searchJobs(where: any, orderBy: any, limit: number, offset: number){
+    async searchJobs(where: any, orderBy: any, limit: number, offset: number) {
         const [items, total] = await this.prisma.$transaction([
-            this.prisma.job.findMany({where, orderBy, take: limit, skip: offset}),
-            this.prisma.job.count({where})
+            this.prisma.job.findMany({
+                where, orderBy, take: limit, skip: offset,
+                include: {
+                    company: {
+                        select: {
+                            id: true,
+                            name: true,
+                            logoUrl: true
+                        }
+                    }
+                }
+            }),
+            this.prisma.job.count({ where })
         ])
-        return {items, total}
+        return { items, total }
     }
 }
