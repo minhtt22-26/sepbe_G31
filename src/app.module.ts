@@ -1,22 +1,18 @@
 import { Module } from '@nestjs/common'
-import { ConfigModule, ConfigService } from '@nestjs/config'
-import { CacheModule } from '@nestjs/cache-manager'
-import { redisStore } from 'cache-manager-redis-yet'
-
+import { ConfigModule } from '@nestjs/config'
 import { appConfig } from './config/app.config'
-import { validateEnv } from './config/validate-env'
-import authConfig from './config/auth.config'
-import emailConfig from './config/email.config'
-
 import { HealthModule } from './modules/health/health.module'
 import { AuthModule } from './modules/auth/auth.module'
+import { validateEnv } from './config/validate-env'
 import { PrismaModule } from './prisma.module'
 import { SessionModule } from './modules/session/session.module'
+import authConfig from './config/auth.config'
 import { UserModule } from './modules/users/user.module'
 import { CompanyModule } from './modules/company/company.module'
 import { NotificationsModule } from './modules/notifications/notifications.module'
 import { EmailModule } from './modules/email/email.module'
-
+import emailConfig from './config/email.config'
+import { JobModule } from './modules/job/job.module'
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -24,36 +20,6 @@ import { EmailModule } from './modules/email/email.module'
       load: [appConfig, authConfig, emailConfig],
       validate: validateEnv,
     }),
-
-    CacheModule.registerAsync({
-      isGlobal: true,
-      inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => {
-        const redisUrl = configService.getOrThrow<string>('REDIS_URL')
-        
-        try {
-          console.log('[CACHE] Initializing Redis store with URL:', redisUrl.replace(/:[^@]+@/, ':****@'))
-          const store = await redisStore({
-            url: redisUrl,
-          })
-          
-          console.log('[CACHE] Store initialized - type:', store?.constructor?.name, '- Connection:', store?.client ? 'CONNECTED' : 'NOT_CONNECTED')
-          
-          if (!store || typeof store !== 'object') {
-            throw new Error('redisStore returned invalid object')
-          }
-
-          return {
-            store,
-            ttl: 600000,
-          }
-        } catch (error) {
-          console.error('[CACHE] ERROR initializing Redis:', error?.message || error)
-          throw new Error(`Cache initialization failed: ${error?.message || error}`)
-        }
-      },
-    }),
-
     HealthModule,
     AuthModule,
     PrismaModule,
@@ -62,6 +28,9 @@ import { EmailModule } from './modules/email/email.module'
     CompanyModule,
     NotificationsModule,
     EmailModule,
+    JobModule
   ],
+  controllers: [],
+  providers: [],
 })
-export class AppModule {}
+export class AppModule { }
