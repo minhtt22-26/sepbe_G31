@@ -49,7 +49,7 @@ export class UserService {
       : null
     if (isExistEmail) {
       throw new BadRequestException({
-        message: 'Email already exists',
+        message: 'Email này đã được sử dụng rồi',
       })
     }
 
@@ -58,7 +58,7 @@ export class UserService {
       : null
     if (isExistName) {
       throw new BadRequestException({
-        message: 'Username already exists',
+        message: 'Tên đăng nhập này đã có người dùng',
       })
     }
 
@@ -85,32 +85,32 @@ export class UserService {
     })
     if (!user) {
       throw new NotFoundException({
-        message: 'User not found.',
+        message: 'Không tìm thấy thông tin người dùng',
       })
     }
 
     if (user.status !== EnumUserStatus.ACTIVE) {
       throw new ForbiddenException({
-        message: 'Inactive account',
+        message: 'Tài khoản của bạn hiện đang bị khóa hoặc chưa kích hoạt',
       })
     }
 
     if (!user.password) {
       throw new ForbiddenException({
-        message: 'Password not created',
+        message: 'Tài khoản này chưa thiết lập mật khẩu',
       })
     }
 
     if (this.authUtil.checkPasswordAttempt(user)) {
       throw new ForbiddenException({
-        message: 'You have entered the password too many times',
+        message: 'Bạn đã nhập sai mật khẩu quá nhiều lần, vui lòng thử lại sau',
       })
     }
 
     if (!this.authUtil.validatePassword(password, user.password)) {
       await this.userRepository.increasePasswordAttempt(user.id)
       throw new ForbiddenException({
-        message: "Password doesn't match",
+        message: 'Mật khẩu không đúng, vui lòng kiểm tra lại',
       })
     }
 
@@ -118,7 +118,7 @@ export class UserService {
 
     if (this.authUtil.checkPasswordExpired(user.passwordExpired)) {
       throw new ForbiddenException({
-        message: 'The password has expired',
+        message: 'Mật khẩu của bạn đã hết hạn, vui lòng đổi mật khẩu mới',
       })
     }
 
@@ -181,8 +181,7 @@ export class UserService {
       expectedSalaryMin > expectedSalaryMax
     ) {
       throw new BadRequestException({
-        message:
-          'The minimum expected salary must be less than maximum expected salary.',
+        message: 'Lương tối thiểu không được lớn hơn lương tối đa',
       })
     }
 
@@ -208,13 +207,13 @@ export class UserService {
     const session = await this.sessionService.getLogin(userId, sessionId)
     if (!session) {
       throw new UnauthorizedException({
-        message: 'Session not found or expired',
+        message: 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại',
       })
     }
 
     if (session.jti !== oldJti) {
       throw new UnauthorizedException({
-        message: 'Refresh token invalid or tampered',
+        message: 'Phiên đăng nhập không hợp lệ, vui lòng đăng nhập lại',
       })
     }
 
@@ -252,7 +251,7 @@ export class UserService {
 
     if (!user) {
       throw new UnauthorizedException({
-        message: 'User not found with this email',
+        message: 'Email này chưa được đăng ký trong hệ thống',
       })
     }
 
@@ -269,7 +268,7 @@ export class UserService {
 
       if (now < canResendAt) {
         throw new BadRequestException({
-          message: 'Please wait before requesting another reset email',
+          message: 'Bạn vừa yêu cầu gửi email rồi, vui lòng đợi một chút nhé',
         })
       }
     }
@@ -300,7 +299,7 @@ export class UserService {
 
     if (!tokenRecord) {
       throw new BadRequestException({
-        message: 'Invalid or expired reset token',
+        message: 'Đường dẫn khôi phục mật khẩu không hợp lệ hoặc đã hết hạn',
       })
     }
 
@@ -346,7 +345,7 @@ export class UserService {
 
     if (user.status !== EnumUserStatus.ACTIVE) {
       throw new ForbiddenException({
-        message: 'Inactive account',
+        message: 'Tài khoản của bạn hiện đang bị khóa hoặc chưa kích hoạt',
       })
     }
 
@@ -358,7 +357,7 @@ export class UserService {
 
     if (!user) {
       throw new NotFoundException({
-        message: 'User not found',
+        message: 'Không tìm thấy người dùng này',
       })
     }
     return user

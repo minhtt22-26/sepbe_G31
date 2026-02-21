@@ -18,7 +18,7 @@ export class AuthService {
     private readonly authUtil: AuthUtil,
     private readonly helperService: HelperService,
     private readonly sessionService: SessionService,
-  ) {}
+  ) { }
 
   createTokens(
     user: User,
@@ -137,7 +137,7 @@ export class AuthService {
 
     if (!userId || !sessionId || !jti) {
       throw new UnauthorizedException({
-        message: 'Invalid token payload',
+        message: 'Thông tin token không hợp lệ',
       })
     }
 
@@ -145,13 +145,13 @@ export class AuthService {
 
     if (!session) {
       throw new UnauthorizedException({
-        message: 'Session not found or invalid',
+        message: 'Phiên đăng nhập không tồn tại hoặc không hợp lệ',
       })
     }
 
     if (session.jti !== payload.jti) {
       throw new UnauthorizedException({
-        message: 'Jti not match',
+        message: 'Phiên đăng nhập không hợp lệ, vui lòng đăng nhập lại',
       })
     }
 
@@ -165,7 +165,7 @@ export class AuthService {
 
     if (!userId || !sessionId || !jti) {
       throw new UnauthorizedException({
-        message: 'Invalid refresh token payload',
+        message: 'Thông tin refresh token không hợp lệ',
       })
     }
 
@@ -173,13 +173,13 @@ export class AuthService {
 
     if (!session) {
       throw new UnauthorizedException({
-        message: 'Refresh token invalid',
+        message: 'Phiên làm việc đã hết hạn, vui lòng đăng nhập lại',
       })
     }
 
     if (session.jti !== payload.jti) {
       throw new UnauthorizedException({
-        message: 'Refresh token tampered',
+        message: 'Refresh token không hợp lệ hoặc đã bị thay đổi',
       })
     }
 
@@ -193,8 +193,8 @@ export class AuthService {
   ): Promise<IAuthAccessTokenPayload> {
     if (err || !user) {
       throw new UnauthorizedException({
-        message: 'Access token invalid',
-        error: err?.message || info?.message || 'Unknow error',
+        message: 'Access token không hợp lệ hoặc đã hết hạn',
+        error: err?.message || info?.message || 'Lỗi không xác định',
       })
     }
 
@@ -208,8 +208,8 @@ export class AuthService {
   ): Promise<IAuthRefreshTokenPayload> {
     if (err || !user) {
       throw new UnauthorizedException({
-        message: 'Refresh token invalid',
-        error: err?.message || info?.message || 'Unknow error',
+        message: 'Refresh token không hợp lệ hoặc đã hết hạn',
+        error: err?.message || info?.message || 'Lỗi không xác định',
       })
     }
 
@@ -221,7 +221,7 @@ export class AuthService {
 
     if (requestHeaders.length !== 2) {
       throw new UnauthorizedException({
-        message: 'Google token required',
+        message: 'Vui lòng cung cấp Google token để đăng nhập',
       })
     }
 
@@ -237,7 +237,7 @@ export class AuthService {
     } catch (err: unknown) {
       console.log(err)
       throw new UnauthorizedException({
-        message: 'Invalid Google token',
+        message: 'Google token không hợp lệ hoặc đã hết hạn',
       })
     }
   }

@@ -65,30 +65,23 @@ export class UserController {
   async forgotPassword(
     @Body() body: ForgotPasswordRequestDto,
     @Req() req: Request,
-  ): Promise<{ message: string }> {
-    await this.userService.forgotPassword(body, {
+  ): Promise<void> {
+    return await this.userService.forgotPassword(body, {
       ipAddress: req.ip ?? 'unknown',
       userAgent: req.headers['user-agent'] ?? 'unknown',
     })
 
-    return {
-      message: 'If an account exists with this email, a reset link has been sent.',
-    };
   }
 
   @Put('reset-password')
   async resetPassword(
     @Body() body: ResetPasswordRequestDto,
     @Req() req: Request,
-  ): Promise<{ message: string }> {
-    await this.userService.resetPassword(body, {
+  ): Promise<void> {
+    return await this.userService.resetPassword(body, {
       ipAddress: req.ip ?? 'unknown',
       userAgent: req.headers['user-agent'] ?? 'unknown',
     })
-
-    return {
-      message: 'Password has been reset successfully.',
-    }
   }
 
   @Post('login/social/google')
@@ -121,14 +114,10 @@ export class UserController {
     @AuthJwtPayload('userId') userId: number,
     @AuthJwtPayload('sessionId') sessionId: string,
     @Req() req: Request,
-  ): Promise<{ message: string }> {
-    await this.userService.logout(userId, sessionId, {
+  ): Promise<void> {
+    return await this.userService.logout(userId, sessionId, {
       ipAddress: req.ip ?? 'unknown',
       userAgent: req.headers['user-agent'] ?? 'unknown',
     })
-
-    return {
-      message: 'Logged out successfully',
-    }
   }
 }
