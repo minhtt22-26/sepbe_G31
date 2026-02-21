@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, MaxLength, MinLength } from "class-validator";
+import { IsEmail, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, MaxLength, MinLength, ValidateIf } from "class-validator";
 import { EnumUserRole } from "src/generated/prisma/enums";
 
 export class UserSignUpRequestDto {
@@ -8,6 +8,7 @@ export class UserSignUpRequestDto {
     @MaxLength(20)
     fullName: string
 
+    @ValidateIf(o => !o.email)
     @IsOptional()
     @IsString()
     @MinLength(3)
@@ -19,6 +20,7 @@ export class UserSignUpRequestDto {
     @IsPhoneNumber()
     phone?: string
 
+    @ValidateIf(o => !o.userName)
     @IsOptional()
     @IsString()
     @IsEmail()

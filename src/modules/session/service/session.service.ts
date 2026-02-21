@@ -31,9 +31,9 @@ export class SessionService {
             return null
         }
 
-        return { 
-            jti: session.jti, 
-            expiredAt: session.expiredAt 
+        return {
+            jti: session.jti,
+            expiredAt: session.expiredAt
         }
     }
 
@@ -44,10 +44,10 @@ export class SessionService {
 
     async getList(
         userId: number
-    ): Promise<SessionListResponseDto[]>{
+    ): Promise<SessionListResponseDto[]> {
         const userIdNum = this.sessionUtil.toNumberId(userId)
         const sessions = await this.sessionRepository.findAll(userIdNum)
-        
+
         return plainToInstance(SessionListResponseDto, sessions, {
             excludeExtraneousValues: true
         })
@@ -67,9 +67,9 @@ export class SessionService {
             sessionId
         )
 
-        if(!session) {
+        if (!session) {
             throw new NotFoundException({
-                message: "Session not found or already expired"
+                message: "Phiên đăng nhập không tồn tại hoặc đã hết hạn"
             })
         }
 

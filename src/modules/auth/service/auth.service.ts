@@ -1,12 +1,16 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
-import { HelperService } from "src/common/helper/service/helper.service";
-import { EnumUserLoginWith, User } from "src/generated/prisma/client";
-import { AuthUtil } from "../utils/auth.utils";
-import { IAuthAccessTokenGenerate, IAuthAccessTokenPayload, IAuthRefreshTokenGenerate, IAuthRefreshTokenPayload, IAuthSocialPayload } from "../interfaces/auth.interface";
-import { SessionService } from "src/modules/session/service/session.service";
-import { AuthTokenResponseDto } from "../dto/response/auth.response.token.dto";
-
-
+import { Injectable, UnauthorizedException } from '@nestjs/common'
+import { HelperService } from 'src/common/helper/service/helper.service'
+import { EnumUserLoginWith, User } from 'src/generated/prisma/client'
+import { AuthUtil } from '../utils/auth.utils'
+import {
+  IAuthAccessTokenGenerate,
+  IAuthAccessTokenPayload,
+  IAuthRefreshTokenGenerate,
+  IAuthRefreshTokenPayload,
+  IAuthSocialPayload,
+} from '../interfaces/auth.interface'
+import { SessionService } from 'src/modules/session/service/session.service'
+import { AuthTokenResponseDto } from '../dto/response/auth.response.token.dto'
 
 @Injectable()
 export class AuthService {
@@ -18,46 +22,58 @@ export class AuthService {
 
   createTokens(
     user: User,
-    loginWith: EnumUserLoginWith
+    loginWith: EnumUserLoginWith,
   ): IAuthAccessTokenGenerate {
     const lastLoginAt = this.helperService.dateCreate()
     const jti = this.authUtil.generateJti()
     const sessionId = this.helperService.randomString(24)
 
     const accessTokenPayload: IAuthAccessTokenPayload =
-      this.authUtil.createAccessTokenPayload(user, sessionId, lastLoginAt, loginWith)
+      this.authUtil.createAccessTokenPayload(
+        user,
+        sessionId,
+        lastLoginAt,
+        loginWith,
+      )
 
-    const accessToken = this.authUtil.createAccessTokens(jti, accessTokenPayload)
+    const accessToken = this.authUtil.createAccessTokens(
+      jti,
+      accessTokenPayload,
+    )
 
     const refreshTokenPayload: IAuthRefreshTokenPayload =
       this.authUtil.createRefreshTokenPayload(accessTokenPayload)
 
-    const refreshToken = this.authUtil.createRefreshTokens(jti, refreshTokenPayload)
+    const refreshToken = this.authUtil.createRefreshTokens(
+      jti,
+      refreshTokenPayload,
+    )
 
     return {
       tokens: {
         tokenType: this.authUtil.jwtPrefix,
         expiredIn: this.authUtil.jwtAccessTokenExpirationTimeInSeconds,
         accessToken,
-        refreshToken
+        refreshToken,
+        role: user.role,
       },
       jti,
-      sessionId
+      sessionId,
     }
   }
 
   refreshTokens(
     user: User,
-    refreshTokenFromRequest: string
+    refreshTokenFromRequest: string,
   ): IAuthRefreshTokenGenerate {
-
     const {
       sessionId,
       loginWith,
       lastLoginAt,
       exp: oldExp,
     } = this.authUtil.payloadToken<IAuthRefreshTokenPayload>(
-      refreshTokenFromRequest)
+      refreshTokenFromRequest,
+    )
 
     const jti = this.authUtil.generateJti()
 
@@ -71,29 +87,26 @@ export class AuthService {
 
     const accessToken: string = this.authUtil.createAccessTokens(
       jti,
-      payloadAccessToken
+      payloadAccessToken,
     )
 
     const newpayloadRefreshToken: IAuthRefreshTokenPayload =
-      this.authUtil.createRefreshTokenPayload(
-        payloadAccessToken
-      )
+      this.authUtil.createRefreshTokenPayload(payloadAccessToken)
 
     //Tính thời gian còn lại của refresh token cũ
     const today = this.helperService.dateCreate()
 
-    const expiredAt = this.helperService.dateCreateFromTimestamp(
-      oldExp! * 1000
-    )
+    const expiredAt = this.helperService.dateCreateFromTimestamp(oldExp! * 1000)
 
     const newRefreshTokenExpired = this.helperService.dateDriff(
       expiredAt,
-      today
+      today,
     )
 
     const newRefreshTokenExpireInseconds =
-      newRefreshTokenExpired && newRefreshTokenExpired.seconds ?
-        newRefreshTokenExpired.seconds : Math.floor(newRefreshTokenExpired.miliseconds / 1000)
+      newRefreshTokenExpired && newRefreshTokenExpired.seconds
+        ? newRefreshTokenExpired.seconds
+        : Math.floor(newRefreshTokenExpired.miliseconds / 1000)
 
     const newRefreshToken: string = this.authUtil.createRefreshTokens(
       jti,
@@ -105,46 +118,40 @@ export class AuthService {
       tokenType: this.authUtil.jwtPrefix,
       expiredIn: this.authUtil.jwtAccessTokenExpirationTimeInSeconds,
       accessToken,
-      refreshToken: newRefreshToken
+      refreshToken: newRefreshToken,
     }
 
     return {
       tokens,
       jti,
       sessionId,
-      expiredInMs: newRefreshTokenExpired.miliseconds
+      expiredInMs: newRefreshTokenExpired.miliseconds,
     }
-
   }
 
   //Validate Strategy
   async validateJwtAccessStrategy(
-    payload: IAuthAccessTokenPayload
+    payload: IAuthAccessTokenPayload,
   ): Promise<IAuthAccessTokenPayload> {
-
     const { userId, sessionId, jti } = payload
 
     if (!userId || !sessionId || !jti) {
       throw new UnauthorizedException({
-        message: "Invalid token payload"
+        message: 'Thông tin token không hợp lệ',
       })
     }
 
-    const session = await this.sessionService.getLogin(
-      userId,
-      sessionId,
-    )
-
+    const session = await this.sessionService.getLogin(userId, sessionId)
 
     if (!session) {
       throw new UnauthorizedException({
-        message: "Session not found or invalid"
+        message: 'Phiên đăng nhập không tồn tại hoặc không hợp lệ',
       })
     }
 
     if (session.jti !== payload.jti) {
       throw new UnauthorizedException({
-        message: "Jti not match"
+        message: 'Phiên đăng nhập không hợp lệ, vui lòng đăng nhập lại',
       })
     }
 
@@ -152,32 +159,27 @@ export class AuthService {
   }
 
   async validateJwtRefreshStrategy(
-    payload: IAuthRefreshTokenPayload
+    payload: IAuthRefreshTokenPayload,
   ): Promise<IAuthRefreshTokenPayload> {
-
     const { userId, sessionId, jti } = payload
 
     if (!userId || !sessionId || !jti) {
       throw new UnauthorizedException({
-        message: "Invalid refresh token payload"
+        message: 'Thông tin refresh token không hợp lệ',
       })
     }
 
-    const session = await this.sessionService.getLogin(
-      userId,
-      sessionId,
-    )
-
+    const session = await this.sessionService.getLogin(userId, sessionId)
 
     if (!session) {
       throw new UnauthorizedException({
-        message: "Refresh token invalid"
+        message: 'Phiên làm việc đã hết hạn, vui lòng đăng nhập lại',
       })
     }
 
     if (session.jti !== payload.jti) {
       throw new UnauthorizedException({
-        message: "Refresh token tampered"
+        message: 'Refresh token không hợp lệ hoặc đã bị thay đổi',
       })
     }
 
@@ -189,12 +191,10 @@ export class AuthService {
     user: IAuthAccessTokenPayload,
     info: Error,
   ): Promise<IAuthAccessTokenPayload> {
-
-    console.log(err)
     if (err || !user) {
       throw new UnauthorizedException({
-        message: "Access token invalid",
-        error: err?.message || info?.message || "Unknow error"
+        message: 'Access token không hợp lệ hoặc đã hết hạn',
+        error: err?.message || info?.message || 'Lỗi không xác định',
       })
     }
 
@@ -206,12 +206,10 @@ export class AuthService {
     user: IAuthRefreshTokenPayload,
     info: Error,
   ): Promise<IAuthRefreshTokenPayload> {
-
-    console.log(err)
     if (err || !user) {
       throw new UnauthorizedException({
-        message: "Refresh token invalid",
-        error: err?.message || info?.message || "Unknow error"
+        message: 'Refresh token không hợp lệ hoặc đã hết hạn',
+        error: err?.message || info?.message || 'Lỗi không xác định',
       })
     }
 
@@ -219,28 +217,28 @@ export class AuthService {
   }
 
   async validateOAuthGoogleGuard(request: any): Promise<boolean> {
-    const requestHeaders = this.authUtil.extractHeaderGoogle(request);
+    const requestHeaders = this.authUtil.extractHeaderGoogle(request)
 
     if (requestHeaders.length !== 2) {
       throw new UnauthorizedException({
-        message: 'Google token required',
-      });
+        message: 'Vui lòng cung cấp Google token để đăng nhập',
+      })
     }
 
     try {
-      const payload = await this.authUtil.verifyGoogle(requestHeaders[1]);
+      const payload = await this.authUtil.verifyGoogle(requestHeaders[1])
 
       request.user = {
         email: payload.email,
         emailVerified: payload.email_verified,
-      } as IAuthSocialPayload;
+      } as IAuthSocialPayload
 
-      return true;
+      return true
     } catch (err: unknown) {
       console.log(err)
       throw new UnauthorizedException({
-        message: 'Invalid Google token',
-      });
+        message: 'Google token không hợp lệ hoặc đã hết hạn',
+      })
     }
   }
 }
