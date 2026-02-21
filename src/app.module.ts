@@ -12,6 +12,7 @@ import { CompanyModule } from './modules/company/company.module'
 import { NotificationsModule } from './modules/notifications/notifications.module'
 import { EmailModule } from './modules/email/email.module'
 import emailConfig from './config/email.config'
+import { JobModule } from './modules/job/job.module'
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -27,6 +28,7 @@ import emailConfig from './config/email.config'
     CompanyModule,
     NotificationsModule,
     EmailModule,
+    JobModule,
   ],
   controllers: [],
   providers: [],
