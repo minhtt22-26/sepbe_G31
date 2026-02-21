@@ -1,15 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from "@nestjs/common"
+import { JobRepository } from "../repositories/job.repository";
+import { CreateJobRequest } from "../dtos/request/create-job.request";
+import { JobResponse } from "../dtos/response/job.response";
+import { UpdateJobRequest } from "../dtos/request/update-job.request";
 import { RepositoryService } from '../repositories/repository.service';
-// import { IJobSearch } from '../interfaces/job.interface';
 import { JobStatus } from 'src/generated/prisma/enums';
-// import { ElasticService } from 'src/modules/elastic/elastic/elastic.service';
 
 @Injectable()
 export class JobService {
-    constructor(
-        private readonly RepositoryService: RepositoryService,
-        // private readonly elastic: ElasticService
-    ) { }
+    constructor(private readonly jobRepository: JobRepository, private readonly repositoryService: RepositoryService) { }
+
     async searchJobs(q: any) {
         const keyword = q.keyword?.trim() || ''
         const province = q.province?.trim() || ''
@@ -72,9 +72,43 @@ export class JobService {
 
         }
     }
-    // async testElastic() {
-    //     return this.elastic.client.info();
-    //   }
+
+    async create(request: CreateJobRequest) {
+        const { companyId, occupationId, ...rest } = request;
+        const job = await this.jobRepository.create({
+            ...rest,
+            company: { connect: { id: request.companyId } },
+            occupation: { connect: { id: request.occupationId } },
+        });
+
+        return new JobResponse(job);
+    }
+
+    async findAll() {
+        const jobs = await this.jobRepository.findAll();
+        return jobs.map((j) => new JobResponse(j));
+    }
+
+    async findOne(id: number) {
+        const job = await this.jobRepository.findById(id);
+        if (!job) throw new NotFoundException('Job not found');
+
+        return new JobResponse(job);
+    }
+
+    async update(id: number, request: UpdateJobRequest) {
+        await this.findOne(id);
+
+        const job = await this.jobRepository.update(id, request);
+        return new JobResponse(job);
+    }
+
+    async remove(id: number) {
+        await this.findOne(id);
+        await this.jobRepository.delete(id);
+
+        return { message: 'Deleted successfully' };
+    }
 
 
 }
