@@ -6,18 +6,20 @@ import { AuthUtil } from './utils/auth.utils'
 import { JwtService } from '@nestjs/jwt'
 import { SessionModule } from '../session/session.module'
 import { AuthJwtAccessStrategy } from './guards/jwt/strategies/auth.jwt.access.strategy'
+import { AuthJwtRefreshStrategy } from './guards/jwt/strategies/auth.jwt.refresh.strategy'
 import { AuthSocialGoogleGuard } from './guards/social/auth.social.google.guard'
 
 @Module({
-  imports: [HelperModule, SessionModule,],
+  imports: [HelperModule, SessionModule],
   controllers: [AuthController],
   providers: [
     AuthService,
     AuthUtil,
     JwtService,
     AuthJwtAccessStrategy,
-    AuthSocialGoogleGuard
+    AuthJwtRefreshStrategy,
+    AuthSocialGoogleGuard,
   ],
   exports: [AuthService, AuthUtil],
 })
-export class AuthModule { }
+export class AuthModule {}
