@@ -1,36 +1,63 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException, Inject } from '@nestjs/common';
 import { CloudinaryService } from 'src/infrastructure/cloudinary/cloudinary.service';
 import { PrismaService } from 'src/prisma.service';
 import { CompanyRegisterDto } from './dtos/request/company.register';
 import { CompanyStatus, EnumUserRole } from 'src/generated/prisma/enums';
 import { UpdateCompanyDto } from './dtos/request/company.update';
 import { CompanyReviewDto } from './dtos/request/company.review';
-
+import { REDIS_CLIENT } from 'src/infrastructure/redis/redis.provider'
+import type { RedisClientType } from 'redis'
 
 @Injectable()
 export class CompanyService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cloudinary: CloudinaryService,
+    @Inject(REDIS_CLIENT) private redis: RedisClientType,
   ) { }
 
-  async findAll() {
-    return this.prisma.company.findMany({
-      where: {
-        status: CompanyStatus.APPROVED,
-      },
-      include: {
-        owner: {
-          select: {
-            fullName: true,
-            phone: true,
-            email: true,
-            avatar: true,
-          },
+async findAll() {
+  const cacheKey = 'companies:approved'
+
+  // Try to get from Redis
+  try {
+    const cached = await this.redis.get(cacheKey)
+    if (cached) {
+      console.log('From Redis')    
+      return JSON.parse(cached)
+    }
+  } catch (err) {
+    console.error('[CACHE] Get from Redis failed:', err?.message)
+  }
+
+  console.log('From Database')
+
+  const companies = await this.prisma.company.findMany({
+    where: {
+      status: CompanyStatus.APPROVED,
+    },
+    include: {
+      owner: {
+        select: {
+          fullName: true,
+          phone: true,
+          email: true,
+          avatar: true,
         },
       },
-    });
+    },
+  })
+
+  // Set directly to Redis
+  try {
+    await this.redis.setEx(cacheKey, 600, JSON.stringify(companies))
+    console.log('[CACHE] Set key success:', cacheKey)
+  } catch (err) {
+    console.error('[CACHE] Set key failed:', err?.message)
   }
+  
+  return companies
+}
 
   async findAllByStatus(status: CompanyStatus) {
     return this.prisma.company.findMany({

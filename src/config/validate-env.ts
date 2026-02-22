@@ -31,6 +31,9 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   JWT_SECRET?: string
+
+  @IsString()
+  REDIS_URL: string
 }
 
 
