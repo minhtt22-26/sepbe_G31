@@ -1,9 +1,10 @@
 import { createClient } from 'redis'
 import { ConfigService } from '@nestjs/config'
+import { Provider } from '@nestjs/common'
 
 export const REDIS_CLIENT = 'REDIS_CLIENT'
 
-export const redisProvider = {
+export const redisProvider: Provider = {
   provide: REDIS_CLIENT,
   useFactory: async (configService: ConfigService) => {
     const redisUrl = configService.getOrThrow<string>('REDIS_URL')
