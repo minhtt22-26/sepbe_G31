@@ -16,6 +16,8 @@ import { UserModule } from './modules/users/user.module'
 import { CompanyModule } from './modules/company/company.module'
 import { NotificationsModule } from './modules/notifications/notifications.module'
 import { EmailModule } from './modules/email/email.module'
+import { QueueModule } from './infrastructure/queue/queue.module'
+import { QueueTestModule } from './modules/queue-test/queue-test.module'
 
 @Module({
   imports: [
@@ -32,13 +34,10 @@ import { EmailModule } from './modules/email/email.module'
         const redisUrl = configService.getOrThrow<string>('REDIS_URL')
         
         try {
-          console.log('[CACHE] Initializing Redis store with URL:', redisUrl.replace(/:[^@]+@/, ':****@'))
           const store = await redisStore({
             url: redisUrl,
           })
-          
-          console.log('[CACHE] Store initialized - type:', store?.constructor?.name, '- Connection:', store?.client ? 'CONNECTED' : 'NOT_CONNECTED')
-          
+                    
           if (!store || typeof store !== 'object') {
             throw new Error('redisStore returned invalid object')
           }
@@ -54,6 +53,9 @@ import { EmailModule } from './modules/email/email.module'
       },
     }),
 
+    // Queue module - import early to avoid circular dependencies
+    QueueModule,
+
     HealthModule,
     AuthModule,
     PrismaModule,
@@ -62,6 +64,7 @@ import { EmailModule } from './modules/email/email.module'
     CompanyModule,
     NotificationsModule,
     EmailModule,
+    QueueTestModule,
   ],
 })
 export class AppModule {}
