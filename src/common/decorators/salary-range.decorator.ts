@@ -24,7 +24,7 @@ export class SalaryRangeConstraint implements ValidatorConstraintInterface {
 export function IsSalaryRangeValid(
     validationOptions?: ValidationOptions
 ) {
-    return function (object: Object, propertyName: string) {
+    return function (object: object, propertyName: string) {
         registerDecorator({
             target: object.constructor,
             propertyName: propertyName,
