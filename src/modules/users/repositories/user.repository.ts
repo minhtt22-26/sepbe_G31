@@ -6,12 +6,14 @@ import {
   Prisma,
   TokenType,
   User,
+  WorkerProfile,
 } from 'src/generated/prisma/client'
 import { PrismaService } from 'src/prisma.service'
 import { UserSignUpRequestDto } from '../dtos/request/user.sign-up.request.dto'
 import { IAuthPassword } from 'src/modules/auth/interfaces/auth.interface'
 import { HelperService } from 'src/common/helper/service/helper.service'
 import { WorkerProfileRequestDto } from '../dtos/request/user.profile.request.dto'
+import { UserInfoRequestDto } from '../dtos/request/user.info.request.dto'
 
 @Injectable()
 export class UserRepository {
@@ -81,27 +83,6 @@ export class UserRepository {
       where: { id: userId },
       data: {
         passwordAttempt: { set: 0 },
-      },
-    })
-  }
-
-  async createProfile(
-    userId: number,
-    { ...profile }: WorkerProfileRequestDto,
-  ): Promise<void> {
-    await this.prisma.workerProfile.create({
-      data: {
-        userId,
-        sectorId: profile.sectorId,
-        occupationId: profile.occupationId,
-        address: profile.address,
-        province: profile.province,
-        district: profile.district,
-        gender: profile.gender,
-        birthYear: profile.birthYear,
-        expectedSalaryMin: profile.expectedSalaryMin,
-        expectedSalaryMax: profile.expectedSalaryMax,
-        experienceYear: profile.experienceYear,
       },
     })
   }
@@ -215,4 +196,49 @@ export class UserRepository {
     })
   }
 
+  async createProfile(
+    userId: number,
+    { ...profile }: WorkerProfileRequestDto,
+  ): Promise<WorkerProfile> {
+    return await this.prisma.workerProfile.create({
+      data: {
+        userId,
+        occupationId: profile.occupationId,
+        shift: profile.shift,
+        address: profile.address,
+        province: profile.province,
+        district: profile.district,
+        gender: profile.gender,
+        birthYear: profile.birthYear,
+        expectedSalaryMin: profile.expectedSalaryMin,
+        expectedSalaryMax: profile.expectedSalaryMax,
+        experienceYear: profile.experienceYear,
+      },
+    })
+  }
+
+  async updateInfoUser(
+    userId: number,
+    data: UserInfoRequestDto
+  ) {
+    return await this.prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data
+    })
+  }
+
+  async getWorkerProfile(userId: number): Promise<WorkerProfile | null> {
+    return await this.prisma.workerProfile.findUnique({
+      where: { userId },
+      include: {
+        occupation: {
+          include: {
+            sector: true
+          }
+        }
+      }
+    })
+  }
 }

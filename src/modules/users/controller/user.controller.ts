@@ -24,7 +24,9 @@ import { ForgotPasswordRequestDto } from 'src/modules/auth/dto/request/forgot-pa
 import { AuthSocialGoogleProtected } from 'src/modules/auth/decorators/auth.social.decorator'
 import { UserCreateSocialRequestDto } from '../dtos/request/user.create-social.request.dto'
 import { EnumUserLoginWith } from 'src/generated/prisma/enums'
-import { User } from 'src/generated/prisma/client'
+import { User, WorkerProfile } from 'src/generated/prisma/client'
+import { WorkerProfileRequestDto } from '../dtos/request/user.profile.request.dto'
+import { UserInfoRequestDto } from '../dtos/request/user.info.request.dto'
 
 @Controller('user')
 export class UserController {
@@ -106,6 +108,32 @@ export class UserController {
   @AuthJwtAccessProtected()
   async getUserInfo(@AuthJwtPayload('userId') userId: number): Promise<User> {
     return await this.userService.getUserById(userId)
+  }
+
+  @Post('worker-profile')
+  @AuthJwtAccessProtected()
+  async createWorkerProfile(
+    @AuthJwtPayload('userId') userId: number,
+    @Body() body: WorkerProfileRequestDto,
+  ): Promise<WorkerProfile> {
+    return await this.userService.createWorkerProfile(userId, body)
+  }
+
+  @Get('worker-profile')
+  @AuthJwtAccessProtected()
+  async getWorkerProfile(
+    @AuthJwtPayload('userId') userId: number,
+  ): Promise<WorkerProfile> {
+    return await this.userService.getWorkerProfile(userId)
+  }
+
+  @Put('user-info')
+  @AuthJwtAccessProtected()
+  async updateInfoUser(
+    @AuthJwtPayload('userId') userId: number,
+    @Body() body: UserInfoRequestDto,
+  ): Promise<User> {
+    return await this.userService.updateInfoUser(userId, body)
   }
 
   @Post('logout')

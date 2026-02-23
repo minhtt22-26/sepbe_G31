@@ -17,6 +17,7 @@ import emailConfig from './config/email.config'
 import { JobModule } from './modules/job/job.module'
 import { CacheModule } from '@nestjs/cache-manager'
 import { redisStore } from 'cache-manager-redis-store'
+import { OccupationModule } from './modules/occupation/occupation.module'
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -63,7 +64,8 @@ import { redisStore } from 'cache-manager-redis-store'
     NotificationsModule,
     EmailModule,
     QueueTestModule,
-    JobModule
+    JobModule,
+    OccupationModule,
   ],
   controllers: [],
   providers: [],

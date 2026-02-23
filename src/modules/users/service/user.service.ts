@@ -15,7 +15,7 @@ import {
   EnumUserRole,
   EnumUserStatus,
 } from 'src/generated/prisma/enums'
-import { User } from 'src/generated/prisma/client'
+import { User, WorkerProfile } from 'src/generated/prisma/client'
 import { AuthTokenResponseDto } from 'src/modules/auth/dto/response/auth.response.token.dto'
 import { AuthService } from 'src/modules/auth/service/auth.service'
 import { HelperService } from 'src/common/helper/service/helper.service'
@@ -26,6 +26,7 @@ import { ISessionCreate } from 'src/modules/session/interfaces/session.interface
 import { ForgotPasswordRequestDto } from 'src/modules/auth/dto/request/forgot-password.request.dto'
 import { ResetPasswordRequestDto } from 'src/modules/auth/dto/request/reset-password.request.dto'
 import { EmailService } from 'src/modules/email/service/email.service'
+import { UserInfoRequestDto } from '../dtos/request/user.info.request.dto'
 
 @Injectable()
 export class UserService {
@@ -171,21 +172,34 @@ export class UserService {
     return tokens
   }
 
-  async WorkerProfile({
-    expectedSalaryMin,
-    expectedSalaryMax,
-  }: WorkerProfileRequestDto) {
-    if (
-      expectedSalaryMin !== undefined &&
-      expectedSalaryMax !== undefined &&
-      expectedSalaryMin > expectedSalaryMax
-    ) {
+  async createWorkerProfile(
+    userId: number,
+    dto: WorkerProfileRequestDto,
+  ): Promise<WorkerProfile> {
+    const existing = await this.userRepository.getWorkerProfile(userId)
+    if (existing) {
       throw new BadRequestException({
-        message: 'Lương tối thiểu không được lớn hơn lương tối đa',
+        message: 'Hồ sơ của bạn đã tồn tại, vui lòng cập nhật thay vì tạo mới',
       })
     }
+    return this.userRepository.createProfile(userId, dto)
+  }
 
-    //        await this.userRepository.createProfile(user.id, { ...profile })
+  async updateInfoUser(
+    userId: number,
+    dto: UserInfoRequestDto,
+  ): Promise<User> {
+    return this.userRepository.updateInfoUser(userId, dto)
+  }
+
+  async getWorkerProfile(userId: number): Promise<WorkerProfile> {
+    const profile = await this.userRepository.getWorkerProfile(userId)
+    if (!profile) {
+      throw new NotFoundException({
+        message: 'Không tìm thấy hồ sơ của người dùng này',
+      })
+    }
+    return profile
   }
 
   async refreshToken(
