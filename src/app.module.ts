@@ -10,13 +10,14 @@ import authConfig from './config/auth.config'
 import { UserModule } from './modules/users/user.module'
 import { CompanyModule } from './modules/company/company.module'
 import { NotificationsModule } from './modules/notifications/notifications.module'
-import { EmailModule } from './modules/email/email.module'
+import { EmailModule } from './infrastructure/email/email.module'
 import { QueueModule } from './infrastructure/queue/queue.module'
 import { QueueTestModule } from './modules/queue-test/queue-test.module'
 import emailConfig from './config/email.config'
 import { JobModule } from './modules/job/job.module'
 import { CacheModule } from '@nestjs/cache-manager'
 import { redisStore } from 'cache-manager-redis-store'
+import { OccupationModule } from './modules/occupation/occupation.module'
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -63,7 +64,8 @@ import { redisStore } from 'cache-manager-redis-store'
     NotificationsModule,
     EmailModule,
     QueueTestModule,
-    JobModule
+    JobModule,
+    OccupationModule,
   ],
   controllers: [],
   providers: [],
