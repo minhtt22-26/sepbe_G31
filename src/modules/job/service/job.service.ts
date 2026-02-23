@@ -2,9 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { RepositoryService } from '../repositories/repository.service';
 // import { IJobSearch } from '../interfaces/job.interface';
 import { JobStatus } from 'src/generated/prisma/enums';
-import { title } from 'process';
-import { contains } from 'class-validator';
-import { equal } from 'assert';
 // import { ElasticService } from 'src/modules/elastic/elastic/elastic.service';
 
 @Injectable()
@@ -28,7 +25,6 @@ export class JobService {
         const page = q.page || 1
         const limit = q.limit || 10
         const skip = (page - 1) * limit
-        const now = new Date();
         const where: any = {
             status: JobStatus.PUBLISHED
         }
@@ -63,9 +59,7 @@ export class JobService {
                 : sortBy === "salary_asc" ? { salaryMax: "asc" }
                     : sortBy === "view" ? { viewCount: "desc" } :
                         { createdAt: "desc" }
-        const { items, total } = await this.RepositoryService.searchJobs
-            (where, orderBy, limit, skip)
-
+        const { items, total } = await this.RepositoryService.searchJobs(where, orderBy, limit, skip)
         return {
             success: true,
             items,
