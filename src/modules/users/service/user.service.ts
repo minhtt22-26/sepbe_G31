@@ -25,7 +25,7 @@ import { IAuthRefreshTokenPayload } from 'src/modules/auth/interfaces/auth.inter
 import { ISessionCreate } from 'src/modules/session/interfaces/session.interface'
 import { ForgotPasswordRequestDto } from 'src/modules/auth/dto/request/forgot-password.request.dto'
 import { ResetPasswordRequestDto } from 'src/modules/auth/dto/request/reset-password.request.dto'
-import { EmailService } from 'src/modules/email/service/email.service'
+import { EmailService } from 'src/infrastructure/email/service/email.service'
 import { UserInfoRequestDto } from '../dtos/request/user.info.request.dto'
 
 @Injectable()

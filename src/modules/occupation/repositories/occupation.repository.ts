@@ -6,7 +6,6 @@ import { PrismaService } from 'src/prisma.service'
 export class OccupationRepository {
     constructor(private readonly prisma: PrismaService) { }
 
-    /** Lấy tất cả ngành đang ACTIVE, kèm danh sách nghề bên trong */
     async findAllSectorsWithOccupations() {
         return this.prisma.sector.findMany({
             where: { status: SectorStatus.ACTIVE },
@@ -26,7 +25,6 @@ export class OccupationRepository {
         })
     }
 
-    /** Lấy danh sách nghề theo ngành */
     async findOccupationsBySector(sectorId: number) {
         return this.prisma.occupation.findMany({
             where: {
