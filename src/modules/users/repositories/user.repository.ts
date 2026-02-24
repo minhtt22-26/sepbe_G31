@@ -205,13 +205,28 @@ export class UserRepository {
         userId,
         occupationId: profile.occupationId,
         shift: profile.shift,
-        address: profile.address,
         province: profile.province,
-        district: profile.district,
         gender: profile.gender,
         birthYear: profile.birthYear,
-        expectedSalaryMin: profile.expectedSalaryMin,
-        expectedSalaryMax: profile.expectedSalaryMax,
+        expectedSalary: profile.expectedSalary,
+        experienceYear: profile.experienceYear,
+      },
+    })
+  }
+
+  async updateProfile(
+    userId: number,
+    { ...profile }: WorkerProfileRequestDto,
+  ): Promise<WorkerProfile> {
+    return await this.prisma.workerProfile.update({
+      where: { userId },
+      data: {
+        occupationId: profile.occupationId,
+        shift: profile.shift,
+        province: profile.province,
+        gender: profile.gender,
+        birthYear: profile.birthYear,
+        expectedSalary: profile.expectedSalary,
         experienceYear: profile.experienceYear,
       },
     })

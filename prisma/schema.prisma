@@ -137,7 +137,7 @@ model User {
   avatar          String?
   fullName        String
   userName        String?            @unique
-  phone           String?             @unique
+  phone           String?            @unique
   role            EnumUserRole
   status          EnumUserStatus     @default(ACTIVE)
   email           String?            @unique
@@ -226,17 +226,14 @@ model WorkerProfile {
   userId Int @unique
 
   occupationId Int?
-  shift EnumShift?
-  
-  address  String?
-  province String?
-  district String?
+  shift        EnumShift?
 
-  gender            EnumUserGender?
-  birthYear         Int?
-  expectedSalaryMin Int?
-  expectedSalaryMax Int?
-  experienceYear    Int?
+  province String?
+
+  gender         EnumUserGender?
+  birthYear      Int?
+  expectedSalary Int?
+  experienceYear Int?
 
   // AI Embeddings for job matching (pgvector)
   profileEmbedding   Unsupported("vector(768)")?
@@ -244,8 +241,6 @@ model WorkerProfile {
 
   user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   occupation Occupation? @relation(fields: [occupationId], references: [id])
-  sector     Sector?     @relation(fields: [sectorId], references: [id])
-  sectorId   Int?
 }
 
 // =====================
@@ -331,7 +326,6 @@ model Sector {
   status    SectorStatus @default(ACTIVE)
 
   occupations Occupation[]
-  workers     WorkerProfile[]
 }
 
 model Occupation {
