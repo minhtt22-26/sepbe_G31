@@ -185,6 +185,19 @@ export class UserService {
     return this.userRepository.createProfile(userId, dto)
   }
 
+  async updateWorkerProfile(
+    userId: number,
+    dto: WorkerProfileRequestDto,
+  ): Promise<WorkerProfile> {
+    const existing = await this.userRepository.getWorkerProfile(userId)
+    if (!existing) {
+      throw new NotFoundException({
+        message: 'Không tìm thấy hồ sơ của bạn, vui lòng tạo hồ sơ trước',
+      })
+    }
+    return this.userRepository.updateProfile(userId, dto)
+  }
+
   async updateInfoUser(
     userId: number,
     dto: UserInfoRequestDto,

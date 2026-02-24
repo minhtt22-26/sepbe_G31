@@ -119,6 +119,15 @@ export class UserController {
     return await this.userService.createWorkerProfile(userId, body)
   }
 
+  @Put('worker-profile')
+  @AuthJwtAccessProtected()
+  async updateWorkerProfile(
+    @AuthJwtPayload('userId') userId: number,
+    @Body() body: WorkerProfileRequestDto,
+  ): Promise<WorkerProfile> {
+    return await this.userService.updateWorkerProfile(userId, body)
+  }
+
   @Get('worker-profile')
   @AuthJwtAccessProtected()
   async getWorkerProfile(
