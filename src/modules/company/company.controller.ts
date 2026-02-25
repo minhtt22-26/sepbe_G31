@@ -8,6 +8,7 @@ import {
   UseInterceptors,
   UploadedFiles,
   Put,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -99,13 +100,28 @@ export class CompanyController {
     return this.companyService.findAllByStatus(status);
   }
 
+  @Get('owner')
+  @ApiOperation({ summary: 'Get company by owner' })
+  @ApiResponse({ status: 200, description: 'Company retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Company not found' })
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  findByOwner(@AuthJwtPayload() user: any) {
+    const ownerId = user.userId;
+    return this.companyService.findByOwnerId(ownerId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get company detail' })
   @ApiParam({ name: 'id', type: Number, description: 'Company ID' })
   @ApiResponse({ status: 200, description: 'Company retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Company not found' })
   findOne(@Param('id') id: string) {
-    return this.companyService.findOne(+id);
+    const companyId = Number(id);
+    if (Number.isNaN(companyId)) {
+      throw new BadRequestException('Invalid company id');
+    }
+    return this.companyService.findOne(companyId);
   }
 
   @Patch('review/:id')
