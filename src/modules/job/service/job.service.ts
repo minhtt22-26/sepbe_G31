@@ -1,8 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { RepositoryService } from '../repositories/repository.service';
 // import { IJobSearch } from '../interfaces/job.interface';
 import { JobStatus } from 'src/generated/prisma/enums';
 // import { ElasticService } from 'src/modules/elastic/elastic/elastic.service';
+import { PrismaService } from 'src/prisma.service';
+import { JobUpdateRequestDto } from '../dtos/job.update.request.dto';
+import { JobCreateRequestDto } from '../dtos/job.create.request.dto';
 
 @Injectable()
 export class JobService {
@@ -76,5 +79,134 @@ export class JobService {
     //     return this.elastic.client.info();
     //   }
 
+    async createJob(
+        dto: JobCreateRequestDto,
+        companyId: number
+    ) {
 
+        // ==============================
+        // 1️⃣ Business Validation
+        // ==============================
+
+        if (
+            dto.salaryMin != null &&
+            dto.salaryMax != null &&
+            dto.salaryMin > dto.salaryMax
+        ) {
+            throw new BadRequestException(
+                'salaryMin cannot be greater than salaryMax'
+            );
+        }
+
+        if (
+            dto.ageMin != null &&
+            dto.ageMax != null &&
+            dto.ageMin > dto.ageMax
+        ) {
+            throw new BadRequestException(
+                'ageMin cannot be greater than ageMax'
+            );
+        }
+
+        if (
+            dto.expiredAt &&
+            new Date(dto.expiredAt) < new Date()
+        ) {
+            throw new BadRequestException(
+                'expiredAt must be in the future'
+            );
+        }
+
+        if (!dto.fields || dto.fields.length === 0) {
+            throw new BadRequestException(
+                'Job must have at least one form field'
+            );
+        }
+
+        // ==============================
+        // 2️⃣ Prepare Job Data
+        // ==============================
+
+        const jobData = {
+            title: dto.title,
+            description: dto.description,
+            occupationId: dto.occupationId,
+            workingShift: dto.workingShift,
+            quantity: dto.quantity,
+            genderRequirement: dto.genderRequirement,
+            address: dto.address,
+            province: dto.province,
+            district: dto.district,
+            salaryMin: dto.salaryMin,
+            salaryMax: dto.salaryMax,
+            ageMin: dto.ageMin,
+            ageMax: dto.ageMax,
+            expiredAt: dto.expiredAt
+                ? new Date(dto.expiredAt)
+                : undefined, // hoặc set mặc định 30 ngày nếu muốn
+
+            companyId,
+            status: JobStatus.WARNING // hoặc ACTIVE nếu không cần duyệt
+        };
+
+        // ==============================
+        // 3️⃣ Call Repository
+        // ==============================
+
+        const created =
+            await this.RepositoryService.createJobWithForm({
+                jobData,
+                fields: dto.fields
+            });
+
+        // ==============================
+        // 4️⃣ Return Response
+        // ==============================
+
+        return {
+            success: true,
+            data: created
+        };
+    }
+
+    async deleteJob(jobId: number, companyId: number) {
+
+        const job = await this.RepositoryService.findJobById(jobId)
+
+        if (!job || job.companyId !== companyId) {
+            throw new Error('Job not found or unauthorized')
+        }
+
+        await this.RepositoryService.deleteJob(jobId)
+
+        return { success: true }
+    }
+
+    async updateJob(
+        jobId: number,
+        dto: JobUpdateRequestDto,
+        companyId: number
+    ) {
+
+        const job = await this.RepositoryService.findJobById(jobId)
+
+        if (!job || job.companyId !== companyId) {
+            throw new Error('Job not found or unauthorized')
+        }
+
+        return this.RepositoryService.updateJobFull(jobId, dto)
+    }
+
+    async getDetail(jobId: number) {
+        const job = await this.RepositoryService.findJobById(jobId);
+
+        if (!job) {
+            throw new Error("Job not found");
+        }
+
+        return {
+            success: true,
+            data: job
+        };
+    }
 }
