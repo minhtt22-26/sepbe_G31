@@ -59,7 +59,7 @@ export class JobService {
                 : sortBy === "salary_asc" ? { salaryMax: "asc" }
                     : sortBy === "view" ? { viewCount: "desc" } :
                         { createdAt: "desc" }
-        const { items, total } = await this.RepositoryService.searchJobs(where, orderBy, limit, skip)
+        const { items, total } = await this.repositoryService.searchJobs(where, orderBy, limit, skip)
         return {
             success: true,
             items,

@@ -6,6 +6,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
 } from '@nestjs/common'
 import { JobService } from '../service/job.service'
 import { CreateJobRequest } from '../dtos/request/create-job.request';
