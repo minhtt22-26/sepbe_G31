@@ -7,11 +7,13 @@ import {
   Post,
   Put,
   Query,
+  ParseIntPipe
 } from '@nestjs/common'
 import { JobService } from '../service/job.service'
 import { CreateJobRequest } from '../dtos/request/create-job.request';
 import { UpdateJobRequest } from '../dtos/request/update-job.request';
 import { JobSearchDto } from "../dtos/job.search.request.dto";
+import { ApiTags, ApiOperation } from "@nestjs/swagger";
 
 @Controller('job')
 export class JobController {
@@ -25,28 +27,38 @@ export class JobController {
   }
 
   @Post()
-  create(@Body() body: CreateJobRequest) {
-    return this.jobService.create(body);
+  @ApiOperation({ summary: "Create new job" })
+  create(@Body() dto: CreateJobRequest) {
+    // lấy companyId từ JWT sau này
+    const fakeCompanyId = 1;
+
+    return this.jobService.createJob(dto, fakeCompanyId);
   }
 
-  @Get()
-  findAll() {
-    return this.jobService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.jobService.findOne(Number(id));
+  // GET JOB DETAIL
+  @Get(":id")
+  @ApiOperation({ summary: "Get job detail by id" })
+  async getDetail(@Param("id", ParseIntPipe) id: number) {
+    return this.jobService.getDetail(id);
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() body: UpdateJobRequest) {
-    return this.jobService.update(Number(id), body);
+  @ApiOperation({ summary: "Update job" })
+  update(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateJobRequest) {
+    const fakeCompanyId = 1;
+
+    return this.jobService.updateJob(id, body, fakeCompanyId);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.jobService.remove(Number(id));
+  // DELETE JOB
+  @Delete(":id")
+  @ApiOperation({ summary: "Delete job" })
+  async delete(
+    @Param("id", ParseIntPipe) id: number
+  ) {
+    const fakeCompanyId = 1;
+
+    return this.jobService.deleteJob(id, fakeCompanyId);
   }
 
 }

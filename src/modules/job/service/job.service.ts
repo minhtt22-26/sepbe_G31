@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException } from "@nestjs/common"
+import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common"
 import { JobRepository } from "../repositories/job.repository";
 import { CreateJobRequest } from "../dtos/request/create-job.request";
 import { JobResponse } from "../dtos/response/job.response";
 import { UpdateJobRequest } from "../dtos/request/update-job.request";
 import { RepositoryService } from '../repositories/repository.service';
 import { JobStatus } from 'src/generated/prisma/enums';
+import { PrismaService } from 'src/prisma.service';
 
 @Injectable()
 export class JobService {
@@ -73,41 +74,135 @@ export class JobService {
         }
     }
 
-    async create(request: CreateJobRequest) {
-        const { companyId, occupationId, ...rest } = request;
-        const job = await this.jobRepository.create({
-            ...rest,
-            company: { connect: { id: request.companyId } },
-            occupation: { connect: { id: request.occupationId } },
-        });
+    async createJob(
+        dto: CreateJobRequest,
+        companyId: number
+    ) {
 
-        return new JobResponse(job);
+        // ==============================
+        // 1️⃣ Business Validation
+        // ==============================
+
+        if (
+            dto.salaryMin != null &&
+            dto.salaryMax != null &&
+            dto.salaryMin > dto.salaryMax
+        ) {
+            throw new BadRequestException(
+                'salaryMin cannot be greater than salaryMax'
+            );
+        }
+
+        if (
+            dto.ageMin != null &&
+            dto.ageMax != null &&
+            dto.ageMin > dto.ageMax
+        ) {
+            throw new BadRequestException(
+                'ageMin cannot be greater than ageMax'
+            );
+        }
+
+        if (
+            dto.expiredAt &&
+            new Date(dto.expiredAt) < new Date()
+        ) {
+            throw new BadRequestException(
+                'expiredAt must be in the future'
+            );
+        }
+
+        if (!dto.fields || dto.fields.length === 0) {
+            throw new BadRequestException(
+                'Job must have at least one form field'
+            );
+        }
+
+        // ==============================
+        // 2️⃣ Prepare Job Data
+        // ==============================
+
+        const jobData = {
+            title: dto.title,
+            description: dto.description,
+            occupationId: dto.occupationId,
+            workingShift: dto.workingShift,
+            quantity: dto.quantity,
+            genderRequirement: dto.genderRequirement,
+            address: dto.address,
+            province: dto.province,
+            district: dto.district,
+            salaryMin: dto.salaryMin,
+            salaryMax: dto.salaryMax,
+            ageMin: dto.ageMin,
+            ageMax: dto.ageMax,
+            expiredAt: dto.expiredAt
+                ? new Date(dto.expiredAt)
+                : undefined, // hoặc set mặc định 30 ngày nếu muốn
+
+            companyId,
+            status: JobStatus.WARNING // hoặc ACTIVE nếu không cần duyệt
+        };
+
+        // ==============================
+        // 3️⃣ Call Repository
+        // ==============================
+
+        const created =
+            await this.repositoryService.createJobWithForm({
+                jobData,
+                fields: dto.fields
+            });
+
+        // ==============================
+        // 4️⃣ Return Response
+        // ==============================
+
+        return {
+            success: true,
+            data: created
+        };
     }
 
-    async findAll() {
-        const jobs = await this.jobRepository.findAll();
-        return jobs.map((j) => new JobResponse(j));
+    async updateJob(
+        jobId: number,
+        dto: UpdateJobRequest,
+        companyId: number
+    ) {
+
+        const job = await this.repositoryService.findJobById(jobId)
+
+        if (!job || job.companyId !== companyId) {
+            throw new Error('Job not found or unauthorized')
+        }
+
+        return this.repositoryService.updateJobFull(jobId, dto)
     }
 
-    async findOne(id: number) {
-        const job = await this.jobRepository.findById(id);
-        if (!job) throw new NotFoundException('Job not found');
+    async getDetail(jobId: number) {
+        const job = await this.repositoryService.findJobById(jobId);
 
-        return new JobResponse(job);
+        if (!job) {
+            throw new Error("Job not found");
+        }
+
+        return {
+            success: true,
+            data: job
+        };
     }
 
-    async update(id: number, request: UpdateJobRequest) {
-        await this.findOne(id);
+    async deleteJob(jobId: number, companyId: number) {
 
-        const job = await this.jobRepository.update(id, request);
-        return new JobResponse(job);
-    }
+        const job = await this.repositoryService.findJobById(jobId)
 
-    async remove(id: number) {
-        await this.findOne(id);
-        await this.jobRepository.delete(id);
+        if (!job || job.companyId !== companyId) {
+            throw new Error('Job not found or unauthorized')
+        }
 
-        return { message: 'Deleted successfully' };
+        await this.repositoryService.deleteJob(jobId)
+
+        return { success: true }
     }
 
 
