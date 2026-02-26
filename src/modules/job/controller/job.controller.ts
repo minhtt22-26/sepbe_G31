@@ -53,14 +53,14 @@ export class JobController {
   }
 
   // DELETE JOB
-  @Delete(":id")
-  @ApiOperation({ summary: "Delete job" })
+  @Delete(':companyId/jobs/:id')
+  @ApiOperation({ summary: "Delete job (Soft delete)" })
   async delete(
-    @Param("id", ParseIntPipe) id: number
+    @Param('companyId', ParseIntPipe) companyId: number,
+    @Param('id', ParseIntPipe) id: number
   ) {
-    const fakeCompanyId = 1;
-
-    return this.jobService.deleteJob(id, fakeCompanyId);
+    // Không còn fake nữa, lấy trực tiếp từ URL
+    return this.jobService.deleteJob(id, companyId);
   }
 
 }
