@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common"
+import { Injectable, BadRequestException } from "@nestjs/common"
 import { JobRepository } from "../repositories/job.repository";
 import { CreateJobRequest } from "../dtos/request/create-job.request";
 import { UpdateJobRequest } from "../dtos/request/update-job.request";

@@ -13,7 +13,7 @@ import { JobService } from '../service/job.service'
 import { CreateJobRequest } from '../dtos/request/create-job.request';
 import { UpdateJobRequest } from '../dtos/request/update-job.request';
 import { JobSearchDto } from "../dtos/job.search.request.dto";
-import { ApiTags, ApiOperation } from "@nestjs/swagger";
+import { ApiOperation } from "@nestjs/swagger";
 
 @Controller('job')
 export class JobController {
