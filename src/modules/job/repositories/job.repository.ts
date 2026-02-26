@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { JobStatus } from 'src/generated/prisma/browser';
 import { PrismaService } from 'src/prisma.service';
 
 @Injectable()
@@ -58,9 +59,12 @@ export class JobRepository {
   }
 
   async deleteJob(jobId: number) {
-    return this.prisma.job.delete({
-      where: { id: jobId }
-    })
+    return this.prisma.job.update({
+      where: { id: jobId },
+      data: {
+        status: JobStatus.DELETED // Giả sử bạn đã có enum JobStatus
+      }
+    });
   }
   async updateJobFull(jobId: number, dto: any) {
     return this.prisma.$transaction(async (tx) => {

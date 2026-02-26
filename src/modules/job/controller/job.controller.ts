@@ -42,12 +42,14 @@ export class JobController {
     return this.jobService.getDetail(id);
   }
 
-  @Put(':id')
+  @Put(':companyId/jobs/:id') // Cấu trúc: /1/jobs/10
   @ApiOperation({ summary: "Update job" })
-  update(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateJobRequest) {
-    const fakeCompanyId = 1;
-
-    return this.jobService.updateJob(id, body, fakeCompanyId);
+  update(
+    @Param('companyId', ParseIntPipe) companyId: number,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdateJobRequest
+  ) {
+    return this.jobService.updateJob(id, body, companyId);
   }
 
   // DELETE JOB
