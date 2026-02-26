@@ -26,13 +26,13 @@ export class JobController {
     return this.jobService.searchJobs(q);
   }
 
-  @Post()
+  @Post(':companyId') // Thêm param vào path
   @ApiOperation({ summary: "Create new job" })
-  create(@Body() dto: CreateJobRequest) {
-    // lấy companyId từ JWT sau này
-    const fakeCompanyId = 1;
-
-    return this.jobService.createJob(dto, fakeCompanyId);
+  create(
+    @Param('companyId', ParseIntPipe) companyId: number, // Lấy ID từ URL
+    @Body() dto: CreateJobRequest
+  ) {
+    return this.jobService.createJob(dto, companyId);
   }
 
   // GET JOB DETAIL
