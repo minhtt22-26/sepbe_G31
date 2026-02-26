@@ -100,18 +100,6 @@ export class CompanyService {
   }
 
   async findByOwnerId(ownerId: number) {
-    const cachedKey = `company:owner:${ownerId}`;
-
-    // Try to get from Redis
-    try {
-      const cached = await this.redis.get(cachedKey);
-      if (cached) {
-        return JSON.parse(cached);
-      }
-    }
-    catch (err) {
-      console.error('[CACHE] Get from Redis failed:', err?.message);
-    }
     const company = await this.prisma.company.findFirst({
       where: { ownerId: ownerId },
       include: {
@@ -132,11 +120,6 @@ export class CompanyService {
 
     if (company.ownerId !== ownerId) {
       throw new ForbiddenException('You are not the owner of this company');
-    }
-    try {
-      await this.redis.setEx(cachedKey, 600, JSON.stringify(company));
-    } catch (err) {
-      console.error('[CACHE] Set key failed:', err?.message);
     }
     return company;
   }
