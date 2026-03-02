@@ -12,6 +12,9 @@ describe('NotificationsController', () => {
   const notificationsServiceMock = {
     findAllForUser: jest.fn(),
     markRead: jest.fn(),
+    markAllRead: jest.fn(),
+    remove: jest.fn(),
+    removeAll: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -50,5 +53,35 @@ describe('NotificationsController', () => {
 
     expect(result).toBe(expected);
     expect(notificationsServiceMock.markRead).toHaveBeenCalledWith(5, 8);
+  });
+
+  it('markAllRead should use user payload', async () => {
+    const expected = { updated: 3 };
+    notificationsServiceMock.markAllRead.mockResolvedValue(expected);
+
+    const result = await controller.markAllRead({ userId: 8 } as any);
+
+    expect(result).toBe(expected);
+    expect(notificationsServiceMock.markAllRead).toHaveBeenCalledWith(8);
+  });
+
+  it('remove should use user payload', async () => {
+    const expected = { deleted: 1 };
+    notificationsServiceMock.remove.mockResolvedValue(expected);
+
+    const result = await controller.remove('6', { userId: 9 } as any);
+
+    expect(result).toBe(expected);
+    expect(notificationsServiceMock.remove).toHaveBeenCalledWith(6, 9);
+  });
+
+  it('removeAll should use user payload', async () => {
+    const expected = { deleted: 5 };
+    notificationsServiceMock.removeAll.mockResolvedValue(expected);
+
+    const result = await controller.removeAll({ userId: 9 } as any);
+
+    expect(result).toBe(expected);
+    expect(notificationsServiceMock.removeAll).toHaveBeenCalledWith(9);
   });
 });

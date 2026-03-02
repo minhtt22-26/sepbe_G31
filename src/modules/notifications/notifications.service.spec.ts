@@ -11,6 +11,7 @@ const prismaMock = {
   notification: {
     findMany: jest.fn(),
     updateMany: jest.fn(),
+    deleteMany: jest.fn(),
   },
 };
 
@@ -62,6 +63,48 @@ describe('NotificationsService', () => {
     expect(prismaMock.notification.updateMany).toHaveBeenCalledWith({
       where: { id: 1, userId: 2 },
       data: { isRead: true },
+    });
+  });
+
+  it('markAllRead should update only unread notifications by user', async () => {
+    prismaMock.notification.updateMany.mockResolvedValue({ count: 4 });
+
+    const result = await service.markAllRead(2);
+
+    expect(result).toEqual({ updated: 4 });
+    expect(prismaMock.notification.updateMany).toHaveBeenCalledWith({
+      where: { userId: 2, isRead: false },
+      data: { isRead: true },
+    });
+  });
+
+  it('remove should throw when not found', async () => {
+    prismaMock.notification.deleteMany.mockResolvedValue({ count: 0 });
+
+    await expect(service.remove(1, 2)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('remove should delete notification', async () => {
+    prismaMock.notification.deleteMany.mockResolvedValue({ count: 1 });
+
+    const result = await service.remove(1, 2);
+
+    expect(result).toEqual({ deleted: 1 });
+    expect(prismaMock.notification.deleteMany).toHaveBeenCalledWith({
+      where: { id: 1, userId: 2 },
+    });
+  });
+
+  it('removeAll should delete notifications by user', async () => {
+    prismaMock.notification.deleteMany.mockResolvedValue({ count: 6 });
+
+    const result = await service.removeAll(2);
+
+    expect(result).toEqual({ deleted: 6 });
+    expect(prismaMock.notification.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 2 },
     });
   });
 });
