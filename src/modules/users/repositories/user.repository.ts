@@ -256,4 +256,24 @@ export class UserRepository {
       }
     })
   }
+
+  async userDelete(
+    userId: number,
+    email: string | null,
+    userName: string | null,
+  ): Promise<User> {
+    const today = this.helperService.dateCreate()
+    const timestamp = today.getTime()
+
+    return await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        status: EnumUserStatus.DELETED,
+        email: email ? `deleted_${timestamp}_${email}` : null,
+        userName: userName ? `deleted_${timestamp}_${userName}` : null,
+      },
+    })
+
+  }
+
 }

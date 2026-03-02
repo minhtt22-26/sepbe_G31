@@ -27,6 +27,7 @@ import { ForgotPasswordRequestDto } from 'src/modules/auth/dto/request/forgot-pa
 import { ResetPasswordRequestDto } from 'src/modules/auth/dto/request/reset-password.request.dto'
 import { EmailService } from 'src/infrastructure/email/service/email.service'
 import { UserInfoRequestDto } from '../dtos/request/user.info.request.dto'
+import { UserChangePasswordRequestDto } from '../dtos/request/user.change-passwrod.dto'
 
 @Injectable()
 export class UserService {
@@ -405,4 +406,72 @@ export class UserService {
   ): Promise<void> {
     await this.sessionService.revoke(userId, sessionId, requestLog)
   }
+
+  async changePassword(
+    userId: number,
+    dto: UserChangePasswordRequestDto,
+  ): Promise<void> {
+    const user = await this.userRepository.findOneById(userId)
+
+    if (!user) {
+      throw new NotFoundException({
+        message: 'Không tìm thấy người dùng này',
+      })
+    }
+
+    if (user.password) {
+      if (!dto.oldPassword) {
+        throw new BadRequestException({
+          message: 'Vui lòng cung cấp mật khẩu hiện tại',
+        })
+      }
+
+      const isValidPassword = this.authUtil.validatePassword(
+        dto.oldPassword!,
+        user.password,
+      )
+
+      if (!isValidPassword) {
+        throw new BadRequestException({
+          message: 'Mật khẩu hiện tại không chính xác',
+        })
+      }
+    }
+
+    const password = this.authUtil.createPassword(dto.newPassword)
+
+    await this.userRepository.updatePassword(
+      userId,
+      password.passwordHash,
+      password.passwordExpired,
+      password.passwordCreated,
+    )
+  }
+
+  async userDeleteAccount(userId: number): Promise<User> {
+    const user = await this.userRepository.findOneById(userId)
+
+    if (!user) {
+      throw new NotFoundException({
+        message: 'Không tìm thấy người dùng này',
+      })
+    }
+
+    if (user.status != EnumUserStatus.ACTIVE) {
+      throw new BadRequestException({
+        message: "Tài khoản của bạn không hoạt động"
+      })
+    }
+
+    await this.sessionService.revokeAll(userId)
+
+    const userUpdate = await this.userRepository.userDelete(
+      userId,
+      user.email,
+      user.userName,
+    )
+
+    return userUpdate
+  }
 }
+

@@ -75,4 +75,9 @@ export class SessionService {
 
         await this.sessionRepository.revoke(userIdNum, sessionId, requestLog)
     }
+
+    async revokeAll(userId: number) {
+        const userIdNum = this.sessionUtil.toNumberId(userId)
+        await this.sessionRepository.revokeAll(userId)
+    }
 }

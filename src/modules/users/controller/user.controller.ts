@@ -27,6 +27,8 @@ import { EnumUserLoginWith } from 'src/generated/prisma/enums'
 import { User, WorkerProfile } from 'src/generated/prisma/client'
 import { WorkerProfileRequestDto } from '../dtos/request/user.profile.request.dto'
 import { UserInfoRequestDto } from '../dtos/request/user.info.request.dto'
+import { UserChangePasswordRequestDto } from '../dtos/request/user.change-passwrod.dto'
+
 
 @Controller('user')
 export class UserController {
@@ -145,6 +147,15 @@ export class UserController {
     return await this.userService.updateInfoUser(userId, body)
   }
 
+  @Put('change-password')
+  @AuthJwtAccessProtected()
+  async changePassword(
+    @AuthJwtPayload('userId') userId: number,
+    @Body() body: UserChangePasswordRequestDto,
+  ): Promise<void> {
+    return await this.userService.changePassword(userId, body)
+  }
+
   @Post('logout')
   @AuthJwtAccessProtected()
   async logout(
@@ -156,5 +167,13 @@ export class UserController {
       ipAddress: req.ip ?? 'unknown',
       userAgent: req.headers['user-agent'] ?? 'unknown',
     })
+  }
+
+  @Put('delete-account')
+  @AuthJwtAccessProtected()
+  async userDeleteAccount(
+    @AuthJwtPayload('userId') userId: number,
+  ): Promise<User> {
+    return await this.userService.userDeleteAccount(userId)
   }
 }

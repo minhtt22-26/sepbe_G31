@@ -9,7 +9,7 @@ export class UserSignUpRequestDto {
     fullName: string
 
     @ValidateIf(o => !o.email)
-    @IsOptional()
+    //@IsOptional()
     @IsString()
     @MinLength(3)
     @MaxLength(20)
@@ -21,7 +21,7 @@ export class UserSignUpRequestDto {
     phone?: string
 
     @ValidateIf(o => !o.userName)
-    @IsOptional()
+    //@IsOptional()
     @IsString()
     @IsEmail()
     email?: string

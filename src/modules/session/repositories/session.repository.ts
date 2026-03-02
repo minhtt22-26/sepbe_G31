@@ -63,12 +63,12 @@ export class SessionRepository {
     }
 
     async revoke(
-      userId: number,
-      sessionId: string,
-      requestLog: {
-        ipAddress: string,
-        userAgent: string,
-      }  
+        userId: number,
+        sessionId: string,
+        requestLog: {
+            ipAddress: string,
+            userAgent: string,
+        }
     ): Promise<Session> {
         return this.prisma.session.update({
             where: {
@@ -79,7 +79,17 @@ export class SessionRepository {
                 isRevoked: true,
                 revokedAt: new Date(),
                 ipAddress: requestLog.ipAddress,
-                userAgent: requestLog.userAgent, 
+                userAgent: requestLog.userAgent,
+            }
+        })
+    }
+
+    async revokeAll(userId: number): Promise<void> {
+        await this.prisma.session.updateMany({
+            where: { userId },
+            data: {
+                isRevoked: true,
+                revokedAt: new Date(),
             }
         })
     }
