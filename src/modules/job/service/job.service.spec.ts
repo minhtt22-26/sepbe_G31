@@ -16,6 +16,7 @@ const jobRepositoryMock = {
   applyJob: jest.fn(),
   findApplicationByJobAndUser: jest.fn(),
   cancelApply: jest.fn(),
+  findApplicationsByUser: jest.fn(),
 };
 
 describe('JobService', () => {
@@ -155,5 +156,29 @@ describe('JobService', () => {
 
     expect(result).toEqual({ success: true });
     expect(jobRepositoryMock.cancelApply).toHaveBeenCalledWith(1, 2);
+  });
+
+  it('getApplicationsByUser should return applications for user', async () => {
+    jobRepositoryMock.findApplicationsByUser.mockResolvedValue([
+      {
+        id: 200,
+        status: JobApplicationStatus.APPLIED,
+        job: { id: 10, title: 'Test Job', company: { id: 5, name: 'Acme' } },
+        answers: [
+          {
+            fieldId: 100,
+            value: 'Nguyễn Văn A',
+            field: { id: 100, label: 'Họ tên', fieldType: 'text', isRequired: true, options: null },
+          },
+        ],
+      },
+    ]);
+
+    const result = await service.getApplicationsByUser(2);
+
+    expect(result.success).toBe(true);
+    expect(jobRepositoryMock.findApplicationsByUser).toHaveBeenCalledWith(2);
+    expect(Array.isArray(result.data)).toBe(true);
+    expect(result.data[0].job.id).toBe(10);
   });
 });
