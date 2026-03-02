@@ -310,4 +310,35 @@ export class JobRepository {
       },
     })
   }
+
+  async findApplicationsByUser(userId: number) {
+    return this.prisma.jobApplication.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        job: {
+          select: {
+            id: true,
+            title: true,
+            company: { select: { id: true, name: true } },
+          },
+        },
+        answers: {
+          select: {
+            fieldId: true,
+            value: true,
+            field: {
+              select: {
+                id: true,
+                label: true,
+                fieldType: true,
+                isRequired: true,
+                options: true,
+              },
+            },
+          },
+        },
+      },
+    })
+  }
 }

@@ -3,9 +3,10 @@ import { JobService } from "./service/job.service";
 import { JobRepository } from "./repositories/job.repository";
 import { JobController } from "./controller/job.controller";
 import { PrismaModule } from "src/prisma.module";
+import { AuthModule } from "../auth/auth.module";
 
 @Module({
-    imports: [PrismaModule],
+    imports: [PrismaModule,AuthModule],
     controllers: [JobController],
     providers: [JobService, JobRepository],
     exports: [JobModule]

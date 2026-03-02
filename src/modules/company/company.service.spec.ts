@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { CompanyService } from './company.service';
 import { PrismaService } from 'src/prisma.service';
+import { REDIS_CLIENT } from 'src/infrastructure/redis/redis.provider';
 import { CloudinaryService } from 'src/infrastructure/cloudinary/cloudinary.service';
 import { CompanyStatus } from 'src/generated/prisma/enums';
 
@@ -28,6 +29,10 @@ const cloudinaryMock = {
   uploadFile: jest.fn(),
 };
 
+const redisMock = {
+  get: jest.fn(),
+  setEx: jest.fn(),
+};
 describe('CompanyService', () => {
   let service: CompanyService;
 
@@ -37,6 +42,7 @@ describe('CompanyService', () => {
         CompanyService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: CloudinaryService, useValue: cloudinaryMock },
+        { provide: REDIS_CLIENT, useValue: redisMock },
       ],
     }).compile();
 

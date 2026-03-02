@@ -321,6 +321,11 @@ export class JobService {
         }
     }
 
+        async getApplicationsByUser(userId: number) {
+            const applications = await this.jobRepository.findApplicationsByUser(userId)
+            return { success: true, data: applications }
+        }
+
     async cancelApplyJob(jobId: number, userId: number) {
         const application = await this.jobRepository.findApplicationByJobAndUser(jobId, userId)
 
