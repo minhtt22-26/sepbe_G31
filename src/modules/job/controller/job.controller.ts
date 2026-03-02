@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Post,
+  Patch,
   Put,
   Query,
   ParseIntPipe
@@ -14,6 +15,11 @@ import { CreateJobRequest } from '../dtos/request/create-job.request';
 import { UpdateJobRequest } from '../dtos/request/update-job.request';
 import { JobSearchDto } from "../dtos/job.search.request.dto";
 import { ApiOperation } from "@nestjs/swagger";
+import { ApplyJobRequest } from '../dtos/request/apply-job.request';
+import {
+  AuthJwtAccessProtected,
+  AuthJwtPayload,
+} from 'src/modules/auth/decorators/auth.jwt.decorator';
 
 @Controller('job')
 export class JobController {
@@ -40,6 +46,33 @@ export class JobController {
   @ApiOperation({ summary: "Get job detail by id" })
   async getDetail(@Param("id", ParseIntPipe) id: number) {
     return this.jobService.getDetail(id);
+  }
+
+  @Get(':id/apply-form')
+  @ApiOperation({ summary: 'Get apply form by job id' })
+  async getApplyForm(@Param('id', ParseIntPipe) id: number) {
+    return this.jobService.getApplyForm(id)
+  }
+
+  @Post(':id/apply')
+  @ApiOperation({ summary: 'Apply job with form answers' })
+  @AuthJwtAccessProtected()
+  async applyJob(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: ApplyJobRequest,
+    @AuthJwtPayload() user: any,
+  ) {
+    return this.jobService.applyJob(id, user.userId, body)
+  }
+
+  @Patch(':id/cancel-apply')
+  @ApiOperation({ summary: 'Cancel applied job' })
+  @AuthJwtAccessProtected()
+  async cancelApply(
+    @Param('id', ParseIntPipe) id: number,
+    @AuthJwtPayload() user: any,
+  ) {
+    return this.jobService.cancelApplyJob(id, user.userId)
   }
 
   @Put(':id')

@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param } from '@nestjs/common';
+import { Controller, Delete, Get, Patch, Param } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
 import { AuthJwtAccessProtected, AuthJwtPayload } from '../auth/decorators/auth.jwt.decorator';
@@ -29,5 +29,40 @@ export class NotificationsController {
     const userId = user.userId;
 
     return this.notificationsService.markRead(+id, userId);
+  }
+
+  @Patch('read-all')
+  @ApiOperation({ summary: 'Đánh dấu tất cả là đã đọc' })
+  @ApiResponse({ status: 200, description: 'Đã đánh dấu toàn bộ thông báo là đã đọc' })
+  @ApiBearerAuth('access-token')
+  @AuthJwtAccessProtected()
+  markAllRead(@AuthJwtPayload() user: any) {
+    const userId = user.userId;
+
+    return this.notificationsService.markAllRead(userId);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Xóa thông báo' })
+  @ApiParam({ name: 'id', type: Number, description: 'Notification ID' })
+  @ApiResponse({ status: 200, description: 'Xóa thông báo thành công' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy thông báo' })
+  @ApiBearerAuth('access-token')
+  @AuthJwtAccessProtected()
+  remove(@Param('id') id: string, @AuthJwtPayload() user: any) {
+    const userId = user.userId;
+
+    return this.notificationsService.remove(+id, userId);
+  }
+
+  @Delete()
+  @ApiOperation({ summary: 'Xóa toàn bộ thông báo' })
+  @ApiResponse({ status: 200, description: 'Xóa toàn bộ thông báo thành công' })
+  @ApiBearerAuth('access-token')
+  @AuthJwtAccessProtected()
+  removeAll(@AuthJwtPayload() user: any) {
+    const userId = user.userId;
+
+    return this.notificationsService.removeAll(userId);
   }
 }
