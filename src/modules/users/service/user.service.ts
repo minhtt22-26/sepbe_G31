@@ -202,6 +202,14 @@ export class UserService {
     userId: number,
     dto: UserInfoRequestDto,
   ): Promise<User> {
+    const user = await this.getUserById(userId)
+
+    if (!user) {
+      throw new NotFoundException({
+        message: 'Không tìm thấy thông tin của bạn',
+      })
+    }
+
     return this.userRepository.updateInfoUser(userId, dto)
   }
 
