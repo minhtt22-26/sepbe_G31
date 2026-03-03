@@ -193,6 +193,8 @@ export class JobRepository {
             id: true,
             name: true,
             logoUrl: true,
+            address: true,
+            website: true,
           },
         },
         occupation: {
