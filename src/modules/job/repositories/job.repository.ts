@@ -180,7 +180,14 @@ export class JobRepository {
   }
   async findJobById(jobId: number) {
     return this.prisma.job.findUnique({
-      where: { id: jobId }
+      where: { id: jobId },
+      include: {
+        applyForms: {
+          include: {
+            fields: true
+          }
+        }
+      }
     })
   }
 

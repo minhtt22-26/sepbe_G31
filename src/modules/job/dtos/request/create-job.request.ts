@@ -15,6 +15,7 @@ import {
 import { Type } from "class-transformer";
 import { EnumShift, EnumUserGender } from "src/generated/prisma/enums";
 import { JobFormFieldDto } from "../job.form-field.dto";
+//import { JobFormFieldDto } from "../job.form-field.dto";
 
 export class CreateJobRequest {
 
@@ -61,42 +62,31 @@ export class CreateJobRequest {
     @IsString()
     district?: string;
 
-    // ==========================
-    // BỔ SUNG PHẦN THIẾU
-    // ==========================
-
-    @ApiPropertyOptional({ example: 5000000 })
-    @IsOptional()
-    @Type(() => Number)
-    @IsInt()
-    salaryMin?: number;
-
-    @ApiPropertyOptional({ example: 10000000 })
-    @IsOptional()
-    @Type(() => Number)
-    @IsInt()
-    salaryMax?: number;
-
-    @ApiPropertyOptional({ example: 18 })
-    @IsOptional()
+    @ApiPropertyOptional()
     @Type(() => Number)
     @IsInt()
     ageMin?: number;
 
-    @ApiPropertyOptional({ example: 35 })
-    @IsOptional()
+    @ApiPropertyOptional()
     @Type(() => Number)
     @IsInt()
     ageMax?: number;
+
+    @ApiPropertyOptional()
+    @Type(() => Number)
+    @IsInt()
+    salaryMin?: number;
+
+    @ApiPropertyOptional()
+    @Type(() => Number)
+    @IsInt()
+    salaryMax?: number;
 
     @ApiPropertyOptional({ example: "2026-12-31T23:59:59.000Z" })
     @IsOptional()
     @IsDateString()
     expiredAt?: string;
 
-    // ==========================
-    // GIỮ NGUYÊN PHẦN FORM FIELDS
-    // ==========================
 
     @ApiProperty({
         type: [JobFormFieldDto]
