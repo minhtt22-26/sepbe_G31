@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform, Type } from "class-transformer";
-import { IsEnum, IsInt, IsOptional, IsString, Min, Max } from "class-validator";
+import { IsEnum, IsInt, IsOptional, IsString, Min, Max, IsBoolean } from "class-validator";
 import { EnumShift, EnumUserGender } from "src/generated/prisma/enums";
 
 export enum JobSortBy {
@@ -105,4 +105,13 @@ export class JobSearchDto {
   @IsOptional()
   @IsEnum(JobSortBy)
   sortBy?: JobSortBy;
+
+  @ApiPropertyOptional({
+    description: "Nếu true, lấy tất cả trạng thái (dành cho employer)",
+    example: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => value === 'true' || value === true)
+  allStatus?: boolean;
 }
