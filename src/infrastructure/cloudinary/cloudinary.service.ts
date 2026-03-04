@@ -13,8 +13,9 @@ export class CloudinaryService {
 
   async uploadFile(file: Express.Multer.File, folder: string) {
     return new Promise((resolve, reject) => {
+      // Use resource_type 'auto' so Cloudinary accepts images and raw files (e.g., PDFs)
       cloudinary.uploader.upload_stream(
-        { folder },
+        { folder, resource_type: 'auto' },
         (error, result) => {
           if (error) return reject(new Error(error?.message || 'Upload failed'));
           resolve(result);
