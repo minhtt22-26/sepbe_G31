@@ -14,11 +14,13 @@ import { JobService } from '../service/job.service'
 import { CreateJobRequest } from '../dtos/request/create-job.request'
 import { UpdateJobRequest } from '../dtos/request/update-job.request'
 import { JobSearchDto } from '../dtos/job.search.request.dto'
+import { WishlistRequestDto } from '../dtos/job.wishlist.request.dto'
 import {
   ApiBearerAuth,
   ApiBody,
   ApiOperation,
   ApiParam,
+  ApiResponse,
   ApiTags,
 } from '@nestjs/swagger'
 import { ApplyJobRequest } from '../dtos/request/apply-job.request'
@@ -35,7 +37,9 @@ export class JobController {
 
   // Search jobs (Elastic)
   //api/job/search?keyword=abc&sectorId=2&workingShift=AFTERNOON&page=1&limit=10
-  @Get('search')
+  @Get("search")
+  @ApiOperation({ summary: 'Search jobs' })
+  @ApiResponse({ status: 200, description: 'Jobs retrieved successfully' })
   async search(@Query() q: JobSearchDto) {
     return this.jobService.searchJobs(q)
   }
@@ -61,6 +65,18 @@ export class JobController {
     const ownerId = user.userId
     const company = await this.companyService.findByOwnerId(ownerId);
     return this.jobService.createJob(dto, company.id);
+  }
+
+  @Get("wishlist")
+  @ApiOperation({ summary: 'Get user wishlist' })
+  @ApiResponse({ status: 200, description: 'Wishlist retrieved successfully' })
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  async getWishlist(
+    @Query() q: WishlistRequestDto,
+    @AuthJwtPayload() user: any
+  ) {
+    return this.jobService.getWistlist(user.userId, q.page, q.limit, q.skip);
   }
 
   // GET JOB DETAIL
@@ -165,5 +181,25 @@ export class JobController {
   @ApiOperation({ summary: 'Get related jobs' })
   async getRelatedJobs(@Param('id', ParseIntPipe) id: number) {
     return this.jobService.getRelatedJobs(id)
+  }
+
+  // wishlist endpoint previously here
+
+  @Post("save/:jobId")
+  @ApiOperation({ summary: 'Save a job' })
+  @ApiResponse({ status: 201, description: 'Job saved successfully' })
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  async saveJob(@Param('jobId') jobId: string, @AuthJwtPayload() user: any) {
+    return this.jobService.saveJob(user.userId, +jobId);
+  }
+
+  @Delete("unsave/:jobId")
+  @ApiOperation({ summary: 'Unsave a job' })
+  @ApiResponse({ status: 200, description: 'Job unsaved successfully' })
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  async unSaveJob(@Param('jobId') jobId: string, @AuthJwtPayload() user: any) {
+    return this.jobService.unSaveJob(user.userId, +jobId);
   }
 }

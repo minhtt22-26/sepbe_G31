@@ -5,7 +5,7 @@ import { PrismaService } from 'src/prisma.service'
 
 @Injectable()
 export class JobRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
   async createJobWithForm(data: any) {
     const occupation = await this.prisma.occupation.findUnique({
       where: { id: data.jobData.occupationId },
@@ -410,6 +410,63 @@ export class JobRepository {
             name: true,
             logoUrl: true,
           },
+        },
+      },
+    })
+  }
+
+  async getWishList(where: any, orderBy: any, limit: number, skip: number) {
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.savedJob.findMany({
+        where,
+        orderBy,
+        take: limit,
+        skip,
+        include: {
+          job: {
+            include: {
+              company: {
+                select: {
+                  id: true,
+                  name: true,
+                  logoUrl: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.savedJob.count({ where }),
+    ])
+    return { items, total }
+  }
+
+  async findSavedJob(userId: number, jobId: number) {
+    return this.prisma.savedJob.findUnique({
+      where: {
+        userId_jobId: {
+          userId,
+          jobId,
+        },
+      },
+    })
+  }
+
+  async saveJob(userId: number, jobId: number) {
+    return this.prisma.savedJob.create({
+      data: {
+        userId,
+        jobId,
+      },
+    })
+  }
+
+  async unSaveJob(userId: number, jobId: number) {
+    return this.prisma.savedJob.delete({
+      where: {
+        userId_jobId: {
+          userId,
+          jobId,
         },
       },
     })
