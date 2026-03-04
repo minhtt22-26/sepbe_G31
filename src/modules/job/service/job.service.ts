@@ -31,8 +31,11 @@ export class JobService {
         const page = q.page || 1
         const limit = q.limit || 10
         const skip = (page - 1) * limit
-        const where: any = {
-            status: JobStatus.PUBLISHED
+        const where: any = {}
+        if (!q.allStatus) {
+            where.status = JobStatus.PUBLISHED
+        } else {
+            where.status = { not: JobStatus.DELETED }
         }
         if (keyword) {
             where.OR = [
@@ -321,10 +324,10 @@ export class JobService {
         }
     }
 
-        async getApplicationsByUser(userId: number) {
-            const applications = await this.jobRepository.findApplicationsByUser(userId)
-            return { success: true, data: applications }
-        }
+    async getApplicationsByUser(userId: number) {
+        const applications = await this.jobRepository.findApplicationsByUser(userId)
+        return { success: true, data: applications }
+    }
 
     async cancelApplyJob(jobId: number, userId: number) {
         const application = await this.jobRepository.findApplicationByJobAndUser(jobId, userId)

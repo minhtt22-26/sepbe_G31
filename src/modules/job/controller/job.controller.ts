@@ -112,7 +112,7 @@ export class JobController {
     return this.jobService.cancelApplyJob(id, userId)
   }
 
-  @Put(':id')
+  @Put(':companyId/jobs/:id')
   @ApiOperation({ summary: "Update job" })
   update(
     @Param('companyId', ParseIntPipe) companyId: number,
