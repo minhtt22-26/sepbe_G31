@@ -40,8 +40,8 @@ export class SessionRepository {
       },
       data: {
         jti: data.jti,
-        ipAddress: data.ipAddress,
-        userAgent: data.userAgent,
+        // ipAddress: data.ipAddress,
+        // userAgent: data.userAgent,
         expiredAt: data.expiredAt,
       },
     })

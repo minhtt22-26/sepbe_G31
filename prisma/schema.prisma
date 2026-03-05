@@ -192,8 +192,8 @@ model Session {
   id        String    @id
   userId    Int
   jti       String    @unique
-  ipAddress String?
-  userAgent String?
+  //ipAddress String?
+  //userAgent String?
   isRevoked Boolean?  @default(false)
   expiredAt DateTime
   revokedAt DateTime?
