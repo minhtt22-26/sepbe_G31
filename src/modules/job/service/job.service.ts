@@ -2,17 +2,20 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
-} from '@nestjs/common'
-import { JobRepository } from '../repositories/job.repository'
-import { CreateJobRequest } from '../dtos/request/create-job.request'
-import { UpdateJobRequest } from '../dtos/request/update-job.request'
-import { JobApplicationStatus, JobStatus } from 'src/generated/prisma/enums'
-import { ApplyJobRequest } from '../dtos/request/apply-job.request'
+} from "@nestjs/common"
+import { JobRepository } from "../repositories/job.repository";
+import { CreateJobRequest } from "../dtos/request/create-job.request";
+import { UpdateJobRequest } from "../dtos/request/update-job.request";
+import {
+  JobApplicationStatus,
+  JobStatus,
+} from 'src/generated/prisma/enums';
+import { ApplyJobRequest } from '../dtos/request/apply-job.request';
 import { JOB_CONSTANTS } from '../constant/job.constant'
 
 @Injectable()
 export class JobService {
-  constructor(private readonly jobRepository: JobRepository) {}
+  constructor(private readonly jobRepository: JobRepository) { }
 
   async searchJobs(q: any) {
     const keyword = q.keyword?.trim() || ''
@@ -29,13 +32,16 @@ export class JobService {
     const page = q.page || 1
     const limit = q.limit || 10
     const skip = (page - 1) * limit
-    const where: any = {
-      status: JobStatus.PUBLISHED,
+    const where: any = {}
+    if (!q.allStatus) {
+      where.status = JobStatus.PUBLISHED
+    } else {
+      where.status = { not: JobStatus.DELETED }
     }
     if (keyword) {
       where.OR = [
-        { title: { contains: keyword, mode: 'insensitive' } },
-        { description: { contains: keyword, mode: 'insensitive' } },
+        { title: { contains: keyword, mode: "insensitive" } },
+        { description: { contains: keyword, mode: "insensitive" } },
       ]
     }
     if (workingShift) {
@@ -48,30 +54,22 @@ export class JobService {
       where.companyId = { equals: Number(companyId) }
     }
     if (province) {
-      where.province = { contains: province, mode: 'insensitive' }
+      where.province = { contains: province, mode: "insensitive" }
     }
     if (district) {
-      where.district = { contains: district, mode: 'insensitive' }
+      where.district = { contains: district, mode: "insensitive" }
     }
     if (genderRequirement) {
       where.genderRequirement = { equals: genderRequirement }
     }
     // if(salaryMin)
-    const sortBy = q.sortBy || 'newest'
+    const sortBy = q.sortBy || "newest"
     const orderBy =
-      sortBy === 'salary_desc'
-        ? { salaryMax: 'desc' }
-        : sortBy === 'salary_asc'
-          ? { salaryMax: 'asc' }
-          : sortBy === 'view'
-            ? { viewCount: 'desc' }
-            : { createdAt: 'desc' }
-    const { items, total } = await this.jobRepository.searchJobs(
-      where,
-      orderBy,
-      limit,
-      skip,
-    )
+      sortBy === "salary_desc" ? { salaryMax: "desc" }
+        : sortBy === "salary_asc" ? { salaryMax: "asc" }
+          : sortBy === "view" ? { viewCount: "desc" } :
+            { createdAt: "desc" }
+    const { items, total } = await this.jobRepository.searchJobs(where, orderBy, limit, skip)
     return {
       success: true,
       items,
@@ -79,12 +77,17 @@ export class JobService {
         page,
         limit,
         total,
-        totalPage: Math.ceil(total / limit),
-      },
+        totalPage: Math.ceil(total / limit)
+      }
+
     }
   }
 
-  async createJob(dto: CreateJobRequest, companyId: number) {
+  async createJob(
+    dto: CreateJobRequest,
+    companyId: number
+  ) {
+
     // ==============================
     // 1️⃣ Business Validation
     // ==============================
@@ -95,21 +98,30 @@ export class JobService {
       dto.salaryMin > dto.salaryMax
     ) {
       throw new BadRequestException(
-        'salaryMin cannot be greater than salaryMax',
-      )
+        'salaryMin cannot be greater than salaryMax'
+      );
     }
 
-    if (dto.ageMin != null && dto.ageMax != null && dto.ageMin > dto.ageMax) {
-      throw new BadRequestException('ageMin cannot be greater than ageMax')
+    if (
+      dto.ageMin != null &&
+      dto.ageMax != null &&
+      dto.ageMin > dto.ageMax
+    ) {
+      throw new BadRequestException(
+        'ageMin cannot be greater than ageMax'
+      );
     }
 
-    if (dto.expiredAt && new Date(dto.expiredAt) < new Date()) {
-      throw new BadRequestException('expiredAt must be in the future')
+    if (
+      dto.expiredAt &&
+      new Date(dto.expiredAt) < new Date()
+    ) {
+      throw new BadRequestException(
+        'expiredAt must be in the future'
+      );
     }
 
-    if (!dto.fields || dto.fields.length === 0) {
-      throw new BadRequestException('Job must have at least one form field')
-    }
+
 
     // ==============================
     // 2️⃣ Prepare Job Data
@@ -129,32 +141,45 @@ export class JobService {
       salaryMax: dto.salaryMax,
       ageMin: dto.ageMin,
       ageMax: dto.ageMax,
-      expiredAt: dto.expiredAt ? new Date(dto.expiredAt) : undefined, // hoặc set mặc định 30 ngày nếu muốn
+      expiredAt: dto.expiredAt
+        ? new Date(dto.expiredAt)
+        : undefined, // hoặc set mặc định 30 ngày nếu muốn
 
       companyId,
-      status: JobStatus.WARNING, // hoặc ACTIVE nếu không cần duyệt
-    }
+      status: JobStatus.WARNING // hoặc ACTIVE nếu không cần duyệt
+    };
 
     // ==============================
     // 3️⃣ Call Repository
     // ==============================
 
-    const created = await this.jobRepository.createJobWithForm({
-      jobData,
-      fields: dto.fields,
-    })
+    try {
+      const created =
+        await this.jobRepository.createJobWithForm({
+          jobData,
+          fields: dto.fields
+        });
 
-    // ==============================
-    // 4️⃣ Return Response
-    // ==============================
+      // ==============================
+      // 4️⃣ Return Response
+      // ==============================
 
-    return {
-      success: true,
-      data: created,
+      return {
+        success: true,
+        data: created
+      };
+    } catch (error) {
+      console.error('\n\n==== PRISMA ERROR LOG ====\n', error.message, '\n==========================\n');
+      throw error;
     }
   }
 
-  async updateJob(jobId: number, dto: UpdateJobRequest, companyId: number) {
+  async updateJob(
+    jobId: number,
+    dto: UpdateJobRequest,
+    companyId: number
+  ) {
+
     const job = await this.jobRepository.findJobById(jobId)
 
     if (!job || job.companyId !== companyId) {
@@ -165,16 +190,20 @@ export class JobService {
   }
 
   async getDetail(jobId: number) {
-    const job = await this.jobRepository.findJobById(jobId)
+    const job = await this.jobRepository.findJobById(jobId);
 
     if (!job) {
-      throw new Error('Job not found')
+      throw new Error("Job not found");
     }
 
-    return job
+    return {
+      success: true,
+      data: job
+    };
   }
 
   async deleteJob(jobId: number, companyId: number) {
+
     const job = await this.jobRepository.findJobById(jobId)
 
     if (!job || job.companyId !== companyId) {
@@ -225,7 +254,7 @@ export class JobService {
 
     const form = jobWithForm.applyForms?.[0]
 
-    if (!form || !form.fields?.length) {
+    if (!form) {
       throw new BadRequestException('Apply form has not been created')
     }
 
@@ -234,9 +263,7 @@ export class JobService {
 
     for (const answer of answers) {
       if (answerByFieldId.has(answer.fieldId)) {
-        throw new BadRequestException(
-          `Duplicate answer for fieldId ${answer.fieldId}`,
-        )
+        throw new BadRequestException(`Duplicate answer for fieldId ${answer.fieldId}`)
       }
       answerByFieldId.set(answer.fieldId, answer.value?.trim())
     }
@@ -261,22 +288,14 @@ export class JobService {
         }
 
         if (parsedOptions.length > 0) {
-          const selected =
-            field.fieldType === 'checkbox'
-              ? value
-                  .split(',')
-                  .map((item) => item.trim())
-                  .filter(Boolean)
-              : [value]
+          const selected = field.fieldType === 'checkbox'
+            ? value.split(',').map((item) => item.trim()).filter(Boolean)
+            : [value]
 
-          const hasInvalid = selected.some(
-            (item) => !parsedOptions.includes(item),
-          )
+          const hasInvalid = selected.some((item) => !parsedOptions.includes(item))
 
           if (hasInvalid) {
-            throw new BadRequestException(
-              `Field "${field.label}" has invalid option`,
-            )
+            throw new BadRequestException(`Field "${field.label}" has invalid option`)
           }
         }
       }
@@ -287,9 +306,7 @@ export class JobService {
     )
 
     if (invalidField) {
-      throw new BadRequestException(
-        `fieldId ${invalidField.fieldId} does not belong to apply form`,
-      )
+      throw new BadRequestException(`fieldId ${invalidField.fieldId} does not belong to apply form`)
     }
 
     const payloadAnswers = answers.map((answer) => ({
@@ -315,10 +332,7 @@ export class JobService {
   }
 
   async cancelApplyJob(jobId: number, userId: number) {
-    const application = await this.jobRepository.findApplicationByJobAndUser(
-      jobId,
-      userId,
-    )
+    const application = await this.jobRepository.findApplicationByJobAndUser(jobId, userId)
 
     if (!application) {
       throw new NotFoundException('Application not found')
@@ -329,8 +343,8 @@ export class JobService {
     }
 
     if (
-      application.status === JobApplicationStatus.UNSUITABLE ||
-      application.status === JobApplicationStatus.SUITABLE
+      application.status === JobApplicationStatus.UNSUITABLE
+      || application.status === JobApplicationStatus.SUITABLE
     ) {
       throw new BadRequestException('Cannot cancel processed application')
     }
@@ -361,4 +375,6 @@ export class JobService {
 
     return relatedJobs
   }
+
+
 }
