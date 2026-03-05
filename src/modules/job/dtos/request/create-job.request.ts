@@ -63,21 +63,25 @@ export class CreateJobRequest {
     district?: string;
 
     @ApiPropertyOptional()
+    @IsOptional()
     @Type(() => Number)
     @IsInt()
     ageMin?: number;
 
     @ApiPropertyOptional()
+    @IsOptional()
     @Type(() => Number)
     @IsInt()
     ageMax?: number;
 
     @ApiPropertyOptional()
+    @IsOptional()
     @Type(() => Number)
     @IsInt()
     salaryMin?: number;
 
     @ApiPropertyOptional()
+    @IsOptional()
     @Type(() => Number)
     @IsInt()
     salaryMax?: number;
@@ -88,11 +92,12 @@ export class CreateJobRequest {
     expiredAt?: string;
 
 
-    @ApiProperty({
+    @ApiPropertyOptional({
         type: [JobFormFieldDto]
     })
+    @IsOptional()
     @IsArray()
     @ValidateNested({ each: true })
     @Type(() => JobFormFieldDto)
-    fields: JobFormFieldDto[];
+    fields?: JobFormFieldDto[];
 }

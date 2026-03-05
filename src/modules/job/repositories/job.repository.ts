@@ -14,11 +14,15 @@ export class JobRepository {
     if (!occupation) {
       throw new BadRequestException('Invalid occupationId')
     }
-    return this.prisma.job.create({
-      data: {
-        ...data.jobData,
-        applyForms: {
-          create: {
+
+    const jobDataCreate: any = {
+      ...data.jobData,
+    };
+
+    if (data.fields && data.fields.length > 0) {
+      jobDataCreate.applyForms = {
+        create: [
+          {
             fields: {
               create: data.fields.map((f: any) => ({
                 label: f.label,
@@ -28,8 +32,12 @@ export class JobRepository {
               }))
             }
           }
-        }
-      },
+        ]
+      };
+    }
+
+    return this.prisma.job.create({
+      data: jobDataCreate,
       include: {
         applyForms: {
           include: {
@@ -37,7 +45,7 @@ export class JobRepository {
           }
         }
       }
-    })
+    });
   }
 
   async searchJobs(where: any, orderBy: any, limit: number, offset: number) {
@@ -79,12 +87,18 @@ export class JobRepository {
       })
 
       // Lấy form hiện tại
-      const form = await tx.jobApplyForm.findFirst({
+      let form = await tx.jobApplyForm.findFirst({
         where: { jobId },
         include: { fields: true }
       })
 
-      if (!form) throw new Error('Form not found')
+      if (!form) {
+        // Tạo biến form mới nếu chưa có
+        form = await tx.jobApplyForm.create({
+          data: { jobId },
+          include: { fields: true }
+        })
+      }
 
       if (!fields || !Array.isArray(fields)) {
         throw new Error('Fields are required')
