@@ -120,11 +120,7 @@ export class JobService {
             );
         }
 
-        if (!dto.fields || dto.fields.length === 0) {
-            throw new BadRequestException(
-                'Job must have at least one form field'
-            );
-        }
+
 
         // ==============================
         // 2️⃣ Prepare Job Data
@@ -156,20 +152,25 @@ export class JobService {
         // 3️⃣ Call Repository
         // ==============================
 
-        const created =
-            await this.jobRepository.createJobWithForm({
-                jobData,
-                fields: dto.fields
-            });
+        try {
+            const created =
+                await this.jobRepository.createJobWithForm({
+                    jobData,
+                    fields: dto.fields
+                });
 
-        // ==============================
-        // 4️⃣ Return Response
-        // ==============================
+            // ==============================
+            // 4️⃣ Return Response
+            // ==============================
 
-        return {
-            success: true,
-            data: created
-        };
+            return {
+                success: true,
+                data: created
+            };
+        } catch (error) {
+            console.error('\n\n==== PRISMA ERROR LOG ====\n', error.message, '\n==========================\n');
+            throw error;
+        }
     }
 
     async updateJob(
@@ -252,7 +253,7 @@ export class JobService {
 
         const form = jobWithForm.applyForms?.[0]
 
-        if (!form || !form.fields?.length) {
+        if (!form) {
             throw new BadRequestException('Apply form has not been created')
         }
 
