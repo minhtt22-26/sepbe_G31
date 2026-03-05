@@ -44,8 +44,16 @@ export default tseslint.config(
 
       // ❌ TẮT STYLE RULE
       '@typescript-eslint/semi': 'off',
-      'semi': 'off',
-      'quotes': 'off',
+      semi: 'off',
+      quotes: 'off',
+    },
+  },
+
+  // 🧪 Test files: disable unbound-method (conflicts with Jest's expect pattern)
+  {
+    files: ['**/*.spec.ts', '**/*.test.ts', '**/test/**/*.ts'],
+    rules: {
+      '@typescript-eslint/unbound-method': 'off',
     },
   },
 )

@@ -180,16 +180,16 @@ export class AuthService {
   ): Promise<IAuthRefreshTokenPayload> {
     const { userId, sessionId, jti } = payload
 
-    console.log('[REFRESH DEBUG] === validateJwtRefreshStrategy ===')
-    console.log(`[REFRESH DEBUG] payload.userId: ${userId}`)
-    console.log(`[REFRESH DEBUG] payload.sessionId: ${sessionId}`)
-    console.log(`[REFRESH DEBUG] payload.jti: ${jti?.substring(0, 10)}...`)
-    console.log(
-      `[REFRESH DEBUG] payload.exp: ${(payload as any).exp} → ${(payload as any).exp ? new Date((payload as any).exp * 1000).toISOString() : 'N/A'}`,
-    )
+    // console.log('[REFRESH DEBUG] === validateJwtRefreshStrategy ===')
+    // console.log(`[REFRESH DEBUG] payload.userId: ${userId}`)
+    // console.log(`[REFRESH DEBUG] payload.sessionId: ${sessionId}`)
+    // console.log(`[REFRESH DEBUG] payload.jti: ${jti?.substring(0, 10)}...`)
+    // console.log(
+    //   `[REFRESH DEBUG] payload.exp: ${(payload as any).exp} → ${(payload as any).exp ? new Date((payload as any).exp * 1000).toISOString() : 'N/A'}`,
+    // )
 
     if (!userId || !sessionId || !jti) {
-      console.error('[REFRESH DEBUG] ❌ FAIL: Missing userId/sessionId/jti')
+      // console.error('[REFRESH DEBUG] ❌ FAIL: Missing userId/sessionId/jti')
       throw new UnauthorizedException({
         message: 'Thông tin refresh token không hợp lệ',
       })
@@ -198,19 +198,19 @@ export class AuthService {
     const session = await this.sessionService.getLogin(userId, sessionId)
 
     if (!session) {
-      console.error(
-        `[REFRESH DEBUG] ❌ FAIL: Session NOT FOUND for userId=${userId}, sessionId=${sessionId}`,
-      )
-      console.error(`[REFRESH DEBUG] → Session may be expired or revoked`)
+      // console.error(
+      //   `[REFRESH DEBUG] ❌ FAIL: Session NOT FOUND for userId=${userId}, sessionId=${sessionId}`,
+      // )
+      // console.error(`[REFRESH DEBUG] → Session may be expired or revoked`)
       throw new UnauthorizedException({
         message: 'Phiên làm việc đã hết hạn, vui lòng đăng nhập lại',
       })
     }
 
-    console.log(
-      `[REFRESH DEBUG] session.jti: ${session.jti?.substring(0, 10)}...`,
-    )
-    console.log(`[REFRESH DEBUG] session.expiredAt: ${session.expiredAt}`)
+    // console.log(
+    //   `[REFRESH DEBUG] session.jti: ${session.jti?.substring(0, 10)}...`,
+    // )
+    // console.log(`[REFRESH DEBUG] session.expiredAt: ${session.expiredAt}`)
 
     if (session.jti !== payload.jti) {
       console.error(`[REFRESH DEBUG] ❌ FAIL: JTI MISMATCH`)
@@ -221,7 +221,7 @@ export class AuthService {
       })
     }
 
-    console.log('[REFRESH DEBUG] ✅ Validation passed')
+    //console.log('[REFRESH DEBUG] ✅ Validation passed')
     return payload
   }
 

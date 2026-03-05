@@ -32,9 +32,9 @@ export class AuthUtil {
   private readonly passwordAttempt: boolean
   private readonly passwordMaxAttempt: number
   private readonly passwordSaltLength: number
-  private readonly passwordExpiredInSeconds: number
-  private readonly passwordExpiredTemporaryInSeconds: number
-  private readonly passwordPeriodInSeconds: number
+  //private readonly passwordExpiredInSeconds: number
+  //private readonly passwordExpiredTemporaryInSeconds: number
+  //private readonly passwordPeriodInSeconds: number
 
   //Forgot password
   private readonly forgotPasswordTokenLength: number
@@ -84,15 +84,15 @@ export class AuthUtil {
     this.passwordSaltLength = this.configService.get<number>(
       'auth.password.saltLength',
     )!
-    this.passwordExpiredInSeconds = this.configService.get<number>(
-      'auth.password.expiredSeconds',
-    )!
-    this.passwordExpiredTemporaryInSeconds = this.configService.get<number>(
-      'auth.password.expiredTemporaryInSeconds',
-    )!
-    this.passwordPeriodInSeconds = this.configService.get<number>(
-      'auth.password.periodInSeconds',
-    )!
+    // this.passwordExpiredInSeconds = this.configService.get<number>(
+    //   'auth.password.expiredSeconds',
+    // )!
+    // this.passwordExpiredTemporaryInSeconds = this.configService.get<number>(
+    //   'auth.password.expiredTemporaryInSeconds',
+    // )!
+    // this.passwordPeriodInSeconds = this.configService.get<number>(
+    //   'auth.password.periodInSeconds',
+    // )!
 
     //forgot password
     this.forgotPasswordTokenLength = this.configService.get<number>(
@@ -188,30 +188,30 @@ export class AuthUtil {
 
   //Password Hash
   createPassword(password: string): IAuthPassword {
-    const today = this.helperService.dateCreate()
+    //const today = this.helperService.dateCreate()
     const salt = this.helperService.bcryptGenrateSalt(this.passwordSaltLength)
 
-    const passwordExpired: Date = this.helperService.dateForward(
-      today,
-      this.helperService.dateCreateDuration({
-        seconds: this.passwordExpiredInSeconds,
-      }),
-    )
+    // const passwordExpired: Date = this.helperService.dateForward(
+    //   today,
+    //   this.helperService.dateCreateDuration({
+    //     seconds: this.passwordExpiredInSeconds,
+    //   }),
+    // )
 
     const passwordHash = this.helperService.bcryptHash(password, salt)
 
-    const passwordPeriodExpired: Date = this.helperService.dateForward(
-      today,
-      this.helperService.dateCreateDuration({
-        seconds: this.passwordPeriodInSeconds,
-      }),
-    )
+    // const passwordPeriodExpired: Date = this.helperService.dateForward(
+    //   today,
+    //   this.helperService.dateCreateDuration({
+    //     seconds: this.passwordPeriodInSeconds,
+    //   }),
+    // )
 
     return {
       passwordHash,
-      passwordExpired,
-      passwordCreated: today,
-      passwordPeriodExpired,
+      //passwordExpired,
+      //passwordCreated: today,
+      //passwordPeriodExpired,
     }
   }
 
@@ -225,11 +225,11 @@ export class AuthUtil {
     return this.helperService.bcryptCompare(passwordString, passWordHash)
   }
 
-  checkPasswordExpired(passwordExpired: Date | null): boolean {
-    if (!passwordExpired) return false
-    const today = new Date()
-    return today > passwordExpired
-  }
+  // checkPasswordExpired(passwordExpired: Date | null): boolean {
+  //   if (!passwordExpired) return false
+  //   const today = new Date()
+  //   return today > passwordExpired
+  // }
 
   //Forgot password
   createForgotPasswordToken(): string {

@@ -20,7 +20,7 @@ export class UserRepository {
   constructor(
     private readonly prisma: PrismaService,
     private readonly helperService: HelperService,
-  ) { }
+  ) {}
 
   async findUserWithByEmail(email: string): Promise<User | null> {
     return this.prisma.user.findUnique({
@@ -52,8 +52,8 @@ export class UserRepository {
         phone,
         role,
         password: passwordData.passwordHash,
-        passwordCreated: passwordData.passwordCreated,
-        passwordExpired: passwordData.passwordExpired,
+        //passwordCreated: passwordData.passwordCreated,
+        //passwordExpired: passwordData.passwordExpired,
       },
     })
   }
@@ -163,15 +163,15 @@ export class UserRepository {
   async updatePassword(
     userId: number,
     passwordHash: string,
-    passwordExpired: Date,
-    passwordCreated: Date,
+    //passwordExpired: Date,
+    //passwordCreated: Date,
   ): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
       data: {
         password: passwordHash,
-        passwordExpired,
-        passwordCreated,
+        //passwordExpired,
+        //passwordCreated,
         passwordAttempt: 0,
       },
     })
@@ -232,15 +232,12 @@ export class UserRepository {
     })
   }
 
-  async updateInfoUser(
-    userId: number,
-    data: UserInfoRequestDto
-  ) {
+  async updateInfoUser(userId: number, data: UserInfoRequestDto) {
     return await this.prisma.user.update({
       where: {
         id: userId,
       },
-      data
+      data,
     })
   }
 
@@ -250,10 +247,10 @@ export class UserRepository {
       include: {
         occupation: {
           include: {
-            sector: true
-          }
-        }
-      }
+            sector: true,
+          },
+        },
+      },
     })
   }
 
@@ -273,7 +270,5 @@ export class UserRepository {
         userName: userName ? `deleted_${timestamp}_${userName}` : null,
       },
     })
-
   }
-
 }

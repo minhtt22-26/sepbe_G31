@@ -143,8 +143,8 @@ model User {
   email           String?            @unique
   password        String?
   loginWith       EnumUserLoginWith?
-  passwordExpired DateTime?
-  passwordCreated DateTime?
+  //passwordExpired DateTime?
+  //passwordCreated DateTime?
   passwordAttempt Int                @default(0)
   isVerified      Boolean            @default(false)
   verifiedAt      DateTime?
