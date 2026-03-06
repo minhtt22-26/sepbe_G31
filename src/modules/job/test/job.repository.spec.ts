@@ -1,19 +1,19 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { JobRepository } from './job.repository';
-import { PrismaService } from 'src/prisma.service';
+import { Test, TestingModule } from '@nestjs/testing'
+import { PrismaService } from 'src/prisma.service'
+import { JobRepository } from '../repositories/job.repository'
 
 jest.mock('src/prisma.service', () => ({
   PrismaService: class {},
-}));
+}))
 
 const prismaMock = {
   job: {
     findUnique: jest.fn(),
   },
-};
+}
 
 describe('JobRepository', () => {
-  let service: JobRepository;
+  let service: JobRepository
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -24,12 +24,12 @@ describe('JobRepository', () => {
           useValue: prismaMock,
         },
       ],
-    }).compile();
+    }).compile()
 
-    service = module.get<JobRepository>(JobRepository);
-  });
+    service = module.get<JobRepository>(JobRepository)
+  })
 
   it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
-});
+    expect(service).toBeDefined()
+  })
+})

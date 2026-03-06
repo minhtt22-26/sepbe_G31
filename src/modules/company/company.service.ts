@@ -1,20 +1,34 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException, Inject } from '@nestjs/common';
-import { CloudinaryService } from 'src/infrastructure/cloudinary/cloudinary.service';
-import { PrismaService } from 'src/prisma.service';
-import { CompanyRegisterDto } from './dtos/request/company.register';
-import { CompanyStatus, EnumUserRole } from 'src/generated/prisma/enums';
-import { UpdateCompanyDto } from './dtos/request/company.update';
-import { CompanyReviewDto } from './dtos/request/company.review';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+  Inject,
+} from '@nestjs/common'
+import { CloudinaryService } from 'src/infrastructure/cloudinary/cloudinary.service'
+import { PrismaService } from 'src/prisma.service'
+import { CompanyRegisterDto } from './dtos/request/company.register'
+import { CompanyStatus, EnumUserRole } from 'src/generated/prisma/enums'
+import { UpdateCompanyDto } from './dtos/request/company.update'
+import { CompanyReviewDto } from './dtos/request/company.review'
 import { REDIS_CLIENT } from 'src/infrastructure/redis/redis.provider'
 import type { RedisClientType } from 'redis'
+import {
+  CompanySearchDto,
+  CompanySortBy,
+} from './dtos/request/company.search.request.dto'
+import { CompanyRepository } from './company.repository'
+import { Prisma } from 'src/generated/prisma/client'
+import { createPaginatedResult } from 'src/common/utils/pagination.util'
 
 @Injectable()
 export class CompanyService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cloudinary: CloudinaryService,
+    private readonly companyRepository: CompanyRepository,
     @Inject(REDIS_CLIENT) private redis: RedisClientType,
-  ) { }
+  ) {}
 
   async findAll() {
     const cacheKey = 'companies:approved'
@@ -74,7 +88,7 @@ export class CompanyService {
           },
         },
       },
-    });
+    })
   }
 
   async findOne(id: number) {
@@ -90,13 +104,13 @@ export class CompanyService {
           },
         },
       },
-    });
+    })
 
     if (!company) {
-      throw new NotFoundException('Company not found');
+      throw new NotFoundException('Company not found')
     }
 
-    return company;
+    return company
   }
 
   async findByOwnerId(ownerId: number) {
@@ -112,35 +126,35 @@ export class CompanyService {
           },
         },
       },
-    });
+    })
 
     if (!company) {
-      throw new NotFoundException('Company not found');
+      throw new NotFoundException('Company not found')
     }
 
     if (company.ownerId !== ownerId) {
-      throw new ForbiddenException('You are not the owner of this company');
+      throw new ForbiddenException('You are not the owner of this company')
     }
-    return company;
+    return company
   }
   async review(id: number, body: CompanyReviewDto) {
     const company = await this.prisma.company.findUnique({
       where: { id },
-    });
+    })
 
     if (!company) {
-      throw new NotFoundException('Company not found');
+      throw new NotFoundException('Company not found')
     }
 
     if (
       body.status !== CompanyStatus.APPROVED &&
       body.status !== CompanyStatus.REJECTED
     ) {
-      throw new BadRequestException('Invalid status');
+      throw new BadRequestException('Invalid status')
     }
 
     if (body.status === CompanyStatus.REJECTED && !body.rejectionReason) {
-      throw new BadRequestException('Rejection reason is required');
+      throw new BadRequestException('Rejection reason is required')
     }
 
     const updatedCompany = await this.prisma.company.update({
@@ -148,20 +162,18 @@ export class CompanyService {
       data: {
         status: body.status,
         rejectionReason:
-          body.status === CompanyStatus.REJECTED
-            ? body.rejectionReason
-            : null,
+          body.status === CompanyStatus.REJECTED ? body.rejectionReason : null,
       },
-    });
+    })
 
     const title =
       body.status === CompanyStatus.APPROVED
         ? 'Công ty đã được duyệt'
-        : 'Công ty bị từ chối';
+        : 'Công ty bị từ chối'
     const message =
       body.status === CompanyStatus.REJECTED
         ? body.rejectionReason || 'Công ty đã bị từ chối'
-        : 'Công ty của bạn đã được duyệt';
+        : 'Công ty của bạn đã được duyệt'
 
     await this.prisma.notification.create({
       data: {
@@ -170,32 +182,32 @@ export class CompanyService {
         message,
         link: `/company/${company.id}`,
       },
-    });
+    })
 
-    return updatedCompany;
+    return updatedCompany
   }
 
   async create(
     data: CompanyRegisterDto,
     files: {
-      logo?: Express.Multer.File[];
-      businessLicense?: Express.Multer.File[];
+      logo?: Express.Multer.File[]
+      businessLicense?: Express.Multer.File[]
     },
     ownerId: number,
   ) {
     try {
-      let logoUrl: string | undefined;
-      let businessLicenseUrl: string | undefined;
+      let logoUrl: string | undefined
+      let businessLicenseUrl: string | undefined
 
       // Upload song song nếu có file
-      const uploadTasks: Promise<any>[] = [];
+      const uploadTasks: Promise<any>[] = []
 
       if (files?.logo?.[0]) {
         uploadTasks.push(
           this.cloudinary.uploadFile(files.logo[0], 'company/logo'),
-        );
+        )
       } else {
-        uploadTasks.push(Promise.resolve(null));
+        uploadTasks.push(Promise.resolve(null))
       }
 
       if (files?.businessLicense?.[0]) {
@@ -204,19 +216,19 @@ export class CompanyService {
             files.businessLicense[0],
             'company/license',
           ),
-        );
+        )
       } else {
-        uploadTasks.push(Promise.resolve(null));
+        uploadTasks.push(Promise.resolve(null))
       }
 
-      const [logoUpload, licenseUpload]: any = await Promise.all(uploadTasks);
+      const [logoUpload, licenseUpload]: any = await Promise.all(uploadTasks)
 
       if (logoUpload) {
-        logoUrl = logoUpload.secure_url;
+        logoUrl = logoUpload.secure_url
       }
 
       if (licenseUpload) {
-        businessLicenseUrl = licenseUpload.secure_url;
+        businessLicenseUrl = licenseUpload.secure_url
       }
 
       // Lưu DB
@@ -232,11 +244,11 @@ export class CompanyService {
           logoUrl,
           businessLicenseUrl,
         },
-      });
+      })
       const manager = await this.prisma.user.findFirst({
         where: { role: EnumUserRole.MANAGER },
         select: { id: true },
-      });
+      })
 
       if (manager) {
         await this.prisma.notification.create({
@@ -246,16 +258,14 @@ export class CompanyService {
             message: `Công ty "${data.name}" vừa đăng ký và đang chờ duyệt.`,
             link: `/admin/companies/${createdCompany.id}`,
           },
-        });
+        })
       }
 
-      return createdCompany;
-
-
+      return createdCompany
     } catch (error) {
       throw new BadRequestException(
         error?.message || 'Failed to create company',
-      );
+      )
     }
   }
   async update(
@@ -264,37 +274,39 @@ export class CompanyService {
     files: any,
     ownerId: number,
   ) {
-
     const company = await this.prisma.company.findUnique({
       where: { id },
-    });
+    })
 
     if (!company) {
-      throw new NotFoundException('Company not found');
+      throw new NotFoundException('Company not found')
     }
 
     if (company.ownerId !== ownerId) {
-      throw new ForbiddenException('You are not allowed');
+      throw new ForbiddenException('You are not allowed')
     }
 
-    let logoUrl = company.logoUrl;
-    let businessLicenseUrl = company.businessLicenseUrl;
+    let logoUrl = company.logoUrl
+    let businessLicenseUrl = company.businessLicenseUrl
 
     // nếu có upload file mới
     if (files?.logo?.length) {
-      const uploadLogo = await this.cloudinary.uploadFile(files.logo[0], 'company/logo') as { secure_url: string };
-      logoUrl = uploadLogo.secure_url;
+      const uploadLogo = (await this.cloudinary.uploadFile(
+        files.logo[0],
+        'company/logo',
+      )) as { secure_url: string }
+      logoUrl = uploadLogo.secure_url
     }
 
     if (files?.businessLicense?.length) {
-      const uploadLicense = await this.cloudinary.uploadFile(
+      const uploadLicense = (await this.cloudinary.uploadFile(
         files.businessLicense[0],
         'company/license',
-      ) as { secure_url: string };
-      businessLicenseUrl = uploadLicense.secure_url;
+      )) as { secure_url: string }
+      businessLicenseUrl = uploadLicense.secure_url
     }
 
-    const { ...updateData } = body as any;
+    const { ...updateData } = body as any
 
     return this.prisma.company.update({
       where: { id },
@@ -303,7 +315,43 @@ export class CompanyService {
         logoUrl: logoUrl,
         businessLicenseUrl: businessLicenseUrl,
       },
-    });
+    })
   }
 
+  async searchCompanies(dto: CompanySearchDto) {
+    const { keyword, sortBy } = dto
+    const skip = dto.skip
+
+    const where: Prisma.CompanyWhereInput = {
+      status: CompanyStatus.APPROVED,
+    }
+
+    if (keyword) {
+      where.OR = [
+        { name: { contains: keyword, mode: 'insensitive' } }, //Ko phan biet hoa thuong
+        { description: { contains: keyword, mode: 'insensitive' } },
+        { address: { contains: keyword, mode: 'insensitive' } },
+      ]
+    }
+
+    const orderByMap: Record<
+      CompanySortBy,
+      Prisma.CompanyOrderByWithRelationInput
+    > = {
+      [CompanySortBy.NEWEST]: { createdAt: 'desc' },
+      [CompanySortBy.NAME_ASC]: { name: 'asc' },
+      [CompanySortBy.NAME_DESC]: { name: 'desc' },
+    }
+
+    const orderBy = orderByMap[sortBy ?? CompanySortBy.NEWEST]
+
+    const { items, total } = await this.companyRepository.searchCompaies(
+      where,
+      orderBy,
+      dto.limit!,
+      skip,
+    )
+
+    return createPaginatedResult(items, total, dto.page!, dto.limit!)
+  }
 }

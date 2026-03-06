@@ -1,16 +1,8 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Post,
-  Put,
-  Req,
-} from '@nestjs/common'
+import { Body, Controller, Get, Post, Put } from '@nestjs/common'
 import { UserService } from '../service/user.service'
 import { UserSignUpRequestDto } from '../dtos/request/user.sign-up.request.dto'
 import { UserLoginResponseDto } from '../dtos/response/user.login.response.dto'
 import { UserLoginRequestDto } from '../dtos/request/user.login.request.dto'
-import type { Request } from 'express'
 import {
   AuthJwtRefreshProtected,
   AuthJwtPayload,
@@ -27,10 +19,11 @@ import { EnumUserLoginWith } from 'src/generated/prisma/enums'
 import { User, WorkerProfile } from 'src/generated/prisma/client'
 import { WorkerProfileRequestDto } from '../dtos/request/user.profile.request.dto'
 import { UserInfoRequestDto } from '../dtos/request/user.info.request.dto'
+import { UserChangePasswordRequestDto } from '../dtos/request/user.change-passwrod.dto'
 
 @Controller('user')
 export class UserController {
-  constructor(private readonly userService: UserService) { }
+  constructor(private readonly userService: UserService) {}
 
   @Post('sign-up')
   async signUp(@Body() body: UserSignUpRequestDto): Promise<void> {
@@ -40,12 +33,15 @@ export class UserController {
   @Post('login/credential')
   async loginWithCredential(
     @Body() body: UserLoginRequestDto,
-    @Req() req: Request,
+    // @Req() req: Request,
   ): Promise<UserLoginResponseDto> {
-    return await this.userService.loginCrendential(body, {
-      ipAddress: req.ip || '',
-      userAgent: (req.headers['user-agent'] as string) || '',
-    })
+    return await this.userService.loginCrendential(
+      body,
+      //   {
+      //   ipAddress: req.ip || '',
+      //   userAgent: (req.headers['user-agent'] as string) || '',
+      // }
+    )
   }
 
   @Post('refresh')
@@ -53,37 +49,46 @@ export class UserController {
   async refreshToken(
     @AuthJwtPayload() user: IAuthRefreshTokenPayload,
     @AuthJwtToken() refreshToken: string,
-    @Req() req: Request,
+    // @Req() req: Request,
   ): Promise<AuthTokenResponseDto> {
     const userFromDb = await this.userService.getUserById(user.userId)
 
-    return await this.userService.refreshToken(userFromDb, refreshToken, {
-      ipAddress: req.ip || '',
-      userAgent: (req.headers['user-agent'] as string) || '',
-    })
+    return await this.userService.refreshToken(
+      userFromDb,
+      refreshToken,
+      //   {
+      //   ipAddress: req.ip || '',
+      //   userAgent: (req.headers['user-agent'] as string) || '',
+      // }
+    )
   }
 
   @Post('forgot-password')
   async forgotPassword(
     @Body() body: ForgotPasswordRequestDto,
-    @Req() req: Request,
+    //@Req() req: Request,
   ): Promise<void> {
-    return await this.userService.forgotPassword(body, {
-      ipAddress: req.ip ?? 'unknown',
-      userAgent: req.headers['user-agent'] ?? 'unknown',
-    })
-
+    return await this.userService.forgotPassword(
+      body,
+      //   {
+      //   ipAddress: req.ip ?? 'unknown',
+      //   userAgent: req.headers['user-agent'] ?? 'unknown',
+      // }
+    )
   }
 
   @Put('reset-password')
   async resetPassword(
     @Body() body: ResetPasswordRequestDto,
-    @Req() req: Request,
+    //@Req() req: Request,
   ): Promise<void> {
-    return await this.userService.resetPassword(body, {
-      ipAddress: req.ip ?? 'unknown',
-      userAgent: req.headers['user-agent'] ?? 'unknown',
-    })
+    return await this.userService.resetPassword(
+      body,
+      //   {
+      //   ipAddress: req.ip ?? 'unknown',
+      //   userAgent: req.headers['user-agent'] ?? 'unknown',
+      // }
+    )
   }
 
   @Post('login/social/google')
@@ -91,16 +96,16 @@ export class UserController {
   async loginWithGoogle(
     @AuthJwtPayload('email') email: string,
     @Body() body: UserCreateSocialRequestDto,
-    @Req() req: Request,
+    // @Req() req: Request,
   ): Promise<UserLoginResponseDto> {
     return this.userService.loginWithSocial(
       email,
       EnumUserLoginWith.SOCIAL_GOOGLE,
       body,
-      {
-        ipAddress: req.ip ?? 'unknown',
-        userAgent: req.headers['user-agent'] ?? 'unknown',
-      },
+      // {
+      //   ipAddress: req.ip ?? 'unknown',
+      //   userAgent: req.headers['user-agent'] ?? 'unknown',
+      // },
     )
   }
 
@@ -145,16 +150,37 @@ export class UserController {
     return await this.userService.updateInfoUser(userId, body)
   }
 
+  @Put('change-password')
+  @AuthJwtAccessProtected()
+  async changePassword(
+    @AuthJwtPayload('userId') userId: number,
+    @Body() body: UserChangePasswordRequestDto,
+  ): Promise<void> {
+    return await this.userService.changePassword(userId, body)
+  }
+
   @Post('logout')
   @AuthJwtAccessProtected()
   async logout(
     @AuthJwtPayload('userId') userId: number,
     @AuthJwtPayload('sessionId') sessionId: string,
-    @Req() req: Request,
+    // @Req() req: Request,
   ): Promise<void> {
-    return await this.userService.logout(userId, sessionId, {
-      ipAddress: req.ip ?? 'unknown',
-      userAgent: req.headers['user-agent'] ?? 'unknown',
-    })
+    return await this.userService.logout(
+      userId,
+      sessionId,
+      //   {
+      //   ipAddress: req.ip ?? 'unknown',
+      //   userAgent: req.headers['user-agent'] ?? 'unknown',
+      // }
+    )
+  }
+
+  @Put('delete-account')
+  @AuthJwtAccessProtected()
+  async userDeleteAccount(
+    @AuthJwtPayload('userId') userId: number,
+  ): Promise<User> {
+    return await this.userService.userDeleteAccount(userId)
   }
 }

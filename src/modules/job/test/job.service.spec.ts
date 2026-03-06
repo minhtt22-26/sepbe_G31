@@ -1,15 +1,12 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { JobService } from './job.service';
-import { JobRepository } from '../repositories/job.repository';
-import {
-  JobApplicationStatus,
-  JobStatus,
-} from 'src/generated/prisma/enums';
+import { Test, TestingModule } from '@nestjs/testing'
+import { BadRequestException, NotFoundException } from '@nestjs/common'
+import { JobRepository } from '../repositories/job.repository'
+import { JobApplicationStatus, JobStatus } from 'src/generated/prisma/enums'
+import { JobService } from '../service/job.service'
 
 jest.mock('src/prisma.service', () => ({
   PrismaService: class {},
-}));
+}))
 
 const jobRepositoryMock = {
   findJobWithApplyForm: jest.fn(),
@@ -17,10 +14,10 @@ const jobRepositoryMock = {
   findApplicationByJobAndUser: jest.fn(),
   cancelApply: jest.fn(),
   findApplicationsByUser: jest.fn(),
-};
+}
 
 describe('JobService', () => {
-  let service: JobService;
+  let service: JobService
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -31,24 +28,26 @@ describe('JobService', () => {
           useValue: jobRepositoryMock,
         },
       ],
-    }).compile();
+    }).compile()
 
-    service = module.get<JobService>(JobService);
-  });
+    service = module.get<JobService>(JobService)
+  })
 
   afterEach(() => {
-    jest.clearAllMocks();
-  });
+    jest.clearAllMocks()
+  })
 
   it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
+    expect(service).toBeDefined()
+  })
 
   it('getApplyForm should throw when job not found', async () => {
-    jobRepositoryMock.findJobWithApplyForm.mockResolvedValue(null);
+    jobRepositoryMock.findJobWithApplyForm.mockResolvedValue(null)
 
-    await expect(service.getApplyForm(1)).rejects.toBeInstanceOf(NotFoundException);
-  });
+    await expect(service.getApplyForm(1)).rejects.toBeInstanceOf(
+      NotFoundException,
+    )
+  })
 
   it('getApplyForm should return first form fields', async () => {
     jobRepositoryMock.findJobWithApplyForm.mockResolvedValue({
@@ -58,16 +57,18 @@ describe('JobService', () => {
       applyForms: [
         {
           id: 10,
-          fields: [{ id: 100, label: 'Họ tên', fieldType: 'text', isRequired: true }],
+          fields: [
+            { id: 100, label: 'Họ tên', fieldType: 'text', isRequired: true },
+          ],
         },
       ],
-    });
+    })
 
-    const result = await service.getApplyForm(1);
+    const result = await service.getApplyForm(1)
 
-    expect(result.success).toBe(true);
-    expect(result.data.formId).toBe(10);
-  });
+    expect(result.success).toBe(true)
+    expect(result.data.formId).toBe(10)
+  })
 
   it('applyJob should throw if required field is missing', async () => {
     jobRepositoryMock.findJobWithApplyForm.mockResolvedValue({
@@ -77,17 +78,25 @@ describe('JobService', () => {
       applyForms: [
         {
           id: 10,
-          fields: [{ id: 100, label: 'Họ tên', fieldType: 'text', isRequired: true, options: null }],
+          fields: [
+            {
+              id: 100,
+              label: 'Họ tên',
+              fieldType: 'text',
+              isRequired: true,
+              options: null,
+            },
+          ],
         },
       ],
-    });
+    })
 
     await expect(
       service.applyJob(1, 2, {
         answers: [],
       }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-  });
+    ).rejects.toBeInstanceOf(BadRequestException)
+  })
 
   it('applyJob should call repository when payload is valid', async () => {
     jobRepositoryMock.findJobWithApplyForm.mockResolvedValue({
@@ -98,7 +107,13 @@ describe('JobService', () => {
         {
           id: 10,
           fields: [
-            { id: 100, label: 'Họ tên', fieldType: 'text', isRequired: true, options: null },
+            {
+              id: 100,
+              label: 'Họ tên',
+              fieldType: 'text',
+              isRequired: true,
+              options: null,
+            },
             {
               id: 101,
               label: 'Ca làm',
@@ -109,17 +124,20 @@ describe('JobService', () => {
           ],
         },
       ],
-    });
-    jobRepositoryMock.applyJob.mockResolvedValue({ id: 200, status: JobApplicationStatus.APPLIED });
+    })
+    jobRepositoryMock.applyJob.mockResolvedValue({
+      id: 200,
+      status: JobApplicationStatus.APPLIED,
+    })
 
     const result = await service.applyJob(1, 2, {
       answers: [
         { fieldId: 100, value: 'Nguyễn Văn A' },
         { fieldId: 101, value: 'MORNING' },
       ],
-    });
+    })
 
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(true)
     expect(jobRepositoryMock.applyJob).toHaveBeenCalledWith({
       jobId: 1,
       userId: 2,
@@ -127,36 +145,40 @@ describe('JobService', () => {
         { fieldId: 100, value: 'Nguyễn Văn A' },
         { fieldId: 101, value: 'MORNING' },
       ],
-    });
-  });
+    })
+  })
 
   it('cancelApplyJob should throw if application not found', async () => {
-    jobRepositoryMock.findApplicationByJobAndUser.mockResolvedValue(null);
+    jobRepositoryMock.findApplicationByJobAndUser.mockResolvedValue(null)
 
-    await expect(service.cancelApplyJob(1, 2)).rejects.toBeInstanceOf(NotFoundException);
-  });
+    await expect(service.cancelApplyJob(1, 2)).rejects.toBeInstanceOf(
+      NotFoundException,
+    )
+  })
 
   it('cancelApplyJob should throw if already cancelled', async () => {
     jobRepositoryMock.findApplicationByJobAndUser.mockResolvedValue({
       id: 100,
       status: JobApplicationStatus.CANCELLED,
-    });
+    })
 
-    await expect(service.cancelApplyJob(1, 2)).rejects.toBeInstanceOf(BadRequestException);
-  });
+    await expect(service.cancelApplyJob(1, 2)).rejects.toBeInstanceOf(
+      BadRequestException,
+    )
+  })
 
   it('cancelApplyJob should cancel when status is APPLIED', async () => {
     jobRepositoryMock.findApplicationByJobAndUser.mockResolvedValue({
       id: 100,
       status: JobApplicationStatus.APPLIED,
-    });
-    jobRepositoryMock.cancelApply.mockResolvedValue({ id: 100 });
+    })
+    jobRepositoryMock.cancelApply.mockResolvedValue({ id: 100 })
 
-    const result = await service.cancelApplyJob(1, 2);
+    const result = await service.cancelApplyJob(1, 2)
 
-    expect(result).toEqual({ success: true });
-    expect(jobRepositoryMock.cancelApply).toHaveBeenCalledWith(1, 2);
-  });
+    expect(result).toEqual({ success: true })
+    expect(jobRepositoryMock.cancelApply).toHaveBeenCalledWith(1, 2)
+  })
 
   it('getApplicationsByUser should return applications for user', async () => {
     jobRepositoryMock.findApplicationsByUser.mockResolvedValue([
@@ -168,17 +190,23 @@ describe('JobService', () => {
           {
             fieldId: 100,
             value: 'Nguyễn Văn A',
-            field: { id: 100, label: 'Họ tên', fieldType: 'text', isRequired: true, options: null },
+            field: {
+              id: 100,
+              label: 'Họ tên',
+              fieldType: 'text',
+              isRequired: true,
+              options: null,
+            },
           },
         ],
       },
-    ]);
+    ])
 
-    const result = await service.getApplicationsByUser(2);
+    const result = await service.getApplicationsByUser(2)
 
-    expect(result.success).toBe(true);
-    expect(jobRepositoryMock.findApplicationsByUser).toHaveBeenCalledWith(2);
-    expect(Array.isArray(result.data)).toBe(true);
-    expect(result.data[0].job.id).toBe(10);
-  });
-});
+    expect(result.success).toBe(true)
+    expect(jobRepositoryMock.findApplicationsByUser).toHaveBeenCalledWith(2)
+    expect(Array.isArray(result.data)).toBe(true)
+    expect(result.data[0].job.id).toBe(10)
+  })
+})

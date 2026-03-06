@@ -1,358 +1,364 @@
 import {
-    Injectable,
-    BadRequestException,
-    NotFoundException,
-} from "@nestjs/common"
-import { JobRepository } from "../repositories/job.repository";
-import { CreateJobRequest } from "../dtos/request/create-job.request";
-import { UpdateJobRequest } from "../dtos/request/update-job.request";
-import {
-    JobApplicationStatus,
-    JobStatus,
-} from 'src/generated/prisma/enums';
-import { ApplyJobRequest } from '../dtos/request/apply-job.request';
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common'
+import { JobRepository } from '../repositories/job.repository'
+import { CreateJobRequest } from '../dtos/request/create-job.request'
+import { UpdateJobRequest } from '../dtos/request/update-job.request'
+import { JobApplicationStatus, JobStatus } from 'src/generated/prisma/enums'
+import { ApplyJobRequest } from '../dtos/request/apply-job.request'
+import { JOB_CONSTANTS } from '../constant/job.constant'
 
 @Injectable()
 export class JobService {
-    constructor(private readonly jobRepository: JobRepository) { }
+  constructor(private readonly jobRepository: JobRepository) {}
 
-    async searchJobs(q: any) {
-        const keyword = q.keyword?.trim() || ''
-        const province = q.province?.trim() || ''
-        const district = q.district
-        // const salaryMin = q.salaryMin
-        // const salaryMax = q.salaryMax
-        const genderRequirement = q.genderRequirement
-        // const ageMin = q.ageMin
-        // const ageMax = q.ageMax
-        const workingShift = q.workingShift
-        const occupationId = q.occupationId
-        const companyId = q.companyId
-        const page = q.page || 1
-        const limit = q.limit || 10
-        const skip = (page - 1) * limit
-        const where: any = {}
-        if (!q.allStatus) {
-            where.status = JobStatus.PUBLISHED
-        } else {
-            where.status = { not: JobStatus.DELETED }
-        }
-        if (keyword) {
-            where.OR = [
-                { title: { contains: keyword, mode: "insensitive" } },
-                { description: { contains: keyword, mode: "insensitive" } },
-            ]
-        }
-        if (workingShift) {
-            where.workingShift = { equals: workingShift }
-        }
-        if (occupationId) {
-            where.occupationId = { equals: Number(occupationId) }
-        }
-        if (companyId) {
-            where.companyId = { equals: Number(companyId) }
-        }
-        if (province) {
-            where.province = { contains: province, mode: "insensitive" }
-        }
-        if (district) {
-            where.district = { contains: district, mode: "insensitive" }
-        }
-        if (genderRequirement) {
-            where.genderRequirement = { equals: genderRequirement }
-        }
-        // if(salaryMin)
-        const sortBy = q.sortBy || "newest"
-        const orderBy =
-            sortBy === "salary_desc" ? { salaryMax: "desc" }
-                : sortBy === "salary_asc" ? { salaryMax: "asc" }
-                    : sortBy === "view" ? { viewCount: "desc" } :
-                        { createdAt: "desc" }
-        const { items, total } = await this.jobRepository.searchJobs(where, orderBy, limit, skip)
-        return {
-            success: true,
-            items,
-            meta: {
-                page,
-                limit,
-                total,
-                totalPage: Math.ceil(total / limit)
-            }
-
-        }
+  async searchJobs(q: any) {
+    const keyword = q.keyword?.trim() || ''
+    const province = q.province?.trim() || ''
+    const district = q.district
+    // const salaryMin = q.salaryMin
+    // const salaryMax = q.salaryMax
+    const genderRequirement = q.genderRequirement
+    // const ageMin = q.ageMin
+    // const ageMax = q.ageMax
+    const workingShift = q.workingShift
+    const occupationId = q.occupationId
+    const companyId = q.companyId
+    const page = q.page || 1
+    const limit = q.limit || 10
+    const skip = (page - 1) * limit
+    const where: any = {
+      status: JobStatus.PUBLISHED,
     }
+    if (keyword) {
+      where.OR = [
+        { title: { contains: keyword, mode: 'insensitive' } },
+        { description: { contains: keyword, mode: 'insensitive' } },
+      ]
+    }
+    if (workingShift) {
+      where.workingShift = { equals: workingShift }
+    }
+    if (occupationId) {
+      where.occupationId = { equals: Number(occupationId) }
+    }
+    if (companyId) {
+      where.companyId = { equals: Number(companyId) }
+    }
+    if (province) {
+      where.province = { contains: province, mode: 'insensitive' }
+    }
+    if (district) {
+      where.district = { contains: district, mode: 'insensitive' }
+    }
+    if (genderRequirement) {
+      where.genderRequirement = { equals: genderRequirement }
+    }
+    // if(salaryMin)
+    const sortBy = q.sortBy || 'newest'
+    const orderBy =
+      sortBy === 'salary_desc'
+        ? { salaryMax: 'desc' }
+        : sortBy === 'salary_asc'
+          ? { salaryMax: 'asc' }
+          : sortBy === 'view'
+            ? { viewCount: 'desc' }
+            : { createdAt: 'desc' }
+    const { items, total } = await this.jobRepository.searchJobs(
+      where,
+      orderBy,
+      limit,
+      skip,
+    )
+    return {
+      success: true,
+      items,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPage: Math.ceil(total / limit),
+      },
+    }
+  }
 
-    async createJob(
-        dto: CreateJobRequest,
-        companyId: number
+  async createJob(dto: CreateJobRequest, companyId: number) {
+    // ==============================
+    // 1️⃣ Business Validation
+    // ==============================
+
+    if (
+      dto.salaryMin != null &&
+      dto.salaryMax != null &&
+      dto.salaryMin > dto.salaryMax
     ) {
-
-        // ==============================
-        // 1️⃣ Business Validation
-        // ==============================
-
-        if (
-            dto.salaryMin != null &&
-            dto.salaryMax != null &&
-            dto.salaryMin > dto.salaryMax
-        ) {
-            throw new BadRequestException(
-                'salaryMin cannot be greater than salaryMax'
-            );
-        }
-
-        if (
-            dto.ageMin != null &&
-            dto.ageMax != null &&
-            dto.ageMin > dto.ageMax
-        ) {
-            throw new BadRequestException(
-                'ageMin cannot be greater than ageMax'
-            );
-        }
-
-        if (
-            dto.expiredAt &&
-            new Date(dto.expiredAt) < new Date()
-        ) {
-            throw new BadRequestException(
-                'expiredAt must be in the future'
-            );
-        }
-
-        if (!dto.fields || dto.fields.length === 0) {
-            throw new BadRequestException(
-                'Job must have at least one form field'
-            );
-        }
-
-        // ==============================
-        // 2️⃣ Prepare Job Data
-        // ==============================
-
-        const jobData = {
-            title: dto.title,
-            description: dto.description,
-            occupationId: dto.occupationId,
-            workingShift: dto.workingShift,
-            quantity: dto.quantity,
-            genderRequirement: dto.genderRequirement,
-            address: dto.address,
-            province: dto.province,
-            district: dto.district,
-            salaryMin: dto.salaryMin,
-            salaryMax: dto.salaryMax,
-            ageMin: dto.ageMin,
-            ageMax: dto.ageMax,
-            expiredAt: dto.expiredAt
-                ? new Date(dto.expiredAt)
-                : undefined, // hoặc set mặc định 30 ngày nếu muốn
-
-            companyId,
-            status: JobStatus.WARNING // hoặc ACTIVE nếu không cần duyệt
-        };
-
-        // ==============================
-        // 3️⃣ Call Repository
-        // ==============================
-
-        const created =
-            await this.jobRepository.createJobWithForm({
-                jobData,
-                fields: dto.fields
-            });
-
-        // ==============================
-        // 4️⃣ Return Response
-        // ==============================
-
-        return {
-            success: true,
-            data: created
-        };
+      throw new BadRequestException(
+        'salaryMin cannot be greater than salaryMax',
+      )
     }
 
-    async updateJob(
-        jobId: number,
-        dto: UpdateJobRequest,
-        companyId: number
-    ) {
-
-        const job = await this.jobRepository.findJobById(jobId)
-
-        if (!job || job.companyId !== companyId) {
-            throw new Error('Job not found or unauthorized')
-        }
-
-        return this.jobRepository.updateJobFull(jobId, dto)
+    if (dto.ageMin != null && dto.ageMax != null && dto.ageMin > dto.ageMax) {
+      throw new BadRequestException('ageMin cannot be greater than ageMax')
     }
 
-    async getDetail(jobId: number) {
-        const job = await this.jobRepository.findJobById(jobId);
-
-        if (!job) {
-            throw new Error("Job not found");
-        }
-
-        return {
-            success: true,
-            data: job
-        };
+    if (dto.expiredAt && new Date(dto.expiredAt) < new Date()) {
+      throw new BadRequestException('expiredAt must be in the future')
     }
 
-    async deleteJob(jobId: number, companyId: number) {
-
-        const job = await this.jobRepository.findJobById(jobId)
-
-        if (!job || job.companyId !== companyId) {
-            throw new Error('Job not found or unauthorized')
-        }
-
-        await this.jobRepository.deleteJob(jobId)
-
-        return { success: true }
+    if (!dto.fields || dto.fields.length === 0) {
+      throw new BadRequestException('Job must have at least one form field')
     }
 
-    async getApplyForm(jobId: number) {
-        const jobWithForm = await this.jobRepository.findJobWithApplyForm(jobId)
+    // ==============================
+    // 2️⃣ Prepare Job Data
+    // ==============================
 
-        if (!jobWithForm) {
-            throw new NotFoundException('Job not found')
-        }
+    const jobData = {
+      title: dto.title,
+      description: dto.description,
+      occupationId: dto.occupationId,
+      workingShift: dto.workingShift,
+      quantity: dto.quantity,
+      genderRequirement: dto.genderRequirement,
+      address: dto.address,
+      province: dto.province,
+      district: dto.district,
+      salaryMin: dto.salaryMin,
+      salaryMax: dto.salaryMax,
+      ageMin: dto.ageMin,
+      ageMax: dto.ageMax,
+      expiredAt: dto.expiredAt ? new Date(dto.expiredAt) : undefined, // hoặc set mặc định 30 ngày nếu muốn
 
-        if (jobWithForm.status !== JobStatus.PUBLISHED) {
-            throw new BadRequestException('Job is not available for apply')
-        }
-
-        if (!jobWithForm.applyForms?.length) {
-            throw new BadRequestException('Apply form has not been created')
-        }
-
-        return {
-            success: true,
-            data: {
-                jobId: jobWithForm.id,
-                title: jobWithForm.title,
-                formId: jobWithForm.applyForms[0].id,
-                fields: jobWithForm.applyForms[0].fields,
-            },
-        }
+      companyId,
+      status: JobStatus.WARNING, // hoặc ACTIVE nếu không cần duyệt
     }
 
-    async applyJob(jobId: number, userId: number, body: ApplyJobRequest) {
-        const jobWithForm = await this.jobRepository.findJobWithApplyForm(jobId)
+    // ==============================
+    // 3️⃣ Call Repository
+    // ==============================
 
-        if (!jobWithForm) {
-            throw new NotFoundException('Job not found')
-        }
+    const created = await this.jobRepository.createJobWithForm({
+      jobData,
+      fields: dto.fields,
+    })
 
-        if (jobWithForm.status !== JobStatus.PUBLISHED) {
-            throw new BadRequestException('Job is not available for apply')
-        }
+    // ==============================
+    // 4️⃣ Return Response
+    // ==============================
 
-        const form = jobWithForm.applyForms?.[0]
+    return {
+      success: true,
+      data: created,
+    }
+  }
 
-        if (!form || !form.fields?.length) {
-            throw new BadRequestException('Apply form has not been created')
-        }
+  async updateJob(jobId: number, dto: UpdateJobRequest, companyId: number) {
+    const job = await this.jobRepository.findJobById(jobId)
 
-        const answers = body.answers || []
-        const answerByFieldId = new Map<number, string>()
+    if (!job || job.companyId !== companyId) {
+      throw new Error('Job not found or unauthorized')
+    }
 
-        for (const answer of answers) {
-            if (answerByFieldId.has(answer.fieldId)) {
-                throw new BadRequestException(`Duplicate answer for fieldId ${answer.fieldId}`)
-            }
-            answerByFieldId.set(answer.fieldId, answer.value?.trim())
-        }
+    return this.jobRepository.updateJobFull(jobId, dto)
+  }
 
-        for (const field of form.fields) {
-            const value = answerByFieldId.get(field.id)
+  async getDetail(jobId: number) {
+    const job = await this.jobRepository.findJobById(jobId)
 
-            if (field.isRequired && !value) {
-                throw new BadRequestException(`Field "${field.label}" is required`)
-            }
+    if (!job) {
+      throw new Error('Job not found')
+    }
 
-            if (value && field.options) {
-                let parsedOptions: string[] = []
+    return job
+  }
 
-                try {
-                    const raw = JSON.parse(field.options)
-                    if (Array.isArray(raw)) {
-                        parsedOptions = raw.map((item: any) => String(item))
-                    }
-                } catch {
-                    parsedOptions = []
-                }
+  async deleteJob(jobId: number, companyId: number) {
+    const job = await this.jobRepository.findJobById(jobId)
 
-                if (parsedOptions.length > 0) {
-                    const selected = field.fieldType === 'checkbox'
-                        ? value.split(',').map((item) => item.trim()).filter(Boolean)
-                        : [value]
+    if (!job || job.companyId !== companyId) {
+      throw new Error('Job not found or unauthorized')
+    }
 
-                    const hasInvalid = selected.some((item) => !parsedOptions.includes(item))
+    await this.jobRepository.deleteJob(jobId)
 
-                    if (hasInvalid) {
-                        throw new BadRequestException(`Field "${field.label}" has invalid option`)
-                    }
-                }
-            }
-        }
+    return { success: true }
+  }
 
-        const invalidField = answers.find(
-            (answer) => !form.fields.some((field) => field.id === answer.fieldId),
+  async getApplyForm(jobId: number) {
+    const jobWithForm = await this.jobRepository.findJobWithApplyForm(jobId)
+
+    if (!jobWithForm) {
+      throw new NotFoundException('Job not found')
+    }
+
+    if (jobWithForm.status !== JobStatus.PUBLISHED) {
+      throw new BadRequestException('Job is not available for apply')
+    }
+
+    if (!jobWithForm.applyForms?.length) {
+      throw new BadRequestException('Apply form has not been created')
+    }
+
+    return {
+      success: true,
+      data: {
+        jobId: jobWithForm.id,
+        title: jobWithForm.title,
+        formId: jobWithForm.applyForms[0].id,
+        fields: jobWithForm.applyForms[0].fields,
+      },
+    }
+  }
+
+  async applyJob(jobId: number, userId: number, body: ApplyJobRequest) {
+    const jobWithForm = await this.jobRepository.findJobWithApplyForm(jobId)
+
+    if (!jobWithForm) {
+      throw new NotFoundException('Job not found')
+    }
+
+    if (jobWithForm.status !== JobStatus.PUBLISHED) {
+      throw new BadRequestException('Job is not available for apply')
+    }
+
+    const form = jobWithForm.applyForms?.[0]
+
+    if (!form || !form.fields?.length) {
+      throw new BadRequestException('Apply form has not been created')
+    }
+
+    const answers = body.answers || []
+    const answerByFieldId = new Map<number, string>()
+
+    for (const answer of answers) {
+      if (answerByFieldId.has(answer.fieldId)) {
+        throw new BadRequestException(
+          `Duplicate answer for fieldId ${answer.fieldId}`,
         )
-
-        if (invalidField) {
-            throw new BadRequestException(`fieldId ${invalidField.fieldId} does not belong to apply form`)
-        }
-
-        const payloadAnswers = answers.map((answer) => ({
-            fieldId: answer.fieldId,
-            value: answer.value.trim(),
-        }))
-
-        const applied = await this.jobRepository.applyJob({
-            jobId,
-            userId,
-            answers: payloadAnswers,
-        })
-
-        return {
-            success: true,
-            data: applied,
-        }
+      }
+      answerByFieldId.set(answer.fieldId, answer.value?.trim())
     }
 
-    async getApplicationsByUser(userId: number) {
-        const applications = await this.jobRepository.findApplicationsByUser(userId)
-        return { success: true, data: applications }
+    for (const field of form.fields) {
+      const value = answerByFieldId.get(field.id)
+
+      if (field.isRequired && !value) {
+        throw new BadRequestException(`Field "${field.label}" is required`)
+      }
+
+      if (value && field.options) {
+        let parsedOptions: string[] = []
+
+        try {
+          const raw = JSON.parse(field.options)
+          if (Array.isArray(raw)) {
+            parsedOptions = raw.map((item: any) => String(item))
+          }
+        } catch {
+          parsedOptions = []
+        }
+
+        if (parsedOptions.length > 0) {
+          const selected =
+            field.fieldType === 'checkbox'
+              ? value
+                  .split(',')
+                  .map((item) => item.trim())
+                  .filter(Boolean)
+              : [value]
+
+          const hasInvalid = selected.some(
+            (item) => !parsedOptions.includes(item),
+          )
+
+          if (hasInvalid) {
+            throw new BadRequestException(
+              `Field "${field.label}" has invalid option`,
+            )
+          }
+        }
+      }
     }
 
-    async cancelApplyJob(jobId: number, userId: number) {
-        const application = await this.jobRepository.findApplicationByJobAndUser(jobId, userId)
+    const invalidField = answers.find(
+      (answer) => !form.fields.some((field) => field.id === answer.fieldId),
+    )
 
-        if (!application) {
-            throw new NotFoundException('Application not found')
-        }
-
-        if (application.status === JobApplicationStatus.CANCELLED) {
-            throw new BadRequestException('Application already cancelled')
-        }
-
-        if (
-            application.status === JobApplicationStatus.UNSUITABLE
-            || application.status === JobApplicationStatus.SUITABLE
-        ) {
-            throw new BadRequestException('Cannot cancel processed application')
-        }
-
-        await this.jobRepository.cancelApply(jobId, userId)
-
-        return {
-            success: true,
-        }
+    if (invalidField) {
+      throw new BadRequestException(
+        `fieldId ${invalidField.fieldId} does not belong to apply form`,
+      )
     }
 
+    const payloadAnswers = answers.map((answer) => ({
+      fieldId: answer.fieldId,
+      value: answer.value.trim(),
+    }))
 
+    const applied = await this.jobRepository.applyJob({
+      jobId,
+      userId,
+      answers: payloadAnswers,
+    })
+
+    return {
+      success: true,
+      data: applied,
+    }
+  }
+
+  async getApplicationsByUser(userId: number) {
+    const applications = await this.jobRepository.findApplicationsByUser(userId)
+    return { success: true, data: applications }
+  }
+
+  async cancelApplyJob(jobId: number, userId: number) {
+    const application = await this.jobRepository.findApplicationByJobAndUser(
+      jobId,
+      userId,
+    )
+
+    if (!application) {
+      throw new NotFoundException('Application not found')
+    }
+
+    if (application.status === JobApplicationStatus.CANCELLED) {
+      throw new BadRequestException('Application already cancelled')
+    }
+
+    if (
+      application.status === JobApplicationStatus.UNSUITABLE ||
+      application.status === JobApplicationStatus.SUITABLE
+    ) {
+      throw new BadRequestException('Cannot cancel processed application')
+    }
+
+    await this.jobRepository.cancelApply(jobId, userId)
+
+    return {
+      success: true,
+    }
+  }
+
+  async getRelatedJobs(
+    jobId: number,
+    limit = JOB_CONSTANTS.DEFAULT_RELATED_LIMIT,
+  ) {
+    const currentJob = await this.jobRepository.findJobById(jobId)
+
+    if (!currentJob) {
+      throw new NotFoundException('Không tìm thấy công việc này')
+    }
+
+    const relatedJobs = await this.jobRepository.getRelatedJobs(
+      jobId,
+      currentJob.occupationId,
+      currentJob.province,
+      limit,
+    )
+
+    return relatedJobs
+  }
 }
