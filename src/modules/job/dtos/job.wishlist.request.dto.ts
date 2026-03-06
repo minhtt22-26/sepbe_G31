@@ -4,16 +4,6 @@ import { IsInt, IsOptional, Min } from 'class-validator';
 
 export class WishlistRequestDto {
 
-    @ApiPropertyOptional({
-        description: 'User ID',
-        example: 1,
-        minimum: 1,
-    })
-    @IsOptional()
-    @Type(() => Number)
-    @IsInt()
-    @Min(1)
-    userId?: number;
 
     @ApiPropertyOptional({
         description: 'Trang hiện tại',
@@ -25,7 +15,7 @@ export class WishlistRequestDto {
     @Type(() => Number)
     @IsInt()
     @Min(1)
-    page?: number = 1;
+    page?: number;
 
     @ApiPropertyOptional({
         description: 'Số lượng mỗi trang',
@@ -37,7 +27,7 @@ export class WishlistRequestDto {
     @Type(() => Number)
     @IsInt()
     @Min(1)
-    limit?: number = 10;
+    limit?: number;
 
     @ApiPropertyOptional({
         description: 'Offset (tự tính từ page nếu không truyền)',
