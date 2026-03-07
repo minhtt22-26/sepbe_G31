@@ -145,35 +145,60 @@ export class CompanyController {
     return this.companyService.review(+id, body)
   }
 
-  @Put('update/:id')
-  @ApiOperation({ summary: 'Update company' })
-  @ApiConsumes('multipart/form-data')
-  @ApiParam({
-    name: 'id',
-    type: Number,
-    description: 'Company ID',
-  })
-  @ApiBody({ type: UpdateCompanyDto })
-  @ApiResponse({ status: 200, description: 'Company updated successfully' })
-  @UseInterceptors(
-    FileFieldsInterceptor([
+@Put('update/:id')
+@ApiOperation({ summary: 'Update company' })
+@ApiConsumes('multipart/form-data')
+@ApiParam({
+  name: 'id',
+  type: Number,
+  description: 'Company ID',
+})
+@ApiBody({ type: UpdateCompanyDto })
+@ApiResponse({ status: 200, description: 'Company updated successfully' })
+@UseInterceptors(
+  FileFieldsInterceptor(
+    [
       { name: 'logo', maxCount: 1 },
       { name: 'businessLicense', maxCount: 1 },
-    ]),
-  )
-  @AuthJwtAccessProtected()
-  @ApiBearerAuth('access-token')
-  async update(
-    @Param('id') id: string,
-    @Body() body: UpdateCompanyDto,
-    @UploadedFiles()
-    files: {
-      logo?: Express.Multer.File[]
-      businessLicense?: Express.Multer.File[]
+    ],
+    {
+      limits: {
+        fileSize: 5 * 1024 * 1024,
+      },
+      fileFilter: (req, file, callback) => {
+        const allowedMimeTypes = [
+          'image/jpeg',
+          'image/png',
+          'application/pdf',
+        ];
+
+        if (!allowedMimeTypes.includes(file.mimetype)) {
+          return callback(
+            new Error('Only JPG, PNG or PDF files are allowed'),
+            false,
+          );
+        }
+
+        callback(null, true);
+      },
     },
-    @AuthJwtPayload() user: any,
-  ) {
-    const ownerId = user.userId
-    return this.companyService.update(+id, body, files, ownerId)
-  }
+  ),
+)
+@AuthJwtAccessProtected()
+@ApiBearerAuth('access-token')
+
+async update(
+  @Param('id') id: string,
+  @Body() body: UpdateCompanyDto,
+  @UploadedFiles()
+  files: {
+    logo?: Express.Multer.File[];
+    businessLicense?: Express.Multer.File[];
+  },
+  @AuthJwtPayload() user: any
+) {
+  const ownerId = user.userId;
+  return this.companyService.update(+id, body, files, ownerId);
+}
+
 }
