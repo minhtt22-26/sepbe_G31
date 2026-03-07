@@ -150,10 +150,33 @@ export class CompanyController {
 @ApiBody({ type: UpdateCompanyDto })
 @ApiResponse({ status: 200, description: 'Company updated successfully' })
 @UseInterceptors(
-  FileFieldsInterceptor([
-    { name: 'logo', maxCount: 1 },
-    { name: 'businessLicense', maxCount: 1 },
-  ]),
+  FileFieldsInterceptor(
+    [
+      { name: 'logo', maxCount: 1 },
+      { name: 'businessLicense', maxCount: 1 },
+    ],
+    {
+      limits: {
+        fileSize: 5 * 1024 * 1024,
+      },
+      fileFilter: (req, file, callback) => {
+        const allowedMimeTypes = [
+          'image/jpeg',
+          'image/png',
+          'application/pdf',
+        ];
+
+        if (!allowedMimeTypes.includes(file.mimetype)) {
+          return callback(
+            new Error('Only JPG, PNG or PDF files are allowed'),
+            false,
+          );
+        }
+
+        callback(null, true);
+      },
+    },
+  ),
 )
 @AuthJwtAccessProtected()
 @ApiBearerAuth('access-token')
