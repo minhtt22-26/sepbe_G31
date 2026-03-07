@@ -23,7 +23,8 @@ export class CloudinaryService {
 
   async uploadFile(file: Express.Multer.File, folder: string) {
     return new Promise<CloudinaryUploadResult>((resolve, reject) => {
-      const resourceType = file.mimetype?.startsWith('image/') ? 'image' : 'raw';
+      const isPdf = file.mimetype === 'application/pdf';
+      const resourceType = file.mimetype?.startsWith('image/') || isPdf ? 'image' : 'raw';
       const extension = extname(file.originalname || '').replace('.', '').toLowerCase();
       const fileName = basename(file.originalname || 'file', extname(file.originalname || ''));
 
@@ -35,7 +36,6 @@ export class CloudinaryService {
           unique_filename: true,
           filename_override: file.originalname,
           public_id: `${Date.now()}-${fileName}`,
-          ...(resourceType === 'raw' && extension ? { format: extension } : {}),
         },
         (error, result) => {
           if (error) return reject(new Error(error?.message || 'Upload failed'));
@@ -45,7 +45,11 @@ export class CloudinaryService {
           }
 
           if (resourceType === 'raw') {
-            const deliveryPublicId = extension
+            const normalizedPublicId = result.public_id.toLowerCase();
+            const hasExtension = extension
+              ? normalizedPublicId.endsWith(`.${extension}`)
+              : false;
+            const deliveryPublicId = extension && !hasExtension
               ? `${result.public_id}.${extension}`
               : result.public_id;
             const deliveryUrl = cloudinary.url(deliveryPublicId, {
@@ -53,6 +57,22 @@ export class CloudinaryService {
               type: 'upload',
               secure: true,
               version: result.version,
+            });
+
+            return resolve({
+              ...result,
+              secure_url: deliveryUrl,
+              url: deliveryUrl,
+            });
+          }
+
+          if (isPdf) {
+            const deliveryUrl = cloudinary.url(result.public_id, {
+              resource_type: 'image',
+              type: 'upload',
+              secure: true,
+              version: result.version,
+              format: 'pdf',
             });
 
             return resolve({
