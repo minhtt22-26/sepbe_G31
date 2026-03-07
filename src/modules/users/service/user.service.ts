@@ -27,6 +27,7 @@ import { ForgotPasswordRequestDto } from 'src/modules/auth/dto/request/forgot-pa
 import { ResetPasswordRequestDto } from 'src/modules/auth/dto/request/reset-password.request.dto'
 import { EmailService } from 'src/infrastructure/email/service/email.service'
 import { UserInfoRequestDto } from '../dtos/request/user.info.request.dto'
+import { UserChangePasswordRequestDto } from '../dtos/request/user.change-passwrod.dto'
 
 @Injectable()
 export class UserService {
@@ -37,7 +38,7 @@ export class UserService {
     private readonly userRepository: UserRepository,
     private readonly sessionService: SessionService,
     private readonly emailService: EmailService,
-  ) { }
+  ) {}
 
   async signUp({
     userName,
@@ -78,7 +79,7 @@ export class UserService {
 
   async loginCrendential(
     { email, userName, password }: UserLoginRequestDto,
-    requestLog: { ipAddress: string; userAgent: string },
+    //requestLog: { ipAddress: string; userAgent: string},
   ): Promise<UserLoginResponseDto> {
     const user = await this.userRepository.findUserWithUserNameOrEmail({
       email,
@@ -117,24 +118,24 @@ export class UserService {
 
     await this.userRepository.resetPasswordAttempt(user.id)
 
-    if (this.authUtil.checkPasswordExpired(user.passwordExpired)) {
-      throw new ForbiddenException({
-        message: 'Mật khẩu của bạn đã hết hạn, vui lòng đổi mật khẩu mới',
-      })
-    }
+    // if (this.authUtil.checkPasswordExpired(user.passwordExpired)) {
+    //   throw new ForbiddenException({
+    //     message: 'Mật khẩu của bạn đã hết hạn, vui lòng đổi mật khẩu mới',
+    //   })
+    // }
 
-    return this.handleLogin(user, EnumUserLoginWith.CREDENTIAL, requestLog)
+    return this.handleLogin(user, EnumUserLoginWith.CREDENTIAL)
   }
 
   private async handleLogin(
     user: User,
     loginWith: EnumUserLoginWith,
-    requestLog: {
-      ipAddress: string
-      userAgent: string
-    },
+    // requestLog: {
+    //   ipAddress: string
+    //   userAgent: string
+    // },
   ): Promise<UserLoginResponseDto> {
-    const tokens = await this.createTokenAndSession(user, loginWith, requestLog)
+    const tokens = await this.createTokenAndSession(user, loginWith)
 
     return { tokens }
   }
@@ -142,10 +143,10 @@ export class UserService {
   private async createTokenAndSession(
     user: User,
     loginWith: EnumUserLoginWith,
-    requestLog: {
-      ipAddress: string
-      userAgent: string
-    },
+    // requestLog: {
+    //   ipAddress: string
+    //   userAgent: string
+    // },
   ): Promise<AuthTokenResponseDto> {
     const { sessionId, jti, tokens } = this.authService.createTokens(
       user,
@@ -162,8 +163,8 @@ export class UserService {
         id: sessionId,
         userId: user.id,
         jti,
-        ipAddress: requestLog.ipAddress,
-        userAgent: requestLog.userAgent,
+        // ipAddress: requestLog.ipAddress,
+        // userAgent: requestLog.userAgent,
         expiredAt,
       }),
       this.userRepository.login(user.id, loginWith),
@@ -198,10 +199,15 @@ export class UserService {
     return this.userRepository.updateProfile(userId, dto)
   }
 
-  async updateInfoUser(
-    userId: number,
-    dto: UserInfoRequestDto,
-  ): Promise<User> {
+  async updateInfoUser(userId: number, dto: UserInfoRequestDto): Promise<User> {
+    const user = await this.getUserById(userId)
+
+    if (!user) {
+      throw new NotFoundException({
+        message: 'Không tìm thấy thông tin của bạn',
+      })
+    }
+
     return this.userRepository.updateInfoUser(userId, dto)
   }
 
@@ -218,10 +224,10 @@ export class UserService {
   async refreshToken(
     user: User,
     refreshToken: string,
-    requestLog: {
-      ipAddress: string
-      userAgent: string
-    },
+    // requestLog: {
+    //   ipAddress: string
+    //   userAgent: string
+    // },
   ): Promise<AuthTokenResponseDto> {
     const {
       sessionId,
@@ -257,8 +263,8 @@ export class UserService {
         userId,
         id: sessionId,
         jti: newJti,
-        ipAddress: requestLog.ipAddress,
-        userAgent: requestLog.userAgent,
+        // ipAddress: requestLog.ipAddress,
+        // userAgent: requestLog.userAgent,
       } as ISessionCreate),
       this.userRepository.updateLastActivity(user.id),
     ])
@@ -268,12 +274,11 @@ export class UserService {
 
   async forgotPassword(
     { email }: ForgotPasswordRequestDto,
-    requestLog: {
-      ipAddress: string
-      userAgent: string
-    },
+    // requestLog: {
+    //   ipAddress: string
+    //   userAgent: string
+    // },
   ): Promise<void> {
-    console.log(requestLog)
     const user = await this.userRepository.findUserWithByEmail(email)
 
     if (!user) {
@@ -318,9 +323,8 @@ export class UserService {
 
   async resetPassword(
     { token, newPassword }: ResetPasswordRequestDto,
-    requestLog: { ipAddress: string; userAgent: string },
+    // requestLog: { ipAddress: string; userAgent: string },
   ): Promise<void> {
-    console.log(requestLog)
     const tokenRecord =
       await this.userRepository.findValidForgotPasswordToken(token)
 
@@ -337,8 +341,8 @@ export class UserService {
     await this.userRepository.updatePassword(
       tokenRecord.userId,
       password.passwordHash,
-      password.passwordExpired,
-      password.passwordCreated,
+      //password.passwordExpired,
+      //password.passwordCreated,
     )
 
     // Mark token là đã sử dụng
@@ -355,7 +359,7 @@ export class UserService {
       fullName?: string
       role: EnumUserRole
     },
-    requestLog: { ipAddress: string; userAgent: string },
+    // requestLog: { ipAddress: string; userAgent: string },
   ): Promise<UserLoginResponseDto> {
     let user = await this.userRepository.findUserWithByEmail(email)
 
@@ -376,7 +380,7 @@ export class UserService {
       })
     }
 
-    return this.handleLogin(user, loginWith, requestLog)
+    return this.handleLogin(user, loginWith)
   }
 
   async getUserById(userId: number): Promise<User> {
@@ -393,8 +397,75 @@ export class UserService {
   async logout(
     userId: number,
     sessionId: string,
-    requestLog: { ipAddress: string; userAgent: string },
+    //requestLog: { ipAddress: string; userAgent: string },
   ): Promise<void> {
-    await this.sessionService.revoke(userId, sessionId, requestLog)
+    await this.sessionService.revoke(userId, sessionId)
+  }
+
+  async changePassword(
+    userId: number,
+    dto: UserChangePasswordRequestDto,
+  ): Promise<void> {
+    const user = await this.userRepository.findOneById(userId)
+
+    if (!user) {
+      throw new NotFoundException({
+        message: 'Không tìm thấy người dùng này',
+      })
+    }
+
+    if (user.password) {
+      if (!dto.oldPassword) {
+        throw new BadRequestException({
+          message: 'Vui lòng cung cấp mật khẩu hiện tại',
+        })
+      }
+
+      const isValidPassword = this.authUtil.validatePassword(
+        dto.oldPassword,
+        user.password,
+      )
+
+      if (!isValidPassword) {
+        throw new BadRequestException({
+          message: 'Mật khẩu hiện tại không chính xác',
+        })
+      }
+    }
+
+    const password = this.authUtil.createPassword(dto.newPassword)
+
+    await this.userRepository.updatePassword(
+      userId,
+      password.passwordHash,
+      //password.passwordExpired,
+      //password.passwordCreated,
+    )
+  }
+
+  async userDeleteAccount(userId: number): Promise<User> {
+    const user = await this.userRepository.findOneById(userId)
+
+    if (!user) {
+      throw new NotFoundException({
+        message: 'Không tìm thấy người dùng này',
+      })
+    }
+
+    if (user.status != EnumUserStatus.ACTIVE) {
+      throw new BadRequestException({
+        message: 'Tài khoản của bạn không hoạt động',
+      })
+    }
+
+    await this.sessionService.revokeAll(userId)
+
+    const userUpdate = await this.userRepository.userDelete(
+      userId,
+      user.email,
+      user.userName,
+    )
+
+    return userUpdate
   }
 }

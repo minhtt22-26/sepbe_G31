@@ -9,7 +9,8 @@ import {
   UploadedFiles,
   Put,
   BadRequestException,
-} from '@nestjs/common';
+  Query,
+} from '@nestjs/common'
 import {
   ApiTags,
   ApiOperation,
@@ -18,14 +19,18 @@ import {
   ApiResponse,
   ApiConsumes,
   ApiBearerAuth,
-} from '@nestjs/swagger';
-import { CompanyService } from './company.service';
-import { CompanyRegisterDto } from './dtos/request/company.register';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
-import { UpdateCompanyDto } from './dtos/request/company.update';
-import { CompanyReviewDto } from './dtos/request/company.review';
-import { CompanyStatus } from 'src/generated/prisma/enums';
-import { AuthJwtAccessProtected, AuthJwtPayload } from '../auth/decorators/auth.jwt.decorator';
+} from '@nestjs/swagger'
+import { CompanyService } from './company.service'
+import { CompanyRegisterDto } from './dtos/request/company.register'
+import { FileFieldsInterceptor } from '@nestjs/platform-express'
+import { UpdateCompanyDto } from './dtos/request/company.update'
+import { CompanyReviewDto } from './dtos/request/company.review'
+import { CompanyStatus } from 'src/generated/prisma/enums'
+import {
+  AuthJwtAccessProtected,
+  AuthJwtPayload,
+} from '../auth/decorators/auth.jwt.decorator'
+import { CompanySearchDto } from './dtos/request/company.search.request.dto'
 
 @Controller('company')
 @ApiTags('Company')
@@ -53,16 +58,16 @@ export class CompanyController {
             'image/jpeg',
             'image/png',
             'application/pdf',
-          ];
+          ]
 
           if (!allowedMimeTypes.includes(file.mimetype)) {
             return callback(
               new Error('Only JPG, PNG or PDF files are allowed'),
               false,
-            );
+            )
           }
 
-          callback(null, true);
+          callback(null, true)
         },
       },
     ),
@@ -72,20 +77,20 @@ export class CompanyController {
     @Body() body: CompanyRegisterDto,
     @UploadedFiles()
     files: {
-      logo?: Express.Multer.File[];
-      businessLicense?: Express.Multer.File[];
+      logo?: Express.Multer.File[]
+      businessLicense?: Express.Multer.File[]
     },
-    @AuthJwtPayload() user: any
+    @AuthJwtPayload() user: any,
   ) {
-    const ownerId = user.userId;
-    return this.companyService.create(body, files, ownerId);
+    const ownerId = user.userId
+    return this.companyService.create(body, files, ownerId)
   }
 
   @Get()
   @ApiOperation({ summary: 'List companies' })
   @ApiResponse({ status: 200, description: 'Companies retrieved successfully' })
   findAll() {
-    return this.companyService.findAll();
+    return this.companyService.findAll()
   }
 
   @Get('status/:status')
@@ -97,7 +102,7 @@ export class CompanyController {
   })
   @ApiResponse({ status: 200, description: 'Companies retrieved successfully' })
   findAllByStatus(@Param('status') status: CompanyStatus) {
-    return this.companyService.findAllByStatus(status);
+    return this.companyService.findAllByStatus(status)
   }
 
   @Get('owner')
@@ -107,8 +112,13 @@ export class CompanyController {
   @AuthJwtAccessProtected()
   @ApiBearerAuth('access-token')
   findByOwner(@AuthJwtPayload() user: any) {
-    const ownerId = user.userId;
-    return this.companyService.findByOwnerId(ownerId);
+    const ownerId = user.userId
+    return this.companyService.findByOwnerId(ownerId)
+  }
+
+  @Get('search')
+  search(@Query() dto: CompanySearchDto) {
+    return this.companyService.searchCompanies(dto)
   }
 
   @Get(':id')
@@ -117,11 +127,11 @@ export class CompanyController {
   @ApiResponse({ status: 200, description: 'Company retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Company not found' })
   findOne(@Param('id') id: string) {
-    const companyId = Number(id);
+    const companyId = Number(id)
     if (Number.isNaN(companyId)) {
-      throw new BadRequestException('Invalid company id');
+      throw new BadRequestException('Invalid company id')
     }
-    return this.companyService.findOne(companyId);
+    return this.companyService.findOne(companyId)
   }
 
   @Patch('review/:id')
@@ -131,12 +141,8 @@ export class CompanyController {
   @ApiResponse({ status: 200, description: 'Company review updated' })
   @ApiResponse({ status: 400, description: 'Invalid review request' })
   @ApiResponse({ status: 404, description: 'Company not found' })
-  review(
-    @Param('id') id: string,
-    @Body() body: CompanyReviewDto,
-  ) {
-
-    return this.companyService.review(+id, body );
+  review(@Param('id') id: string, @Body() body: CompanyReviewDto) {
+    return this.companyService.review(+id, body)
   }
 
 @Put('update/:id')

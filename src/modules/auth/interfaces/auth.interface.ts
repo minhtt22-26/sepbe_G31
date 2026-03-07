@@ -40,9 +40,9 @@ export type IAuthRefreshTokenPayload = Omit<
 //Password interface
 export class IAuthPassword {
   passwordHash: string
-  passwordExpired: Date
-  passwordCreated: Date
-  passwordPeriodExpired: Date
+  //passwordExpired: Date
+  //passwordCreated: Date
+  //passwordPeriodExpired: Date
 }
 
 export interface IForgotPasswordCreate {
