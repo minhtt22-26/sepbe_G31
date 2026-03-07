@@ -2,6 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { v2 as cloudinary } from 'cloudinary';
 import { extname, basename } from 'path';
 
+type CloudinaryUploadResult = {
+  public_id: string;
+  secure_url: string;
+  url?: string;
+  version?: number;
+  format?: string;
+  resource_type?: string;
+};
+
 @Injectable()
 export class CloudinaryService {
   constructor() {
@@ -13,7 +22,7 @@ export class CloudinaryService {
   }
 
   async uploadFile(file: Express.Multer.File, folder: string) {
-    return new Promise((resolve, reject) => {
+    return new Promise<CloudinaryUploadResult>((resolve, reject) => {
       const resourceType = file.mimetype?.startsWith('image/') ? 'image' : 'raw';
       const extension = extname(file.originalname || '').replace('.', '').toLowerCase();
       const fileName = basename(file.originalname || 'file', extname(file.originalname || ''));
@@ -30,7 +39,30 @@ export class CloudinaryService {
         },
         (error, result) => {
           if (error) return reject(new Error(error?.message || 'Upload failed'));
-          resolve(result);
+
+          if (!result) {
+            return reject(new Error('Upload failed'));
+          }
+
+          if (resourceType === 'raw') {
+            const deliveryPublicId = extension
+              ? `${result.public_id}.${extension}`
+              : result.public_id;
+            const deliveryUrl = cloudinary.url(deliveryPublicId, {
+              resource_type: 'raw',
+              type: 'upload',
+              secure: true,
+              version: result.version,
+            });
+
+            return resolve({
+              ...result,
+              secure_url: deliveryUrl,
+              url: deliveryUrl,
+            });
+          }
+
+          resolve(result as CloudinaryUploadResult);
         },
       ).end(file.buffer);
     });
