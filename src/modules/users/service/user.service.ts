@@ -192,12 +192,12 @@ export class UserService {
     userId: number,
     dto: WorkerProfileRequestDto,
   ): Promise<WorkerProfile> {
-    const existing = await this.userRepository.getWorkerProfile(userId)
-    if (!existing) {
-      throw new NotFoundException({
-        message: 'Không tìm thấy hồ sơ người lao động',
-      })
-    }
+    // const existing = await this.userRepository.getWorkerProfile(userId)
+    // if (!existing) {
+    //   throw new NotFoundException({
+    //     message: 'Không tìm thấy hồ sơ người lao động',
+    //   })
+    // }
     return this.userRepository.updateProfile(userId, dto)
   }
 
