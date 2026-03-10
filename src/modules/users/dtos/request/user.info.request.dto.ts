@@ -1,22 +1,50 @@
-import { IsEmail, IsOptional, IsPhoneNumber, IsString, IsUrl, MaxLength, MinLength } from "class-validator";
+import { ApiProperty } from '@nestjs/swagger'
+import {
+  IsEmail,
+  IsOptional,
+  IsPhoneNumber,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator'
 
 export class UserInfoRequestDto {
-    @IsOptional()
-    @IsUrl()
-    avatar?: string
+  @ApiProperty({
+    type: 'string',
+    format: 'binary',
+    description: 'Avatar image file (JPG/PNG)',
+    required: false,
+  })
+  @IsOptional()
+  avatar?: any
 
-    @IsOptional()
-    @IsString()
-    @MinLength(2)
-    @MaxLength(30)
-    fullName?: string
+  @ApiProperty({
+    example: 'John Doe',
+    description: 'Full name of the user',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(30)
+  fullName?: string
 
-    @IsOptional()
-    @IsPhoneNumber('VN')
-    phone?: string
+  @ApiProperty({
+    example: '0912345678',
+    description: 'Phone number (VN)',
+    required: false,
+  })
+  @IsOptional()
+  @IsPhoneNumber('VN')
+  phone?: string
 
-    @IsOptional()
-    @IsEmail()
-    @MaxLength(255)
-    email?: string
+  @ApiProperty({
+    example: 'example@gmail.com',
+    description: 'Email address',
+    required: false,
+  })
+  @IsOptional()
+  @IsEmail()
+  @MaxLength(255)
+  email?: string
 }

@@ -28,6 +28,7 @@ import { ResetPasswordRequestDto } from 'src/modules/auth/dto/request/reset-pass
 import { EmailService } from 'src/infrastructure/email/service/email.service'
 import { UserInfoRequestDto } from '../dtos/request/user.info.request.dto'
 import { UserChangePasswordRequestDto } from '../dtos/request/user.change-passwrod.dto'
+import { CloudinaryService } from 'src/infrastructure/cloudinary/cloudinary.service'
 
 @Injectable()
 export class UserService {
@@ -38,6 +39,7 @@ export class UserService {
     private readonly userRepository: UserRepository,
     private readonly sessionService: SessionService,
     private readonly emailService: EmailService,
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
 
   async signUp({
@@ -193,7 +195,11 @@ export class UserService {
     return this.userRepository.updateProfile(userId, dto)
   }
 
-  async updateInfoUser(userId: number, dto: UserInfoRequestDto): Promise<User> {
+  async updateInfoUser(
+    userId: number,
+    dto: UserInfoRequestDto,
+    file?: Express.Multer.File,
+  ): Promise<User> {
     const user = await this.getUserById(userId)
 
     if (!user) {
@@ -202,7 +208,25 @@ export class UserService {
       })
     }
 
-    return this.userRepository.updateInfoUser(userId, dto)
+    let avatarUrl = dto.avatar
+    if (file) {
+      const uploadResult = await this.cloudinaryService.uploadFile(
+        file,
+        'user_avatars',
+      )
+      avatarUrl = (uploadResult as any).secure_url
+    }
+
+    if (typeof dto.avatar !== 'string') {
+      delete dto.avatar
+    }
+
+    const { ...updateData } = dto
+
+    return await this.userRepository.updateInfoUser(userId, {
+      ...updateData,
+      ...(avatarUrl && { avatar: avatarUrl }),
+    })
   }
 
   async getWorkerProfile(userId: number): Promise<WorkerProfile> {

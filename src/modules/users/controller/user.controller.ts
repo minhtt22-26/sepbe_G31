@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Post, Put } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Put,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
+import { ApiBearerAuth, ApiConsumes, ApiOperation } from '@nestjs/swagger'
 import { UserService } from '../service/user.service'
 import { UserSignUpRequestDto } from '../dtos/request/user.sign-up.request.dto'
 import { UserLoginResponseDto } from '../dtos/response/user.login.response.dto'
@@ -143,11 +153,29 @@ export class UserController {
 
   @Put('user-info')
   @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Update user info including avatar upload' })
+  @UseInterceptors(
+    FileInterceptor('avatar', {
+      limits: {
+        fileSize: 5 * 1024 * 1024,
+      },
+      fileFilter: (req, file, callback) => {
+        const allowedMimeTypes = ['image/jpeg', 'image/png']
+        if (!allowedMimeTypes.includes(file.mimetype)) {
+          return callback(new Error('Only JPG or PNG files are allowed'), false)
+        }
+        callback(null, true)
+      },
+    }),
+  )
   async updateInfoUser(
     @AuthJwtPayload('userId') userId: number,
     @Body() body: UserInfoRequestDto,
+    @UploadedFile() file?: Express.Multer.File,
   ): Promise<User> {
-    return await this.userService.updateInfoUser(userId, body)
+    return await this.userService.updateInfoUser(userId, body, file)
   }
 
   @Put('change-password')
