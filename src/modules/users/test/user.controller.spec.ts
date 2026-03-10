@@ -139,12 +139,19 @@ describe('UserController', () => {
       expect(userService.resetPassword).toHaveBeenCalled()
     })
 
-    it('changePassword: should delegate to service', async () => {
+    it('changePassword: Normal: should delegate to service', async () => {
       await controller.changePassword(1, {
         oldPassword: 'old',
         newPassword: 'new',
       })
       expect(userService.changePassword).toHaveBeenCalled()
+    })
+
+    it('changePassword: Abnormal: should handle service errors', async () => {
+      mockUserService.changePassword.mockRejectedValue(new BadRequestException('Error'))
+      await expect(
+        controller.changePassword(1, { oldPassword: 'o', newPassword: 'n' }),
+      ).rejects.toThrow(BadRequestException)
     })
   })
 
@@ -185,9 +192,14 @@ describe('UserController', () => {
       )
     })
 
-    it('userDeleteAccount: should call service', async () => {
+    it('userDeleteAccount: Normal: should call service', async () => {
       await controller.userDeleteAccount(1)
       expect(userService.userDeleteAccount).toHaveBeenCalledWith(1)
+    })
+
+    it('userDeleteAccount: Abnormal: should handle service errors', async () => {
+      mockUserService.userDeleteAccount.mockRejectedValue(new BadRequestException('Error'))
+      await expect(controller.userDeleteAccount(1)).rejects.toThrow(BadRequestException)
     })
   })
 })
