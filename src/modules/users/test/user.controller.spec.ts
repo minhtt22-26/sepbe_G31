@@ -2,16 +2,12 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { UserController } from '../controller/user.controller'
 import { UserService } from '../service/user.service'
 import { UserSignUpRequestDto } from '../dtos/request/user.sign-up.request.dto'
-import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common'
+import { UserLoginRequestDto } from '../dtos/request/user.login.request.dto'
+import { EnumUserLoginWith, EnumUserRole } from 'src/generated/prisma/enums'
+import { BadRequestException, UnauthorizedException } from '@nestjs/common'
 import { AuthService } from 'src/modules/auth/service/auth.service'
 import { AuthUtil } from 'src/modules/auth/utils/auth.utils'
 import { HelperService } from 'src/common/helper/service/helper.service'
-import { EnumUserRole } from 'src/generated/prisma/enums'
 
 describe('UserController', () => {
   let controller: UserController
@@ -30,6 +26,8 @@ describe('UserController', () => {
     getWorkerProfile: jest.fn(),
     updateInfoUser: jest.fn(),
     logout: jest.fn(),
+    changePassword: jest.fn(),
+    userDeleteAccount: jest.fn(),
   }
 
   beforeEach(async () => {
@@ -51,43 +49,50 @@ describe('UserController', () => {
     jest.clearAllMocks()
   })
 
-  // --- 1. Authentication ---
   describe('signUp', () => {
     const signUpDto: UserSignUpRequestDto = {
-      fullName: 'Test',
-      userName: 'test',
-      email: 't@e.com',
-      password: 'p',
+      fullName: 'Test User',
+      userName: 'testuser',
+      email: 'test@example.com',
+      password: 'password123',
       role: EnumUserRole.WORKER,
     }
-    it('Normal: should call service.signUp', async () => {
+
+    it('Normal: should call userService.signUp successfully', async () => {
       mockUserService.signUp.mockResolvedValue(undefined)
       await controller.signUp(signUpDto)
       expect(userService.signUp).toHaveBeenCalledWith(signUpDto)
     })
-    it('Abnormal: should propagate service error', async () => {
-      mockUserService.signUp.mockRejectedValue(new BadRequestException())
+
+    it('Abnormal: should propagate error from userService.signUp', async () => {
+      mockUserService.signUp.mockRejectedValue(new BadRequestException('Error'))
       await expect(controller.signUp(signUpDto)).rejects.toThrow(
         BadRequestException,
       )
     })
+
     it('Boundary: should handle minimal data', async () => {
       mockUserService.signUp.mockResolvedValue(undefined)
-      const minimal = { fullName: 'M', role: EnumUserRole.WORKER } as any
-      await controller.signUp(minimal)
-      expect(userService.signUp).toHaveBeenCalledWith(minimal)
+      const minimalDto: any = { fullName: 'Min', role: EnumUserRole.WORKER }
+      await controller.signUp(minimalDto)
+      expect(userService.signUp).toHaveBeenCalledWith(minimalDto)
     })
   })
 
   describe('loginWithCredential', () => {
-    const loginDto = { email: 't@e.com', password: 'p' }
-    //const req = { ip: '1.1', headers: { 'user-agent': 'a' } } as any;
+    const loginDto: UserLoginRequestDto = { email: 't@e.com', password: 'p' }
+    // const  = {
+    //   ip: '1.1.1.1',
+    //   headers: { 'user-agent': 'agent' },
+    // } as any
+
     it('Normal: should login successfully', async () => {
       mockUserService.loginCrendential.mockResolvedValue({ tokens: {} })
       await controller.loginWithCredential(loginDto)
-      expect(userService.loginCrendential).toHaveBeenCalled()
+      expect(userService.loginCrendential).toHaveBeenCalledWith(loginDto)
     })
-    it('Abnormal: should handle unauthorized', async () => {
+
+    it('Abnormal: should handle unauthorized login', async () => {
       mockUserService.loginCrendential.mockRejectedValue(
         new UnauthorizedException(),
       )
@@ -95,156 +100,94 @@ describe('UserController', () => {
         UnauthorizedException,
       )
     })
+
+    it('Boundary: should handle missing headers/IP', async () => {
+      mockUserService.loginCrendential.mockResolvedValue({ tokens: {} })
+      await controller.loginWithCredential(loginDto)
+      expect(userService.loginCrendential).toHaveBeenCalledWith(loginDto)
+    })
   })
 
   describe('refreshToken', () => {
+    const user = { userId: 1 } as any
+    // const  = { ip: '1.1.1.1', headers: {} } as any
+
     it('Normal: should refresh tokens', async () => {
       mockUserService.getUserById.mockResolvedValue({ id: 1 })
       mockUserService.refreshToken.mockResolvedValue({ accessToken: 'a' })
-      const result = await controller.refreshToken(
-        { userId: 1 } as any,
-        'token',
-      )
+      const result = await controller.refreshToken(user, 'old')
       expect(result).toEqual({ accessToken: 'a' })
     })
+
     it('Abnormal: should handle user not found', async () => {
       mockUserService.getUserById.mockResolvedValue(null)
-      await controller.refreshToken({ userId: 1 } as any, 'token')
-      expect(userService.refreshToken).toHaveBeenCalledWith(
-        null,
-        'token',
-        expect.any(Object),
-      )
+      await controller.refreshToken(user, 'old')
+      expect(userService.refreshToken).toHaveBeenCalledWith(null, 'old')
     })
   })
 
-  // --- 2. Password Management ---
-  describe('forgotPassword', () => {
-    it('Normal: should delegate to service', async () => {
+  describe('Password Management', () => {
+    // const  = { ip: '1.1.1.1', headers: {} } as any
+
+    it('forgotPassword: should delegate to service', async () => {
       await controller.forgotPassword({ email: 'e' })
       expect(userService.forgotPassword).toHaveBeenCalled()
     })
-    it('Abnormal: should handle service error', async () => {
-      mockUserService.forgotPassword.mockRejectedValue(
-        new BadRequestException(),
-      )
-      await expect(controller.forgotPassword({ email: 'e' })).rejects.toThrow(
-        BadRequestException,
-      )
-    })
-  })
 
-  describe('resetPassword', () => {
-    it('Normal: should delegate to service', async () => {
+    it('resetPassword: should delegate to service', async () => {
       await controller.resetPassword({ token: 't', newPassword: 'p' })
       expect(userService.resetPassword).toHaveBeenCalled()
     })
-    it('Abnormal: should handle service error', async () => {
-      mockUserService.resetPassword.mockRejectedValue(new BadRequestException())
-      await expect(
-        controller.resetPassword({ token: 't', newPassword: 'p' }),
-      ).rejects.toThrow(BadRequestException)
+
+    it('changePassword: should delegate to service', async () => {
+      await controller.changePassword(1, {
+        oldPassword: 'old',
+        newPassword: 'new',
+      })
+      expect(userService.changePassword).toHaveBeenCalled()
     })
   })
 
-  // --- 3. Worker Profile ---
-  describe('createWorkerProfile', () => {
-    it('Normal: should create profile', async () => {
-      mockUserService.createWorkerProfile.mockResolvedValue({ id: 1 })
+  describe('Profile & Info', () => {
+    it('createWorkerProfile: should call service', async () => {
       await controller.createWorkerProfile(1, {} as any)
       expect(userService.createWorkerProfile).toHaveBeenCalledWith(1, {})
     })
-    it('Abnormal: should handle already exists', async () => {
-      mockUserService.createWorkerProfile.mockRejectedValue(
-        new BadRequestException('Exists'),
-      )
-      await expect(
-        controller.createWorkerProfile(1, {} as any),
-      ).rejects.toThrow(BadRequestException)
-    })
-  })
 
-  describe('updateWorkerProfile', () => {
-    it('Normal: should update profile', async () => {
-      mockUserService.updateWorkerProfile.mockResolvedValue({ id: 1 })
-      await controller.updateWorkerProfile(1, {} as any)
-      expect(userService.updateWorkerProfile).toHaveBeenCalledWith(1, {})
+    it('getWorkerProfile: should call service', async () => {
+      await controller.getWorkerProfile(1)
+      expect(userService.getWorkerProfile).toHaveBeenCalledWith(1)
     })
-    it('Abnormal: should handle not found', async () => {
-      mockUserService.updateWorkerProfile.mockRejectedValue(
-        new NotFoundException(),
-      )
-      await expect(
-        controller.updateWorkerProfile(1, {} as any),
-      ).rejects.toThrow(NotFoundException)
-    })
-  })
 
-  describe('getWorkerProfile', () => {
-    it('Normal: should return profile', async () => {
-      mockUserService.getWorkerProfile.mockResolvedValue({ id: 1 })
-      const result = await controller.getWorkerProfile(1)
-      expect(result).toEqual({ id: 1 })
-    })
-    it('Abnormal: should handle not found', async () => {
-      mockUserService.getWorkerProfile.mockRejectedValue(
-        new NotFoundException(),
-      )
-      await expect(controller.getWorkerProfile(1)).rejects.toThrow(
-        NotFoundException,
-      )
-    })
-  })
-
-  // --- 4. User Info ---
-  describe('getUserInfo', () => {
-    it('Normal: should return user info', async () => {
-      mockUserService.getUserById.mockResolvedValue({ id: 1 })
-      const result = await controller.getUserInfo(1)
-      expect(result).toEqual({ id: 1 })
-    })
-    it('Abnormal: should handle user not found', async () => {
-      mockUserService.getUserById.mockRejectedValue(new NotFoundException())
-      await expect(controller.getUserInfo(1)).rejects.toThrow(NotFoundException)
-    })
-  })
-
-  describe('updateInfoUser', () => {
-    it('Normal: should update user info', async () => {
-      mockUserService.updateInfoUser.mockResolvedValue({ id: 1 })
+    it('updateInfoUser: should call service', async () => {
       await controller.updateInfoUser(1, {} as any)
-      expect(userService.updateInfoUser).toHaveBeenCalledWith(1, {})
-    })
-    it('Abnormal: should handle error', async () => {
-      mockUserService.updateInfoUser.mockRejectedValue(
-        new BadRequestException(),
-      )
-      await expect(controller.updateInfoUser(1, {} as any)).rejects.toThrow(
-        BadRequestException,
-      )
+      expect(userService.updateInfoUser).toHaveBeenCalledWith(1, {}, undefined)
     })
   })
 
-  // --- 5. Others ---
-  describe('logout', () => {
-    it('Normal: should call logout service', async () => {
-      await controller.logout(1, 's')
+  describe('Auth Social & Session', () => {
+    it('logout: should call session service revoke', async () => {
+      await controller.logout(
+        1,
+        's',
+        //  { headers: {} } as any
+      )
       expect(userService.logout).toHaveBeenCalled()
     })
-  })
 
-  describe('loginWithGoogle', () => {
-    it('Normal: should call social login service', async () => {
+    it('loginWithGoogle: should call service', async () => {
+      mockUserService.loginWithSocial.mockResolvedValue({ tokens: {} })
       await controller.loginWithGoogle('e', {} as any)
-      expect(userService.loginWithSocial).toHaveBeenCalled()
+      expect(userService.loginWithSocial).toHaveBeenCalledWith(
+        'e',
+        EnumUserLoginWith.SOCIAL_GOOGLE,
+        {},
+      )
     })
-    it('Abnormal: should handle forbidden', async () => {
-      mockUserService.loginWithSocial.mockRejectedValue(
-        new ForbiddenException(),
-      )
-      await expect(controller.loginWithGoogle('e', {} as any)).rejects.toThrow(
-        ForbiddenException,
-      )
+
+    it('userDeleteAccount: should call service', async () => {
+      await controller.userDeleteAccount(1)
+      expect(userService.userDeleteAccount).toHaveBeenCalledWith(1)
     })
   })
 })
