@@ -128,6 +128,12 @@ enum OrderType {
   FEATURE_LISTING
 }
 
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+}
+
 // =====================
 // USER & AUTH
 // =====================
@@ -166,6 +172,11 @@ model User {
   reportedJobs       JobReport[]           @relation("JobReporter")
   reportedReviews    CompanyReviewReport[] @relation("ReviewReporter")
   notifications      Notification[]
+
+  conversationsAsUser1 ChatConversation[] @relation("ChatUser1")
+  conversationsAsUser2 ChatConversation[] @relation("ChatUser2")
+
+  messages ChatMessage[]
 
   @@index([email])
   @@index([role])
@@ -519,4 +530,30 @@ model TermsConditions {
   updatedAt   DateTime @updatedAt
 
   @@index([effectiveAt])
+}
+
+model ChatConversation {
+  id        Int      @id @default(autoincrement())
+  user1Id   Int
+  user2Id   Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user1    User          @relation("ChatUser1", fields: [user1Id], references: [id])
+  user2    User          @relation("ChatUser2", fields: [user2Id], references: [id])
+  messages ChatMessage[]
+  @@unique([user1Id, user2Id])
+  @@index([user1Id])
+  @@index([user2Id])
+}
+model ChatMessage {
+  id             Int           @id @default(autoincrement())
+  conversationId Int
+  senderId       Int
+  content        String
+  status         MessageStatus @default(SENT)
+  createdAt      DateTime      @default(now())
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User             @relation(fields: [senderId], references: [id])
+  @@index([conversationId, createdAt])
+  @@index([senderId])
 }
