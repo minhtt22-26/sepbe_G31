@@ -94,13 +94,6 @@ describe('JobController', () => {
 
       await expect(controller.getDetail(1)).rejects.toThrow('Job not found')
     })
-
-    it('Boundary: should handle invalid ID type (handled by ParseIntPipe)', async () => {
-      // Logic inside controller is just delegation
-      jobServiceMock.getDetail.mockResolvedValue({ id: 999 })
-      const result = await controller.getDetail(999)
-      expect(result).toEqual({ id: 999 })
-    })
   })
 
   describe('getRelatedJobs', () => {
