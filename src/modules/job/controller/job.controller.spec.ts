@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { JobController } from './job.controller'
 import { JobService } from '../service/job.service'
-import { CompanyService } from 'src/modules/company/company.service'
+import { JobController } from './job.controller'
 
 jest.mock('src/prisma.service', () => ({
   PrismaService: class { },
