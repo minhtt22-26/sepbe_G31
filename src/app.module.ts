@@ -20,6 +20,7 @@ import { redisStore } from 'cache-manager-redis-store'
 import { OccupationModule } from './modules/occupation/occupation.module'
 import { SectorModule } from './modules/sector/sector.module'
 import { TermsConditionsModule } from './modules/terms-conditions/terms-conditions.module'
+import { ChatModule } from './modules/chat/chat.module'
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -48,8 +49,13 @@ import { TermsConditionsModule } from './modules/terms-conditions/terms-conditio
             ttl: 600000,
           }
         } catch (error) {
-          console.error('[CACHE] ERROR initializing Redis:', error?.message || error)
-          throw new Error(`Cache initialization failed: ${error?.message || error}`)
+          console.error(
+            '[CACHE] ERROR initializing Redis:',
+            error?.message || error,
+          )
+          throw new Error(
+            `Cache initialization failed: ${error?.message || error}`,
+          )
         }
       },
     }),
@@ -70,8 +76,9 @@ import { TermsConditionsModule } from './modules/terms-conditions/terms-conditio
     OccupationModule,
     SectorModule,
     TermsConditionsModule,
+    ChatModule,
   ],
   controllers: [],
   providers: [],
 })
-export class AppModule { }
+export class AppModule {}
