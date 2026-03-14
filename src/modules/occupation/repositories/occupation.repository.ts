@@ -18,6 +18,12 @@ export class OccupationRepository {
                 id: true,
                 name: true,
                 sectorId: true,
+                sector: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
                 status: true,
             },
         })
@@ -33,6 +39,12 @@ export class OccupationRepository {
                 id: true,
                 name: true,
                 sectorId: true,
+                sector: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
                 status: true,
             },
         })
