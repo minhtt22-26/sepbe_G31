@@ -19,6 +19,7 @@ import { CacheModule } from '@nestjs/cache-manager'
 import { redisStore } from 'cache-manager-redis-store'
 import { OccupationModule } from './modules/occupation/occupation.module'
 import { SectorModule } from './modules/sector/sector.module'
+import { TermsConditionsModule } from './modules/terms-conditions/terms-conditions.module'
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -68,6 +69,7 @@ import { SectorModule } from './modules/sector/sector.module'
     JobModule,
     OccupationModule,
     SectorModule,
+    TermsConditionsModule,
   ],
   controllers: [],
   providers: [],
