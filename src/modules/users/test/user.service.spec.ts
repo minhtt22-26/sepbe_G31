@@ -18,6 +18,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common'
+import { CloudinaryService } from 'src/infrastructure/cloudinary/cloudinary.service'
 
 describe('UserService', () => {
   let service: UserService
@@ -45,6 +46,7 @@ describe('UserService', () => {
     findValidForgotPasswordToken: jest.fn(),
     updatePassword: jest.fn(),
     markForgotPasswordTokenUsed: jest.fn(),
+    userDelete: jest.fn(),
   }
 
   const mockAuthUtil = {
@@ -72,9 +74,13 @@ describe('UserService', () => {
     getLogin: jest.fn(),
     updateLogin: jest.fn(),
     revoke: jest.fn(),
+    revokeAll: jest.fn(),
   }
   const mockEmailService = {
     sendForgotPasswordEmail: jest.fn(),
+  }
+  const mockCloudinaryService = {
+    uploadFile: jest.fn(),
   }
 
   beforeEach(async () => {
@@ -87,6 +93,7 @@ describe('UserService', () => {
         { provide: HelperService, useValue: mockHelperService },
         { provide: SessionService, useValue: mockSessionService },
         { provide: EmailService, useValue: mockEmailService },
+        { provide: CloudinaryService, useValue: mockCloudinaryService },
       ],
     }).compile()
 
@@ -637,12 +644,67 @@ describe('UserService', () => {
 
       it('Boundary: should handle repository error', async () => {
         mockUserRepository.findOneById.mockResolvedValue({ id: 1 })
-        mockUserRepository.updateInfoUser.mockRejectedValue(
-          new Error('DB Error'),
-        )
+        mockUserRepository.updateInfoUser.mockRejectedValue(new Error('DB Error'))
         await expect(
           service.updateInfoUser(1, { fullName: 'New' } as any),
         ).rejects.toThrow('DB Error')
+      })
+    })
+  })
+
+  describe('Password & Account Management', () => {
+    const userId = 1
+    const mockUser = { id: userId, password: 'hashed_password', status: EnumUserStatus.ACTIVE } as any
+
+    describe('changePassword', () => {
+      const dto = { oldPassword: 'old', newPassword: 'new' }
+
+      it('Normal: should successfully change password when old password is correct', async () => {
+        mockUserRepository.findOneById.mockResolvedValue(mockUser)
+        mockAuthUtil.validatePassword.mockReturnValue(true)
+        mockAuthUtil.createPassword.mockReturnValue({ passwordHash: 'new_hashed' })
+        mockUserRepository.updatePassword.mockResolvedValue(undefined)
+
+        await service.changePassword(userId, dto)
+
+        expect(userRepository.updatePassword).toHaveBeenCalledWith(userId, 'new_hashed')
+      })
+
+      it('Abnormal: should throw NotFoundException when user not found', async () => {
+        mockUserRepository.findOneById.mockResolvedValue(null)
+        await expect(service.changePassword(userId, dto)).rejects.toThrow(NotFoundException)
+      })
+
+      it('Boundary: should throw BadRequestException when old password is incorrect', async () => {
+        mockUserRepository.findOneById.mockResolvedValue(mockUser)
+        mockAuthUtil.validatePassword.mockReturnValue(false)
+        
+        await expect(service.changePassword(userId, dto)).rejects.toThrow(BadRequestException)
+        await expect(service.changePassword(userId, dto)).rejects.toThrow('Mật khẩu hiện tại không chính xác')
+      })
+    })
+
+    describe('userDeleteAccount', () => {
+      it('Normal: should successfully delete active account and revoke sessions', async () => {
+        mockUserRepository.findOneById.mockResolvedValue(mockUser)
+        mockUserRepository.userDelete.mockResolvedValue({ ...mockUser, status: EnumUserStatus.INACTIVE })
+
+        const result = await service.userDeleteAccount(userId)
+
+        expect(sessionService.revokeAll).toHaveBeenCalledWith(userId)
+        expect(userRepository.userDelete).toHaveBeenCalled()
+        expect(result.status).toBe(EnumUserStatus.INACTIVE)
+      })
+
+      it('Abnormal: should throw NotFoundException when user not found', async () => {
+        mockUserRepository.findOneById.mockResolvedValue(null)
+        await expect(service.userDeleteAccount(userId)).rejects.toThrow(NotFoundException)
+      })
+
+      it('Boundary: should throw BadRequestException when account is not active', async () => {
+        mockUserRepository.findOneById.mockResolvedValue({ ...mockUser, status: EnumUserStatus.INACTIVE })
+        await expect(service.userDeleteAccount(userId)).rejects.toThrow(BadRequestException)
+        await expect(service.userDeleteAccount(userId)).rejects.toThrow('Tài khoản của bạn không hoạt động')
       })
     })
   })

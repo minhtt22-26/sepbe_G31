@@ -216,18 +216,14 @@ export class UserRepository {
 
   async updateProfile(
     userId: number,
-    { ...profile }: WorkerProfileRequestDto,
+    profile: WorkerProfileRequestDto,
   ): Promise<WorkerProfile> {
-    return await this.prisma.workerProfile.update({
+    return this.prisma.workerProfile.upsert({
       where: { userId },
-      data: {
-        occupationId: profile.occupationId,
-        shift: profile.shift,
-        province: profile.province,
-        gender: profile.gender,
-        birthYear: profile.birthYear,
-        expectedSalary: profile.expectedSalary,
-        experienceYear: profile.experienceYear,
+      update: profile,
+      create: {
+        userId,
+        ...profile,
       },
     })
   }

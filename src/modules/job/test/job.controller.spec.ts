@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { JobService } from '../service/job.service'
-import { JobController } from './job.controller'
+import { JobController } from '../controller/job.controller'
 
 jest.mock('src/prisma.service', () => ({
-  PrismaService: class { },
+  PrismaService: class {},
 }))
 
 const jobServiceMock = {
@@ -11,6 +11,8 @@ const jobServiceMock = {
   applyJob: jest.fn(),
   cancelApplyJob: jest.fn(),
   getApplicationsByUser: jest.fn(),
+  getDetail: jest.fn(),
+  getRelatedJobs: jest.fn(),
 }
 
 describe('JobController', () => {
@@ -23,7 +25,7 @@ describe('JobController', () => {
         {
           provide: JobService,
           useValue: jobServiceMock,
-        }
+        },
       ],
     }).compile()
 
@@ -73,5 +75,54 @@ describe('JobController', () => {
 
     expect(result).toBe(expected)
     expect(jobServiceMock.getApplicationsByUser).toHaveBeenCalledWith(42)
+  })
+
+  describe('getDetail', () => {
+    it('Normal: should return job detail when job exists', async () => {
+      const mockJob = { id: 1, title: 'Job 1' }
+      jobServiceMock.getDetail.mockResolvedValue(mockJob)
+
+      const result = await controller.getDetail(1)
+
+      expect(result).toEqual(mockJob)
+      expect(jobServiceMock.getDetail).toHaveBeenCalledWith(1)
+    })
+
+    it('Abnormal: should throw error when job not found', async () => {
+      const error = new Error('Job not found')
+      jobServiceMock.getDetail.mockRejectedValue(error)
+
+      await expect(controller.getDetail(1)).rejects.toThrow('Job not found')
+    })
+  })
+
+  describe('getRelatedJobs', () => {
+    it('Normal: should return related jobs list', async () => {
+      const mockRelated = [{ id: 2 }, { id: 3 }]
+      jobServiceMock.getRelatedJobs.mockResolvedValue(mockRelated)
+
+      const result = await controller.getRelatedJobs(1)
+
+      expect(result).toEqual(mockRelated)
+      expect(jobServiceMock.getRelatedJobs).toHaveBeenCalledWith(1)
+    })
+
+    it('Abnormal: should handle service errors', async () => {
+      jobServiceMock.getRelatedJobs.mockRejectedValue(
+        new Error('Service Error'),
+      )
+
+      await expect(controller.getRelatedJobs(1)).rejects.toThrow(
+        'Service Error',
+      )
+    })
+
+    it('Boundary: should handle empty related jobs list', async () => {
+      jobServiceMock.getRelatedJobs.mockResolvedValue([])
+
+      const result = await controller.getRelatedJobs(1)
+
+      expect(result).toEqual([])
+    })
   })
 })

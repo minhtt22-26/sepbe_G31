@@ -75,12 +75,12 @@ export class AuthService {
       refreshTokenFromRequest,
     )
 
-    console.log('[REFRESH DEBUG] === refreshTokens called ===')
-    console.log(`[REFRESH DEBUG] sessionId: ${sessionId}`)
-    console.log(`[REFRESH DEBUG] oldExp (unix): ${oldExp}`)
-    console.log(
-      `[REFRESH DEBUG] oldExp (date): ${oldExp ? new Date(oldExp * 1000).toISOString() : 'N/A'}`,
-    )
+    // console.log('[REFRESH DEBUG] === refreshTokens called ===')
+    // console.log(`[REFRESH DEBUG] sessionId: ${sessionId}`)
+    // console.log(`[REFRESH DEBUG] oldExp (unix): ${oldExp}`)
+    // console.log(
+    //   `[REFRESH DEBUG] oldExp (date): ${oldExp ? new Date(oldExp * 1000).toISOString() : 'N/A'}`,
+    // )
 
     const jti = this.authUtil.generateJti()
 
@@ -115,15 +115,15 @@ export class AuthService {
         ? newRefreshTokenExpired.seconds
         : Math.floor(newRefreshTokenExpired.miliseconds / 1000)
 
-    console.log(`[REFRESH DEBUG] today: ${today.toISOString()}`)
-    console.log(`[REFRESH DEBUG] expiredAt: ${expiredAt.toISOString()}`)
-    console.log(
-      `[REFRESH DEBUG] remaining seconds: ${newRefreshTokenExpireInseconds}`,
-    )
-    console.log(
-      `[REFRESH DEBUG] remaining minutes: ${Math.floor(newRefreshTokenExpireInseconds / 60)}`,
-    )
-    console.log(`[REFRESH DEBUG] new jti: ${jti.substring(0, 10)}...`)
+    // console.log(`[REFRESH DEBUG] today: ${today.toISOString()}`)
+    // console.log(`[REFRESH DEBUG] expiredAt: ${expiredAt.toISOString()}`)
+    // console.log(
+    //   `[REFRESH DEBUG] remaining seconds: ${newRefreshTokenExpireInseconds}`,
+    // )
+    // console.log(
+    //   `[REFRESH DEBUG] remaining minutes: ${Math.floor(newRefreshTokenExpireInseconds / 60)}`,
+    // )
+    // console.log(`[REFRESH DEBUG] new jti: ${jti.substring(0, 10)}...`)
 
     const newRefreshToken: string = this.authUtil.createRefreshTokens(
       jti,

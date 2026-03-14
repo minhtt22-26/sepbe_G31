@@ -14,6 +14,8 @@ const jobRepositoryMock = {
   findApplicationByJobAndUser: jest.fn(),
   cancelApply: jest.fn(),
   findApplicationsByUser: jest.fn(),
+  findJobById: jest.fn(),
+  getRelatedJobs: jest.fn(),
 }
 
 describe('JobService', () => {
@@ -208,5 +210,77 @@ describe('JobService', () => {
     expect(jobRepositoryMock.findApplicationsByUser).toHaveBeenCalledWith(2)
     expect(Array.isArray(result.data)).toBe(true)
     expect(result.data[0].job.id).toBe(10)
+  })
+
+  describe('getDetail', () => {
+    const jobId = 1
+    const mockJob = { id: jobId, title: 'Test Job' }
+
+    it('Normal: should return job detail when job exists', async () => {
+      jobRepositoryMock.findJobById.mockResolvedValue(mockJob)
+
+      const result = await service.getDetail(jobId)
+
+      expect(result).toEqual(mockJob)
+      expect(jobRepositoryMock.findJobById).toHaveBeenCalledWith(jobId)
+    })
+
+    it('Abnormal: should throw Error when job is not found', async () => {
+      jobRepositoryMock.findJobById.mockResolvedValue(null)
+
+      await expect(service.getDetail(jobId)).rejects.toThrow('Job not found')
+    })
+
+    it('Boundary: should propagate database error', async () => {
+      const dbError = new Error('Database connection failed')
+      jobRepositoryMock.findJobById.mockRejectedValue(dbError)
+
+      await expect(service.getDetail(jobId)).rejects.toThrow(dbError)
+    })
+  })
+
+  describe('getRelatedJobs', () => {
+    const jobId = 1
+    const mockJob = { id: jobId, occupationId: 5, province: 'Hanoi' }
+    const mockRelatedJobs = [
+      { id: 2, title: 'Related Job 1' },
+      { id: 3, title: 'Related Job 2' },
+    ]
+
+    it('Normal: should return related jobs when original job exists', async () => {
+      jobRepositoryMock.findJobById.mockResolvedValue(mockJob)
+      jobRepositoryMock.getRelatedJobs.mockResolvedValue(mockRelatedJobs)
+
+      const result = await service.getRelatedJobs(jobId)
+
+      expect(result).toEqual(mockRelatedJobs)
+      expect(jobRepositoryMock.findJobById).toHaveBeenCalledWith(jobId)
+      expect(jobRepositoryMock.getRelatedJobs).toHaveBeenCalledWith(
+        jobId,
+        mockJob.occupationId,
+        mockJob.province,
+        expect.any(Number),
+      )
+    })
+
+    it('Abnormal: should throw NotFoundException when job is not found', async () => {
+      jobRepositoryMock.findJobById.mockResolvedValue(null)
+
+      await expect(service.getRelatedJobs(jobId)).rejects.toThrow(
+        NotFoundException,
+      )
+      await expect(service.getRelatedJobs(jobId)).rejects.toThrow(
+        'Không tìm thấy công việc này',
+      )
+    })
+
+    it('Boundary: should return empty list when no related jobs found', async () => {
+      jobRepositoryMock.findJobById.mockResolvedValue(mockJob)
+      jobRepositoryMock.getRelatedJobs.mockResolvedValue([])
+
+      const result = await service.getRelatedJobs(jobId)
+
+      expect(result).toEqual([])
+    })
   })
 })
