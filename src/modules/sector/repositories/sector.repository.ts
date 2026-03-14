@@ -43,6 +43,18 @@ export class SectorRepository {
         })
     }
 
+    async restore(id: number, name: string) {
+        return this.prisma.sector.update({
+            where: {
+                id,
+            },
+            data: {
+                name,
+                status: SectorStatus.ACTIVE,
+            },
+        })
+    }
+
     async update(id: number, name: string) {
         return this.prisma.sector.update({
             where: {
