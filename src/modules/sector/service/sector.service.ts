@@ -3,6 +3,7 @@ import {
     Injectable,
     NotFoundException,
 } from '@nestjs/common'
+import { SectorStatus } from 'src/generated/prisma/enums'
 import { SectorRepository } from '../repositories/sector.repository'
 import { CreateSectorRequest } from '../dtos/request/create-sector.request'
 import { UpdateSectorRequest } from '../dtos/request/update-sector.request'
@@ -14,6 +15,10 @@ export class SectorService {
     async create(body: CreateSectorRequest) {
         const normalizedName = body.name.trim()
         const existed = await this.sectorRepository.findByName(normalizedName)
+
+        if (existed?.status === SectorStatus.DELETED) {
+            return this.sectorRepository.restore(existed.id, normalizedName)
+        }
 
         if (existed) {
             throw new ConflictException('Sector name already exists')

@@ -10,6 +10,7 @@ jest.mock('src/prisma.service', () => ({
 const sectorRepositoryMock = {
     findByName: jest.fn(),
     create: jest.fn(),
+    restore: jest.fn(),
     findAll: jest.fn(),
     findById: jest.fn(),
     update: jest.fn(),
@@ -49,11 +50,34 @@ describe('SectorService', () => {
     })
 
     it('create should throw when sector name already exists', async () => {
-        sectorRepositoryMock.findByName.mockResolvedValue({ id: 99, name: 'Sản xuất' })
+        sectorRepositoryMock.findByName.mockResolvedValue({
+            id: 99,
+            name: 'Sản xuất',
+            status: 'ACTIVE',
+        })
 
         await expect(service.create({ name: 'Sản xuất' })).rejects.toBeInstanceOf(
             ConflictException,
         )
+    })
+
+    it('create should restore deleted sector with same name', async () => {
+        sectorRepositoryMock.findByName.mockResolvedValue({
+            id: 10,
+            name: 'Sản xuất',
+            status: 'DELETED',
+        })
+        sectorRepositoryMock.restore.mockResolvedValue({
+            id: 10,
+            name: 'Sản xuất',
+            status: 'ACTIVE',
+        })
+
+        const result = await service.create({ name: '  Sản xuất  ' })
+
+        expect(result).toEqual({ id: 10, name: 'Sản xuất', status: 'ACTIVE' })
+        expect(sectorRepositoryMock.restore).toHaveBeenCalledWith(10, 'Sản xuất')
+        expect(sectorRepositoryMock.create).not.toHaveBeenCalled()
     })
 
     it('findAll should return all active sectors', async () => {
