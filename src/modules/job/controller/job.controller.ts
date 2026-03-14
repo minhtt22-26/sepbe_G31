@@ -26,11 +26,12 @@ import {
   AuthJwtAccessProtected,
   AuthJwtPayload,
 } from 'src/modules/auth/decorators/auth.jwt.decorator'
+import { CompanyService } from 'src/modules/company/company.service'
 
 @ApiTags('Job')
 @Controller('job')
 export class JobController {
-  constructor(private readonly jobService: JobService) {}
+  constructor(private readonly jobService: JobService, private readonly companyService: CompanyService) { }
 
   // Search jobs (Elastic)
   //api/job/search?keyword=abc&sectorId=2&workingShift=AFTERNOON&page=1&limit=10
@@ -39,13 +40,27 @@ export class JobController {
     return this.jobService.searchJobs(q)
   }
 
-  @Post(':companyId') // Thêm param vào path
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  @Get('get-for-employer')
+  async getForEmployer(@AuthJwtPayload() user: any, @Query() q: JobSearchDto) {
+    const ownerId = user.userId
+    const company = await this.companyService.findByOwnerId(ownerId);
+    q.companyId = company.id;
+    return this.jobService.searchJobs(q)
+  }
+
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Create new job' })
-  create(
-    @Param('companyId', ParseIntPipe) companyId: number, // Lấy ID từ URL
+  @Post()
+  async create(
+    @AuthJwtPayload() user: any,
     @Body() dto: CreateJobRequest,
   ) {
-    return this.jobService.createJob(dto, companyId)
+    const ownerId = user.userId
+    const company = await this.companyService.findByOwnerId(ownerId);
+    return this.jobService.createJob(dto, company.id);
   }
 
   // GET JOB DETAIL
@@ -118,25 +133,32 @@ export class JobController {
     return this.jobService.cancelApplyJob(id, userId)
   }
 
-  @Put(':companyId/jobs/:id')
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  @Put(':id')
   @ApiOperation({ summary: 'Update job' })
-  update(
-    @Param('companyId', ParseIntPipe) companyId: number,
+  async update(
+    @AuthJwtPayload() user: any,
     @Param('id', ParseIntPipe) id: number,
     @Body() body: UpdateJobRequest,
   ) {
-    return this.jobService.updateJob(id, body, companyId)
+    const ownerId = user.userId
+    const company = await this.companyService.findByOwnerId(ownerId);
+    return this.jobService.updateJob(id, body, company.id);
   }
 
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
   // DELETE JOB
-  @Delete(':companyId/jobs/:id')
+  @Delete(':id')
   @ApiOperation({ summary: 'Delete job (Soft delete)' })
   async delete(
-    @Param('companyId', ParseIntPipe) companyId: number,
+    @AuthJwtPayload() user: any,
     @Param('id', ParseIntPipe) id: number,
   ) {
-    // Không còn fake nữa, lấy trực tiếp từ URL
-    return this.jobService.deleteJob(id, companyId)
+    const ownerId = user.userId
+    const company = await this.companyService.findByOwnerId(ownerId);
+    return this.jobService.deleteJob(id, company.id);
   }
 
   @Get(':id/related')

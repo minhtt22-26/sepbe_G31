@@ -1,9 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { JobController } from './job.controller'
 import { JobService } from '../service/job.service'
+import { CompanyService } from 'src/modules/company/company.service'
 
 jest.mock('src/prisma.service', () => ({
-  PrismaService: class {},
+  PrismaService: class { },
 }))
 
 const jobServiceMock = {
@@ -23,7 +24,7 @@ describe('JobController', () => {
         {
           provide: JobService,
           useValue: jobServiceMock,
-        },
+        }
       ],
     }).compile()
 
