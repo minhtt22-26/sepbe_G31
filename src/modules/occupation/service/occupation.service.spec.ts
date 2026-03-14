@@ -156,7 +156,17 @@ describe('OccupationService', () => {
     })
 
     it('getOccupationsBySector should call repository', async () => {
-        const expected = [{ id: 1, name: 'Công nhân may' }]
+        const expected = [
+            {
+                id: 1,
+                name: 'Công nhân may',
+                sectorId: 1,
+                sector: {
+                    id: 1,
+                    name: 'Sản xuất',
+                },
+            },
+        ]
         occupationRepositoryMock.findOccupationsBySector.mockResolvedValue(expected)
 
         const result = await service.getOccupationsBySector(1)

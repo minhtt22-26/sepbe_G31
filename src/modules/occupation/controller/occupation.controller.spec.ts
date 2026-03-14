@@ -58,7 +58,17 @@ describe('OccupationController', () => {
     })
 
     it('getOccupationsBySector should call service', async () => {
-        const expected = [{ id: 1, name: 'Công nhân may' }]
+        const expected = [
+            {
+                id: 1,
+                name: 'Công nhân may',
+                sectorId: 2,
+                sector: {
+                    id: 2,
+                    name: 'May mặc',
+                },
+            },
+        ]
         occupationServiceMock.getOccupationsBySector.mockResolvedValue(expected)
 
         const result = await controller.getOccupationsBySector(2)

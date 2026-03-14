@@ -136,6 +136,13 @@ export class OccupationRepository {
             select: {
                 id: true,
                 name: true,
+                sectorId: true,
+                sector: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
             },
         })
     }
