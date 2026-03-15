@@ -290,7 +290,7 @@ export class JobRepository {
       })
 
       if (existing && existing.status !== JobApplicationStatus.CANCELLED) {
-        throw new BadRequestException('You have already applied for this job')
+        throw new BadRequestException('Bạn đã ứng tuyển công việc này rồi')
       }
 
       let applicationId = existing?.id
