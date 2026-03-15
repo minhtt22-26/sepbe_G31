@@ -12,7 +12,9 @@ import { JOB_CONSTANTS } from '../constant/job.constant'
 
 @Injectable()
 export class JobService {
-  constructor(private readonly jobRepository: JobRepository) {}
+  constructor(
+    private readonly jobRepository: JobRepository,
+  ) { }
 
   async searchJobs(q: any) {
     const keyword = q.keyword?.trim() || ''
@@ -85,6 +87,51 @@ export class JobService {
         totalPage: Math.ceil(total / limit),
       },
     }
+  }
+
+  async getWistlist(userId: number, page?: number, limit?: number, skip?: number) {
+    const where = {
+      userId: userId
+    }
+    const orderBy = {
+      createdAt: 'desc'
+    }
+    const { items, total } = await this.jobRepository.getWishList(where, orderBy, limit || 10, skip || 0);
+    return {
+      success: true,
+      items,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPage: Math.ceil(total / (limit || 10))
+      }
+    }
+  }
+
+  async saveJob(userId: number, jobId: number) {
+    const job = await this.jobRepository.findJobById(jobId);
+    if (!job) {
+      throw new NotFoundException('Job not found');
+    }
+
+    const existing = await this.jobRepository.findSavedJob(userId, jobId);
+    if (existing) {
+      return { success: true, message: 'Job already saved' };
+    }
+
+    await this.jobRepository.saveJob(userId, jobId);
+    return { success: true, message: 'Job saved successfully' };
+  }
+
+  async unSaveJob(userId: number, jobId: number) {
+    const existing = await this.jobRepository.findSavedJob(userId, jobId);
+    if (!existing) {
+      return { success: true, message: 'Job not saved yet' };
+    }
+
+    await this.jobRepository.unSaveJob(userId, jobId);
+    return { success: true, message: 'Job unsaved successfully' };
   }
 
   async createJob(dto: CreateJobRequest, companyId: number) {
@@ -277,9 +324,9 @@ export class JobService {
           const selected =
             field.fieldType === 'checkbox'
               ? value
-                  .split(',')
-                  .map((item) => item.trim())
-                  .filter(Boolean)
+                .split(',')
+                .map((item) => item.trim())
+                .filter(Boolean)
               : [value]
 
           const hasInvalid = selected.some(
