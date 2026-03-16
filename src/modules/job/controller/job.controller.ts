@@ -9,10 +9,12 @@ import {
   Put,
   Query,
   ParseIntPipe,
+  BadRequestException,
 } from '@nestjs/common'
 import { JobService } from '../service/job.service'
 import { CreateJobRequest } from '../dtos/request/create-job.request'
 import { UpdateJobRequest } from '../dtos/request/update-job.request'
+import { UpdateApplicationStatusRequest } from '../dtos/request/update-application-status.request'
 import { JobSearchDto } from '../dtos/job.search.request.dto'
 import { WishlistRequestDto } from '../dtos/job.wishlist.request.dto'
 import {
@@ -77,6 +79,37 @@ export class JobController {
     @AuthJwtPayload() user: any
   ) {
     return this.jobService.getWistlist(user.userId, q.page, q.limit, q.skip);
+  }
+
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get applications for employer' })
+  @Get('employer/applications')
+  async getApplicationsForEmployer(
+    @AuthJwtPayload() user: any,
+    @Query('jobId') jobId?: string,
+  ) {
+    const ownerId = user.userId
+    const company = await this.companyService.findByOwnerId(ownerId);
+    const parsedJobId = jobId ? parseInt(jobId, 10) : undefined;
+    if (parsedJobId !== undefined && isNaN(parsedJobId)) {
+      throw new BadRequestException('jobId must be a number')
+    }
+    return this.jobService.getApplicationsForEmployer(company.id, parsedJobId);
+  }
+
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Update application status by employer' })
+  @Put('applications/:applicationId/status')
+  async updateApplicationStatus(
+    @AuthJwtPayload() user: any,
+    @Param('applicationId', ParseIntPipe) applicationId: number,
+    @Body() body: UpdateApplicationStatusRequest,
+  ) {
+    const ownerId = user.userId;
+    const company = await this.companyService.findByOwnerId(ownerId);
+    return this.jobService.updateApplicationStatus(applicationId, company.id, body.status);
   }
 
   // GET JOB DETAIL
