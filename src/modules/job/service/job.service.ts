@@ -374,6 +374,26 @@ export class JobService {
     return { success: true, data: applications }
   }
 
+  async getApplicationsForEmployer(companyId: number, jobId?: number) {
+    const applications = await this.jobRepository.findApplicationsForCompany(
+      companyId,
+      jobId,
+    )
+    return { success: true, data: applications }
+  }
+
+  async updateApplicationStatus(applicationId: number, companyId: number, status: JobApplicationStatus) {
+    const application = await this.jobRepository.findApplicationById(applicationId)
+    if (!application) {
+      throw new NotFoundException('Application not found')
+    }
+    if (application.job.companyId !== companyId) {
+      throw new BadRequestException('Unauthorized to update this application')
+    }
+    await this.jobRepository.updateApplicationStatus(applicationId, status)
+    return { success: true }
+  }
+
   async cancelApplyJob(jobId: number, userId: number) {
     const application = await this.jobRepository.findApplicationByJobAndUser(
       jobId,

@@ -389,6 +389,94 @@ export class JobRepository {
     })
   }
 
+  async findApplicationsForCompany(companyId: number, jobId?: number) {
+    return this.prisma.jobApplication.findMany({
+      where: {
+        job: {
+          companyId,
+          ...(jobId ? { id: jobId } : {}),
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            phone: true,
+            avatar: true,
+            workerProfile: {
+              select: {
+                gender: true,
+                birthYear: true,
+                province: true,
+                experienceYear: true,
+                expectedSalary: true,
+                shift: true,
+                occupation: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        job: {
+          select: {
+            id: true,
+            title: true,
+            companyId: true,
+          },
+        },
+        answers: {
+          select: {
+            fieldId: true,
+            value: true,
+            field: {
+              select: {
+                id: true,
+                label: true,
+                fieldType: true,
+              },
+            },
+          },
+        },
+      },
+    })
+  }
+
+  async updateApplicationStatus(applicationId: number, status: JobApplicationStatus) {
+    return this.prisma.jobApplication.update({
+      where: { id: applicationId },
+      data: { status },
+      include: {
+        job: {
+          select: {
+            title: true,
+            companyId: true,
+          },
+        },
+      },
+    })
+  }
+
+  async findApplicationById(applicationId: number) {
+    return this.prisma.jobApplication.findUnique({
+      where: { id: applicationId },
+      include: {
+        job: {
+          select: {
+            id: true,
+            title: true,
+            companyId: true,
+          },
+        },
+      },
+    })
+  }
+
   async getRelatedJobs(
     jobId: number,
     occupationId: number,
