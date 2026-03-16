@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
-import { JobApplicationStatus } from 'src/generated/prisma/enums'
+import { JobApplicationStatus, ReportStatus } from 'src/generated/prisma/enums'
 import { JobStatus } from 'src/generated/prisma/browser'
 import { PrismaService } from 'src/prisma.service'
 
@@ -557,6 +557,47 @@ export class JobRepository {
           jobId,
         },
       },
+    })
+  }
+
+  async findJobReport(userId: number, jobId: number) {
+    return this.prisma.jobReport.findUnique({
+      where: {
+        jobId_reporterId: {
+          jobId,
+          reporterId: userId,
+        },
+      },
+    })
+  }
+  async getAllJobReport(userId: number, status: ReportStatus, page: number, limit: number) {
+    const skip = (page - 1) * limit
+    return this.prisma.jobReport.findMany({
+      where: {
+        status: status,
+      },
+      skip: skip,
+      take: limit
+    })
+  }
+
+  async createJobReport(userId: number, dto: any) {
+    return this.prisma.jobReport.create({
+      data: {
+        jobId: dto.jobId,
+        reporterId: userId,
+        reason: dto.reason,
+        description: dto.description,
+        status: 'PENDING',
+      },
+    })
+  }
+  async changeJobReportStatus(jobId, status: ReportStatus) {
+    return this.prisma.jobReport.update({
+      where: { id: jobId },
+      data: {
+        status: status
+      }
     })
   }
 }

@@ -6,9 +6,10 @@ import {
 import { JobRepository } from '../repositories/job.repository'
 import { CreateJobRequest } from '../dtos/request/create-job.request'
 import { UpdateJobRequest } from '../dtos/request/update-job.request'
-import { JobApplicationStatus, JobStatus } from 'src/generated/prisma/enums'
+import { JobApplicationStatus, JobStatus, ReportStatus } from 'src/generated/prisma/enums'
 import { ApplyJobRequest } from '../dtos/request/apply-job.request'
 import { JOB_CONSTANTS } from '../constant/job.constant'
+import { JobReportDto } from '../dtos/job.report.request.dto'
 
 @Injectable()
 export class JobService {
@@ -440,5 +441,29 @@ export class JobService {
     )
 
     return relatedJobs
+  }
+
+  async getAllJobReport(userId: number, status: ReportStatus, page: number, limit: number) {
+    const allJobReports = await this.jobRepository.getAllJobReport(userId, status, page, limit)
+    if (!allJobReports) {
+      throw new NotFoundException("The job report list is empty!")
+    }
+    return allJobReports
+  }
+
+  async reportJob(userId: number, dto: JobReportDto) {
+    const job = await this.jobRepository.findJobById(dto.jobId)
+
+    if (!job) {
+      throw new NotFoundException('Job not found')
+    }
+
+    const existingReport = await this.jobRepository.findJobReport(userId, dto.jobId)
+    if (existingReport) {
+      throw new BadRequestException('You have already reported this job')
+    }
+
+    const createJobReport = await this.jobRepository.createJobReport(userId, dto)
+    return { success: true }
   }
 }
