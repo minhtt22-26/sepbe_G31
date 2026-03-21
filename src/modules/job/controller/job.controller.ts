@@ -74,7 +74,7 @@ export class JobController {
   }
 
   @Get('wishlist')
-  @AuthRoleProtected(EnumUserRole.WORKER, EnumUserRole.EMPLOYER)
+  @AuthRoleProtected(EnumUserRole.WORKER)
   @ApiOperation({ summary: 'Get user wishlist' })
   @ApiResponse({ status: 200, description: 'Wishlist retrieved successfully' })
   @AuthJwtAccessProtected()
@@ -86,35 +86,41 @@ export class JobController {
     return this.jobService.getWistlist(user.userId, q.page, q.limit, q.skip)
   }
 
+  @Get('employer/applications')
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
   @AuthJwtAccessProtected()
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Get applications for employer' })
-  @Get('employer/applications')
   async getApplicationsForEmployer(
     @AuthJwtPayload() user: any,
     @Query('jobId') jobId?: string,
   ) {
     const ownerId = user.userId
-    const company = await this.companyService.findByOwnerId(ownerId);
-    const parsedJobId = jobId ? parseInt(jobId, 10) : undefined;
+    const company = await this.companyService.findByOwnerId(ownerId)
+    const parsedJobId = jobId ? parseInt(jobId, 10) : undefined
     if (parsedJobId !== undefined && isNaN(parsedJobId)) {
       throw new BadRequestException('jobId must be a number')
     }
-    return this.jobService.getApplicationsForEmployer(company.id, parsedJobId);
+    return this.jobService.getApplicationsForEmployer(company.id, parsedJobId)
   }
 
+  @Put('applications/:applicationId/status')
   @AuthJwtAccessProtected()
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Update application status by employer' })
-  @Put('applications/:applicationId/status')
   async updateApplicationStatus(
     @AuthJwtPayload() user: any,
     @Param('applicationId', ParseIntPipe) applicationId: number,
     @Body() body: UpdateApplicationStatusRequest,
   ) {
-    const ownerId = user.userId;
-    const company = await this.companyService.findByOwnerId(ownerId);
-    return this.jobService.updateApplicationStatus(applicationId, company.id, body.status);
+    const ownerId = user.userId
+    const company = await this.companyService.findByOwnerId(ownerId)
+    return this.jobService.updateApplicationStatus(
+      applicationId,
+      company.id,
+      body.status,
+    )
   }
 
   // GET JOB DETAIL
@@ -230,7 +236,7 @@ export class JobController {
   // wishlist endpoint previously here
 
   @Post('save/:jobId')
-  @AuthRoleProtected(EnumUserRole.WORKER, EnumUserRole.EMPLOYER)
+  @AuthRoleProtected(EnumUserRole.WORKER)
   @ApiOperation({ summary: 'Save a job' })
   @ApiResponse({ status: 201, description: 'Job saved successfully' })
   @AuthJwtAccessProtected()
@@ -240,7 +246,7 @@ export class JobController {
   }
 
   @Delete('unsave/:jobId')
-  @AuthRoleProtected(EnumUserRole.WORKER, EnumUserRole.EMPLOYER)
+  @AuthRoleProtected(EnumUserRole.WORKER)
   @ApiOperation({ summary: 'Unsave a job' })
   @ApiResponse({ status: 200, description: 'Job unsaved successfully' })
   @AuthJwtAccessProtected()
