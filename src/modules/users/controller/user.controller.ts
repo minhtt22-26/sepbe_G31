@@ -152,7 +152,7 @@ export class UserController {
   }
 
   @Get('worker-profile')
-  @AuthRoleProtected(EnumUserRole.ADMIN)
+  @AuthRoleProtected(EnumUserRole.WORKER)
   @AuthJwtAccessProtected()
   async getWorkerProfile(
     @AuthJwtPayload('userId') userId: number,
