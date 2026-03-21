@@ -136,10 +136,12 @@ enum MessageStatus {
 
 enum MatchingWeightKey {
   SKILL_WEIGHT       // Trọng số độ khớp Kỹ năng (AI Vector)
-  CULTURE_WEIGHT     // Trọng số độ khớp Văn hóa/Môi trường (AI Vector)
+  BENEFIT_WEIGHT     // Trọng số độ khớp Phúc lợi/Mong muốn (AI Vector)
   SALARY_WEIGHT      // Trọng số tiêu chí Lương
   LOCATION_WEIGHT    // Trọng số tiêu chí Địa điểm
-  //OCCUPATION_WEIGHT  // Trọng số tiêu chí Ngành nghề
+  SHIFT_WEIGHT       // Trọng số tiêu chí Ca làm việc
+  GENDER_WEIGHT      // Trọng số tiêu chí Giới tính
+  AGE_WEIGHT         // Trọng số tiêu chí Độ tuổi
 }
 
 // =====================
@@ -260,9 +262,8 @@ model WorkerProfile {
   desiredJobText String?         @db.Text // VD: "Tìm cty bao cơm, không ép tăng ca"
 
   // AI Embeddings for job matching (pgvector)
-  profileEmbedding   Unsupported("vector(768)")?//Bỏ
-  skillEmbedding   Unsupported("vector(768)")? // Vector của (occupation + experienceYear + bio)
-  cultureEmbedding Unsupported("vector(768)")? // Vector của (desiredJobText)
+  skillEmbedding   Unsupported("vector(3072)")? // Vector của (occupation + experienceYear + bio)
+  cultureEmbedding Unsupported("vector(3072)")? // Vector của (desiredJobText)
   embeddingUpdatedAt DateTime?
 
   user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -400,9 +401,8 @@ model Job {
   isFlagged          Boolean                     @default(false)
 
     // --- AI EMBEDDINGS (Multi-Vector) ---
-  reqEmbedding      Unsupported("vector(768)")? // Vector phần "Yêu cầu công việc" 
-  benefitEmbedding  Unsupported("vector(768)")? // Vector phần "Quyền lợi"
-  jobEmbedding       Unsupported("vector(768)")?//Bỏ
+  reqEmbedding      Unsupported("vector(3072)")? // Vector phần "Yêu cầu công việc" 
+  benefitEmbedding  Unsupported("vector(3072)")? // Vector phần "Quyền lợi"
   embeddingUpdatedAt DateTime?
 
   createdAt DateTime @default(now())
