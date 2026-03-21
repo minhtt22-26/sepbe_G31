@@ -21,13 +21,13 @@ export class AIMatchingController {
   }
 
   @Get('weights')
-  @AuthRoleProtected(EnumUserRole.ADMIN, EnumUserRole.MANAGER)
+  @AuthRoleProtected(EnumUserRole.ADMIN)
   async getWeights() {
     return this.aiMatchingService.getWeights()
   }
 
   @Put('weights')
-  @AuthRoleProtected(EnumUserRole.ADMIN, EnumUserRole.MANAGER)
+  @AuthRoleProtected(EnumUserRole.ADMIN)
   async updateWeights(@Body() dto: UpdateWeightsRequestDto) {
     return this.aiMatchingService.updateWeights(dto.weights)
   }
