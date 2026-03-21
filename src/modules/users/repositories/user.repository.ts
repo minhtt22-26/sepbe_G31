@@ -14,6 +14,7 @@ import { IAuthPassword } from 'src/modules/auth/interfaces/auth.interface'
 import { HelperService } from 'src/common/helper/service/helper.service'
 import { WorkerProfileRequestDto } from '../dtos/request/user.profile.request.dto'
 import { UserInfoRequestDto } from '../dtos/request/user.info.request.dto'
+import { WorkerProfileWithOccupation } from '../interfaces/worker-profile.interface'
 
 @Injectable()
 export class UserRepository {
@@ -198,18 +199,12 @@ export class UserRepository {
 
   async createProfile(
     userId: number,
-    { ...profile }: WorkerProfileRequestDto,
+    profile: WorkerProfileRequestDto,
   ): Promise<WorkerProfile> {
     return await this.prisma.workerProfile.create({
       data: {
         userId,
-        occupationId: profile.occupationId,
-        shift: profile.shift,
-        province: profile.province,
-        gender: profile.gender,
-        birthYear: profile.birthYear,
-        expectedSalary: profile.expectedSalary,
-        experienceYear: profile.experienceYear,
+        ...profile,
       },
     })
   }
@@ -237,7 +232,9 @@ export class UserRepository {
     })
   }
 
-  async getWorkerProfile(userId: number): Promise<WorkerProfile | null> {
+  async getWorkerProfile(
+    userId: number,
+  ): Promise<WorkerProfileWithOccupation | null> {
     return await this.prisma.workerProfile.findUnique({
       where: { userId },
       include: {

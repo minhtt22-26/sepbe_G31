@@ -4,6 +4,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Length,
   Max,
   Min,
 } from 'class-validator'
@@ -22,6 +23,10 @@ export class WorkerProfileRequestDto {
   @IsOptional()
   @IsString()
   province?: string
+
+  @IsOptional()
+  @IsString()
+  ward?: string
 
   @IsOptional()
   @IsEnum(EnumUserGender)
@@ -47,4 +52,14 @@ export class WorkerProfileRequestDto {
   @Min(0)
   @Max(80)
   experienceYear?: number
+
+  @IsOptional()
+  @IsString()
+  @Length(10, 100)
+  bio?: string
+
+  @IsOptional()
+  @IsString()
+  @Length(10, 100)
+  desiredJobText?: string
 }
