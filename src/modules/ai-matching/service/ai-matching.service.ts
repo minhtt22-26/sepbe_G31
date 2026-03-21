@@ -12,6 +12,7 @@ import { MatchedJobResponseDto } from '../dto/response/matched-job.response.dto'
 import { JobService } from 'src/modules/job/service/job.service'
 import { EmbeddingService } from 'src/modules/embedding/service/embedding.service'
 import { EmbeddingTextBuilder } from 'src/modules/embedding/builder/embedding-text.builder'
+import { IMatchingWeight } from '../interfaces/ai-matching.interface'
 
 @Injectable()
 export class AIMatchingService {
@@ -201,5 +202,19 @@ export class AIMatchingService {
       skillEmbedding,
       cultureEmbedding,
     )
+  }
+
+  async getWeights(): Promise<IMatchingWeight[]> {
+    return this.aiMatchingRepository.getWeights()
+  }
+
+  async updateWeights(weights: IMatchingWeight[]): Promise<IMatchingWeight[]> {
+    const totalWeight = weights.reduce((sum, item) => sum + item.weight, 0)
+
+    if (Math.abs(totalWeight - 1) > 0.0001) {
+      throw new BadRequestException('Tổng các trọng số phải chính xác bằng 1')
+    }
+
+    return this.aiMatchingRepository.updateWeights(weights)
   }
 }
