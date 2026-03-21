@@ -12,7 +12,12 @@ export class AIMatchingController {
   constructor(private readonly aiMatchingService: AIMatchingService) {}
 
   @Get('jobs')
-  @AuthRoleProtected(EnumUserRole.WORKER)
+  @AuthRoleProtected(
+    EnumUserRole.ADMIN,
+    EnumUserRole.EMPLOYER,
+    EnumUserRole.MANAGER,
+    EnumUserRole.WORKER,
+  )
   async getMatchedJobs(
     @AuthJwtPayload('userId') userId: number,
     @Query('limit') limit?: number,

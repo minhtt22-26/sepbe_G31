@@ -18,6 +18,7 @@ import {
   AuthJwtPayload,
   AuthJwtToken,
   AuthJwtAccessProtected,
+  AuthRoleProtected,
 } from 'src/modules/auth/decorators/auth.jwt.decorator'
 import type { IAuthRefreshTokenPayload } from 'src/modules/auth/interfaces/auth.interface'
 import { AuthTokenResponseDto } from 'src/modules/auth/dto/response/auth.response.token.dto'
@@ -25,7 +26,7 @@ import { ResetPasswordRequestDto } from 'src/modules/auth/dto/request/reset-pass
 import { ForgotPasswordRequestDto } from 'src/modules/auth/dto/request/forgot-password.request.dto'
 import { AuthSocialGoogleProtected } from 'src/modules/auth/decorators/auth.social.decorator'
 import { UserCreateSocialRequestDto } from '../dtos/request/user.create-social.request.dto'
-import { EnumUserLoginWith } from 'src/generated/prisma/enums'
+import { EnumUserLoginWith, EnumUserRole } from 'src/generated/prisma/enums'
 import { User, WorkerProfile } from 'src/generated/prisma/client'
 import { WorkerProfileRequestDto } from '../dtos/request/user.profile.request.dto'
 import { UserInfoRequestDto } from '../dtos/request/user.info.request.dto'
@@ -128,6 +129,7 @@ export class UserController {
 
   @Post('worker-profile')
   @AuthJwtAccessProtected()
+  @AuthRoleProtected(EnumUserRole.WORKER)
   async createWorkerProfile(
     @AuthJwtPayload('userId') userId: number,
     @Body() body: WorkerProfileRequestDto,
@@ -136,6 +138,7 @@ export class UserController {
   }
 
   @Put('worker-profile')
+  @AuthRoleProtected(EnumUserRole.WORKER)
   @AuthJwtAccessProtected()
   async updateWorkerProfile(
     @AuthJwtPayload('userId') userId: number,
@@ -145,6 +148,7 @@ export class UserController {
   }
 
   @Get('worker-profile')
+  @AuthRoleProtected(EnumUserRole.ADMIN)
   @AuthJwtAccessProtected()
   async getWorkerProfile(
     @AuthJwtPayload('userId') userId: number,
