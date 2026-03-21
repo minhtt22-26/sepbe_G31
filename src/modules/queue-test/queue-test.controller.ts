@@ -1,6 +1,6 @@
 import { Controller, Post, Get } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger'
-import { EmailQueueService } from 'src/infrastructure/queue/services/email-queue.service'
+import { EmailQueueService } from 'src/infrastructure/queue/email/service/email-queue.service'
 
 @ApiTags('Queue Test')
 @Controller('api/queue-test')

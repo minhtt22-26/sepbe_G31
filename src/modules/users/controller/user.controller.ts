@@ -30,6 +30,7 @@ import { User, WorkerProfile } from 'src/generated/prisma/client'
 import { WorkerProfileRequestDto } from '../dtos/request/user.profile.request.dto'
 import { UserInfoRequestDto } from '../dtos/request/user.info.request.dto'
 import { UserChangePasswordRequestDto } from '../dtos/request/user.change-passwrod.dto'
+import { WorkerProfileWithOccupation } from '../interfaces/worker-profile.interface'
 
 @Controller('user')
 export class UserController {
@@ -147,7 +148,7 @@ export class UserController {
   @AuthJwtAccessProtected()
   async getWorkerProfile(
     @AuthJwtPayload('userId') userId: number,
-  ): Promise<WorkerProfile> {
+  ): Promise<WorkerProfileWithOccupation> {
     return await this.userService.getWorkerProfile(userId)
   }
 
