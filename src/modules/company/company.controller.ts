@@ -10,6 +10,8 @@ import {
   Put,
   BadRequestException,
   Query,
+  ParseIntPipe,
+  Delete,
 } from '@nestjs/common'
 import {
   ApiTags,
@@ -31,11 +33,14 @@ import {
   AuthJwtPayload,
 } from '../auth/decorators/auth.jwt.decorator'
 import { CompanySearchDto } from './dtos/request/company.search.request.dto'
+import { JobRatingDto, UpdateJobRatingDto } from './dtos/request/job.rating.dto'
+import { ReportReviewDto } from './dtos/request/report.review.dto'
+
 
 @Controller('company')
 @ApiTags('Company')
 export class CompanyController {
-  constructor(private readonly companyService: CompanyService) {}
+  constructor(private readonly companyService: CompanyService) { }
 
   @Post('create')
   @ApiOperation({ summary: 'Create a company' })
@@ -145,60 +150,128 @@ export class CompanyController {
     return this.companyService.review(+id, body)
   }
 
-@Put('update/:id')
-@ApiOperation({ summary: 'Update company' })
-@ApiConsumes('multipart/form-data')
-@ApiParam({
-  name: 'id',
-  type: Number,
-  description: 'Company ID',
-})
-@ApiBody({ type: UpdateCompanyDto })
-@ApiResponse({ status: 200, description: 'Company updated successfully' })
-@UseInterceptors(
-  FileFieldsInterceptor(
-    [
-      { name: 'logo', maxCount: 1 },
-      { name: 'businessLicense', maxCount: 1 },
-    ],
-    {
-      limits: {
-        fileSize: 5 * 1024 * 1024,
-      },
-      fileFilter: (req, file, callback) => {
-        const allowedMimeTypes = [
-          'image/jpeg',
-          'image/png',
-          'application/pdf',
-        ];
+  @Put('update/:id')
+  @ApiOperation({ summary: 'Update company' })
+  @ApiConsumes('multipart/form-data')
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    description: 'Company ID',
+  })
+  @ApiBody({ type: UpdateCompanyDto })
+  @ApiResponse({ status: 200, description: 'Company updated successfully' })
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'logo', maxCount: 1 },
+        { name: 'businessLicense', maxCount: 1 },
+      ],
+      {
+        limits: {
+          fileSize: 5 * 1024 * 1024,
+        },
+        fileFilter: (req, file, callback) => {
+          const allowedMimeTypes = [
+            'image/jpeg',
+            'image/png',
+            'application/pdf',
+          ];
 
-        if (!allowedMimeTypes.includes(file.mimetype)) {
-          return callback(
-            new Error('Only JPG, PNG or PDF files are allowed'),
-            false,
-          );
-        }
+          if (!allowedMimeTypes.includes(file.mimetype)) {
+            return callback(
+              new Error('Only JPG, PNG or PDF files are allowed'),
+              false,
+            );
+          }
 
-        callback(null, true);
+          callback(null, true);
+        },
       },
+    ),
+  )
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+
+  async update(
+    @Param('id') id: string,
+    @Body() body: UpdateCompanyDto,
+    @UploadedFiles()
+    files: {
+      logo?: Express.Multer.File[];
+      businessLicense?: Express.Multer.File[];
     },
-  ),
-)
-@AuthJwtAccessProtected()
-@ApiBearerAuth('access-token')
+    @AuthJwtPayload() user: any
+  ) {
+    const ownerId = user.userId;
+    return this.companyService.update(+id, body, files, ownerId);
+  }
 
-async update(
-  @Param('id') id: string,
-  @Body() body: UpdateCompanyDto,
-  @UploadedFiles()
-  files: {
-    logo?: Express.Multer.File[];
-    businessLicense?: Express.Multer.File[];
-  },
-  @AuthJwtPayload() user: any
-) {
-  const ownerId = user.userId;
-  return this.companyService.update(+id, body, files, ownerId);
-}
+  // ================= COMPANY REVIEWS =================
+
+  @Post(':id/review')
+  @ApiOperation({ summary: 'Create a company review' })
+  @ApiParam({ name: 'id', type: Number, description: 'Company ID' })
+  @ApiBody({ type: JobRatingDto })
+  @ApiResponse({ status: 201, description: 'Company review created' })
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  async createReview(
+    @Param('id') id: string,
+    @Body() body: JobRatingDto,
+    @AuthJwtPayload() user: any,
+  ) {
+    return this.companyService.createReview(+id, user.userId, body);
+  }
+
+  @Get(':id/reviews')
+  @ApiOperation({ summary: 'Get company reviews by company ID' })
+  @ApiParam({ name: 'id', type: Number, description: 'Company ID' })
+  @ApiResponse({ status: 200, description: 'List of company reviews' })
+  async getReviews(@Param('id') id: string) {
+    return this.companyService.getReviewsByCompanyId(+id);
+  }
+
+  @Put('reviews/:reviewId')
+  @ApiOperation({ summary: 'Update a company review' })
+  @ApiParam({ name: 'reviewId', type: Number, description: 'Review ID' })
+  @ApiBody({ type: UpdateJobRatingDto })
+  @ApiResponse({ status: 200, description: 'Company review updated' })
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  async updateReview(
+    @Param('reviewId') reviewId: string,
+    @Body() body: UpdateJobRatingDto,
+    @AuthJwtPayload() user: any,
+  ) {
+    return this.companyService.updateReview(+reviewId, user.userId, body);
+  }
+
+  @Delete('reviews/:reviewId')
+  @ApiOperation({ summary: 'Delete a company review' })
+  @ApiParam({ name: 'reviewId', type: Number, description: 'Review ID' })
+  @ApiResponse({ status: 200, description: 'Company review deleted' })
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  async deleteReview(
+    @Param('reviewId') reviewId: string,
+    @AuthJwtPayload() user: any,
+  ) {
+    return this.companyService.deleteReview(+reviewId, user.userId);
+  }
+
+  @Post('reviews/:reviewId/report')
+  @ApiOperation({ summary: 'Report a company review' })
+  @ApiParam({ name: 'reviewId', type: Number, description: 'Review ID' })
+  @ApiBody({ type: ReportReviewDto })
+  @ApiResponse({ status: 201, description: 'Review reported' })
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  async reportReview(
+    @Param('reviewId') reviewId: string,
+    @Body() body: ReportReviewDto,
+    @AuthJwtPayload() user: any,
+  ) {
+    return this.companyService.reportReview(+reviewId, user.userId, body);
+  }
 
 }
