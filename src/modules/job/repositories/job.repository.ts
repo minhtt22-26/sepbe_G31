@@ -577,7 +577,22 @@ export class JobRepository {
         status: status,
       },
       skip: skip,
-      take: limit
+      take: limit,
+      include: {
+        job: {
+          select: {
+            id: true,
+            title: true,
+            company: {
+              select: {
+                id: true,
+                name: true,
+                logoUrl: true,
+              },
+            },
+          },
+        },
+      },
     })
   }
 
@@ -600,4 +615,6 @@ export class JobRepository {
       }
     })
   }
+  
+  
 }

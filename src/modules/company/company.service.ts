@@ -354,4 +354,92 @@ export class CompanyService {
 
     return createPaginatedResult(items, total, dto.page!, dto.limit!)
   }
+
+  // ================= COMPANY REVIEWS =================
+
+  async createReview(companyId: number, userId: number, dto: any) {
+    const company = await this.prisma.company.findUnique({ where: { id: companyId } })
+    if (!company) throw new NotFoundException('Company not found')
+
+    const existingReview = await this.prisma.companyReview.findUnique({
+      where: {
+        companyId_userId: { companyId, userId }
+      }
+    })
+    
+    if (existingReview) throw new BadRequestException('You have already reviewed this company')
+
+    return this.prisma.companyReview.create({
+      data: {
+        companyId,
+        userId,
+        ...dto
+      }
+    })
+  }
+
+  async getReviewsByCompanyId(companyId: number) {
+    const reviews = await this.prisma.companyReview.findMany({
+      where: { companyId },
+      include: {
+        user: { select: { fullName: true, avatar: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return reviews.map((r) => {
+      if (r.isAnonymous) {
+        return {
+          ...r,
+          user: { fullName: 'Anonymous', avatar: null }
+        }
+      }
+      return r;
+    });
+  }
+
+  async updateReview(reviewId: number, userId: number, dto: any) {
+    const review = await this.prisma.companyReview.findUnique({ where: { id: reviewId } })
+    if (!review) throw new NotFoundException('Review not found')
+
+    if (review.userId !== userId) throw new ForbiddenException('You can only update your own review')
+
+    return this.prisma.companyReview.update({
+      where: { id: reviewId },
+      data: dto
+    })
+  }
+
+  async deleteReview(reviewId: number, userId: number) {
+    const review = await this.prisma.companyReview.findUnique({ where: { id: reviewId } })
+    if (!review) throw new NotFoundException('Review not found')
+
+    if (review.userId !== userId) throw new ForbiddenException('You can only delete your own review')
+
+    return this.prisma.companyReview.delete({ where: { id: reviewId } })
+  }
+
+  async reportReview(reviewId: number, userId: number, dto: any) {
+    const review = await this.prisma.companyReview.findUnique({ where: { id: reviewId } })
+    if (!review) throw new NotFoundException('Review not found')
+
+    if (review.userId === userId) throw new BadRequestException('You cannot report your own review')
+
+    const existingReport = await this.prisma.companyReviewReport.findUnique({
+      where: {
+        reviewId_reporterId: { reviewId, reporterId: userId }
+      }
+    })
+
+    if (existingReport) throw new BadRequestException('You have already reported this review')
+
+    return this.prisma.companyReviewReport.create({
+      data: {
+        reviewId,
+        reporterId: userId,
+        reason: dto.reason,
+        description: dto.description
+      }
+    })
+  }
 }

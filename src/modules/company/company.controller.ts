@@ -10,6 +10,8 @@ import {
   Put,
   BadRequestException,
   Query,
+  ParseIntPipe,
+  Delete,
 } from '@nestjs/common'
 import {
   ApiTags,
@@ -32,11 +34,14 @@ import {
   AuthRoleProtected,
 } from '../auth/decorators/auth.jwt.decorator'
 import { CompanySearchDto } from './dtos/request/company.search.request.dto'
+import { JobRatingDto, UpdateJobRatingDto } from './dtos/request/job.rating.dto'
+import { ReportReviewDto } from './dtos/request/report.review.dto'
+
 
 @Controller('company')
 @ApiTags('Company')
 export class CompanyController {
-  constructor(private readonly companyService: CompanyService) {}
+  constructor(private readonly companyService: CompanyService) { }
 
   @Post('create')
   @ApiOperation({ summary: 'Create a company' })
