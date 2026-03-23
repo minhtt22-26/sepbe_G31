@@ -371,9 +371,9 @@ export class CompanyService {
 
     return this.prisma.companyReview.create({
       data: {
+        ...dto,
         companyId,
         userId,
-        ...dto
       }
     })
   }
@@ -382,9 +382,10 @@ export class CompanyService {
     const reviews = await this.prisma.companyReview.findMany({
       where: { companyId },
       include: {
-        user: { select: { fullName: true, avatar: true } }
+        user: { select: { id: true, fullName: true, avatar: true } }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      take: 100
     });
 
     return reviews.map((r) => {
@@ -404,9 +405,13 @@ export class CompanyService {
 
     if (review.userId !== userId) throw new ForbiddenException('You can only update your own review')
 
+    const updateData = { ...dto }
+    delete updateData.userId
+    delete updateData.companyId
+
     return this.prisma.companyReview.update({
       where: { id: reviewId },
-      data: dto
+      data: updateData
     })
   }
 

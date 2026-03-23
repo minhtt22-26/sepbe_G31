@@ -247,10 +247,10 @@ export class JobController {
   async reportJob(@Body() body: JobReportDto, @AuthJwtPayload('userId') userId: number) {
     return this.jobService.reportJob(userId, body);
   }
-  //report job endpoint
-  @Post('report/all')
-  @ApiOperation({ summary: 'Report a job' })
-  @ApiResponse({ status: 201, description: 'Job report successfully' })
+  //get all job reports by status (for manager)
+  @Get('report/all')
+  @ApiOperation({ summary: 'Get all job reports by status' })
+  @ApiResponse({ status: 200, description: 'Job reports retrieved' })
   @AuthJwtAccessProtected()
   @ApiBearerAuth('access-token')
   async getAllJobReport(@Query('status', new ParseEnumPipe(ReportStatus, {
@@ -259,5 +259,16 @@ export class JobController {
     }
   })) status: ReportStatus, @AuthJwtPayload('userId') userId: number, @Query('page') page: number, @Query('limit') limit: number) {
     return this.jobService.getAllJobReport(userId, status, page, limit);
+  }
+
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Update job report status' })
+  @Put('report/:id/status')
+  async updateReportStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { status: ReportStatus },
+  ) {
+    return this.jobService.updateJobReportStatus(id, body.status);
   }
 }

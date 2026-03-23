@@ -40,3 +40,9 @@ export class JobReportDto {
   @IsString()
   description?: string;
 }
+
+export class UpdateJobReportStatusDto {
+  @ApiProperty({ enum: ReportStatus, example: ReportStatus.RESOLVED })
+  @IsEnum(ReportStatus, { message: "Trạng thái báo cáo không hợp lệ" })
+  status: ReportStatus;
+}
