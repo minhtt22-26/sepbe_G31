@@ -10,7 +10,6 @@ import {
   Put,
   BadRequestException,
   Query,
-  ParseIntPipe,
   Delete,
 } from '@nestjs/common'
 import {

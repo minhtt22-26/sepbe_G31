@@ -462,9 +462,6 @@ export class JobService {
     if (existingReport) {
       throw new BadRequestException('You have already reported this job')
     }
-
-    const createJobReport = await this.jobRepository.createJobReport(userId, dto)
-    return { success: true }
   }
 
   async updateJobReportStatus(reportId: number, status: ReportStatus) {
