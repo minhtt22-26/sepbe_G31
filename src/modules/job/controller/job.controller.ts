@@ -10,7 +10,6 @@ import {
   Query,
   ParseIntPipe,
   ParseEnumPipe,
-  ParseEnumPipe,
   BadRequestException,
 } from '@nestjs/common'
 import { JobService } from '../service/job.service'
@@ -19,7 +18,6 @@ import { UpdateJobRequest } from '../dtos/request/update-job.request'
 import { UpdateApplicationStatusRequest } from '../dtos/request/update-application-status.request'
 import { JobSearchDto } from '../dtos/job.search.request.dto'
 import { WishlistRequestDto } from '../dtos/job.wishlist.request.dto'
-import { JobReportDto } from '../dtos/job.report.request.dto'
 import { JobReportDto } from '../dtos/job.report.request.dto'
 import {
   ApiBearerAuth,
