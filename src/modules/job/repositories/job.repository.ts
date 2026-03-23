@@ -11,7 +11,7 @@ import { PrismaService } from 'src/prisma.service'
 
 @Injectable()
 export class JobRepository {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
   async createJobWithForm(data: any) {
     const occupation = await this.prisma.occupation.findUnique({
       where: { id: data.jobData.occupationId },
@@ -71,6 +71,18 @@ export class JobRepository {
               id: true,
               name: true,
               logoUrl: true,
+            },
+          },
+          occupation: {
+            select: {
+              id: true,
+              name: true,
+              sector: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
             },
           },
         },
@@ -583,7 +595,10 @@ export class JobRepository {
     })
   }
 
-  async updateApplicationStatus(applicationId: number, status: JobApplicationStatus) {
+  async updateApplicationStatus(
+    applicationId: number,
+    status: JobApplicationStatus,
+  ) {
     return this.prisma.jobApplication.update({
       where: { id: applicationId },
       data: { status },
