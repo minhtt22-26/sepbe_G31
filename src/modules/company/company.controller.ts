@@ -10,6 +10,8 @@ import {
   Put,
   BadRequestException,
   Query,
+  Delete,
+  ParseIntPipe,
 } from '@nestjs/common'
 import {
   ApiTags,
@@ -138,20 +140,87 @@ export class CompanyController {
     return this.companyService.findOne(companyId)
   }
 
-  @Patch('review/:id')
-  @AuthRoleProtected(EnumUserRole.WORKER)
-  @ApiOperation({ summary: 'Approve or reject company' })
+  @Patch('status/:id')
+  @AuthRoleProtected(EnumUserRole.MANAGER)
+  @ApiOperation({ summary: 'Approve or reject company profile' })
   @ApiParam({ name: 'id', type: Number, description: 'Company ID' })
   @ApiBody({ type: CompanyReviewDto })
-  @ApiResponse({ status: 200, description: 'Company review updated' })
-  @ApiResponse({ status: 400, description: 'Invalid review request' })
+  @ApiResponse({ status: 200, description: 'Company status updated' })
+  @ApiResponse({ status: 400, description: 'Invalid status request' })
   @ApiResponse({ status: 404, description: 'Company not found' })
   @AuthJwtAccessProtected()
   @ApiBearerAuth('access-token')
+  updateStatus(@Param('id') id: string, @Body() body: CompanyReviewDto) {
+    return this.companyService.review(+id, body)
+  }
+
+  // Alias kept for frontend compatibility
+  @Patch('review/:id')
+  @AuthRoleProtected(EnumUserRole.MANAGER)
+  @ApiOperation({ summary: 'Approve or reject company (alias)' })
   @AuthJwtAccessProtected()
   @ApiBearerAuth('access-token')
-  review(@Param('id') id: string, @Body() body: CompanyReviewDto) {
+  reviewAlias(@Param('id') id: string, @Body() body: CompanyReviewDto) {
     return this.companyService.review(+id, body)
+  }
+
+  // ================= COMPANY REVIEWS =================
+
+  @Post(':id/review')
+  @AuthRoleProtected(EnumUserRole.WORKER)
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Create a review for a company' })
+  createReview(
+    @Param('id', ParseIntPipe) id: number,
+    @AuthJwtPayload('userId') userId: number,
+    @Body() dto: any,
+  ) {
+    return this.companyService.createReview(id, userId, dto)
+  }
+
+  @Get(':id/reviews')
+  @ApiOperation({ summary: 'Get all reviews of a company' })
+  getReviews(@Param('id', ParseIntPipe) id: number) {
+    return this.companyService.getReviewsByCompanyId(id)
+  }
+
+  @Put('reviews/:reviewId')
+  @AuthRoleProtected(EnumUserRole.WORKER)
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Update a review' })
+  updateReview(
+    @Param('reviewId', ParseIntPipe) reviewId: number,
+    @AuthJwtPayload('userId') userId: number,
+    @Body() dto: any,
+  ) {
+    return this.companyService.updateReview(reviewId, userId, dto)
+  }
+
+  @Delete('reviews/:reviewId')
+  @AuthRoleProtected(EnumUserRole.WORKER)
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Delete a review' })
+  deleteReview(
+    @Param('reviewId', ParseIntPipe) reviewId: number,
+    @AuthJwtPayload('userId') userId: number,
+  ) {
+    return this.companyService.deleteReview(reviewId, userId)
+  }
+
+  @Post('reviews/:reviewId/report')
+  @AuthRoleProtected(EnumUserRole.WORKER)
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Report a review' })
+  reportReview(
+    @Param('reviewId', ParseIntPipe) reviewId: number,
+    @AuthJwtPayload('userId') userId: number,
+    @Body() dto: any,
+  ) {
+    return this.companyService.reportReview(reviewId, userId, dto)
   }
 
   @Put('update/:id')
