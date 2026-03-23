@@ -39,8 +39,6 @@ import { CompanySearchDto } from './dtos/request/company.search.request.dto'
 @ApiTags('Company')
 export class CompanyController {
   constructor(private readonly companyService: CompanyService) { }
-  constructor(private readonly companyService: CompanyService) { }
-
   @Post('create')
   @ApiOperation({ summary: 'Create a company' })
   @ApiResponse({ status: 201, description: 'Company created successfully' })
