@@ -10,6 +10,7 @@ import {
   Put,
   BadRequestException,
   Query,
+  Delete,
 } from '@nestjs/common'
 import {
   ApiTags,
@@ -37,6 +38,7 @@ import { CompanySearchDto } from './dtos/request/company.search.request.dto'
 @Controller('company')
 @ApiTags('Company')
 export class CompanyController {
+  constructor(private readonly companyService: CompanyService) { }
   constructor(private readonly companyService: CompanyService) { }
 
   @Post('create')
@@ -147,6 +149,8 @@ export class CompanyController {
   @ApiResponse({ status: 200, description: 'Company review updated' })
   @ApiResponse({ status: 400, description: 'Invalid review request' })
   @ApiResponse({ status: 404, description: 'Company not found' })
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
   @AuthJwtAccessProtected()
   @ApiBearerAuth('access-token')
   review(@Param('id') id: string, @Body() body: CompanyReviewDto) {
