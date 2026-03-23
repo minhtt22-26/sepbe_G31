@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
-import { JobApplicationStatus } from 'src/generated/prisma/enums'
+import { JobApplicationStatus, ReportStatus } from 'src/generated/prisma/enums'
 import { JobStatus } from 'src/generated/prisma/browser'
 import { PrismaService } from 'src/prisma.service'
 
@@ -559,4 +559,67 @@ export class JobRepository {
       },
     })
   }
+
+  async findJobReport(userId: number, jobId: number) {
+    return this.prisma.jobReport.findUnique({
+      where: {
+        jobId_reporterId: {
+          jobId,
+          reporterId: userId,
+        },
+      },
+    })
+  }
+  async getAllJobReport(userId: number, status: ReportStatus, page: number, limit: number) {
+    const pageNum = Number(page) || 1;
+    const limitNum = Number(limit) || 10;
+    const skip = (pageNum - 1) * limitNum;
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.jobReport.findMany({
+        where: { status: status },
+        skip: skip,
+        take: Number(limit),
+        orderBy: { createdAt: 'desc' },
+        include: {
+          job: {
+            select: {
+              id: true,
+              title: true,
+              company: {
+                select: { id: true, name: true, logoUrl: true },
+              },
+            },
+          },
+          // include người báo cáo
+          reporter: {
+            select: { id: true, fullName: true, email: true },
+          },
+        },
+      }),
+      this.prisma.jobReport.count({ where: { status: status } }),
+    ])
+    return { data, total, page, limit }
+  }
+
+  async createJobReport(userId: number, dto: any) {
+    return this.prisma.jobReport.create({
+      data: {
+        jobId: dto.jobId,
+        reporterId: userId,
+        reason: dto.reason,
+        description: dto.description,
+        status: 'PENDING',
+      },
+    })
+  }
+  async changeJobReportStatus(jobId, status: ReportStatus) {
+    return this.prisma.jobReport.update({
+      where: { id: jobId },
+      data: {
+        status: status
+      }
+    })
+  }
+  
+  
 }

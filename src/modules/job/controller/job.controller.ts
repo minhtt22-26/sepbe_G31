@@ -9,6 +9,7 @@ import {
   Put,
   Query,
   ParseIntPipe,
+  ParseEnumPipe,
   BadRequestException,
 } from '@nestjs/common'
 import { JobService } from '../service/job.service'
@@ -17,6 +18,7 @@ import { UpdateJobRequest } from '../dtos/request/update-job.request'
 import { UpdateApplicationStatusRequest } from '../dtos/request/update-application-status.request'
 import { JobSearchDto } from '../dtos/job.search.request.dto'
 import { WishlistRequestDto } from '../dtos/job.wishlist.request.dto'
+import { JobReportDto } from '../dtos/job.report.request.dto'
 import {
   ApiBearerAuth,
   ApiBody,
@@ -33,6 +35,7 @@ import {
 } from 'src/modules/auth/decorators/auth.jwt.decorator'
 import { CompanyService } from 'src/modules/company/company.service'
 import { EnumUserRole } from 'src/generated/prisma/enums'
+import { ReportStatus } from 'src/generated/prisma/enums'
 
 @ApiTags('Job')
 @Controller('job')
@@ -40,7 +43,7 @@ export class JobController {
   constructor(
     private readonly jobService: JobService,
     private readonly companyService: CompanyService,
-  ) {}
+  ) { }
 
   // Search jobs (Elastic)
   //api/job/search?keyword=abc&sectorId=2&workingShift=AFTERNOON&page=1&limit=10
@@ -253,5 +256,38 @@ export class JobController {
   @ApiBearerAuth('access-token')
   async unSaveJob(@Param('jobId') jobId: string, @AuthJwtPayload() user: any) {
     return this.jobService.unSaveJob(user.userId, +jobId)
+  }
+  //report job endpoint
+  @Post('report')
+  @ApiOperation({ summary: 'Report a job' })
+  @ApiResponse({ status: 201, description: 'Job report successfully' })
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  async reportJob(@Body() body: JobReportDto, @AuthJwtPayload('userId') userId: number) {
+    return this.jobService.reportJob(userId, body);
+  }
+  //get all job reports by status (for manager)
+  @Get('report/all')
+  @ApiOperation({ summary: 'Get all job reports by status' })
+  @ApiResponse({ status: 200, description: 'Job reports retrieved' })
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  async getAllJobReport(@Query('status', new ParseEnumPipe(ReportStatus, {
+    exceptionFactory: () => {
+      return new BadRequestException("Status must be PENDING, RESOLVED, REJECTED")
+    }
+  })) status: ReportStatus, @AuthJwtPayload('userId') userId: number, @Query('page') page: number, @Query('limit') limit: number) {
+    return this.jobService.getAllJobReport(userId, status, page, limit);
+  }
+
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Update job report status' })
+  @Put('report/:id/status')
+  async updateReportStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { status: ReportStatus },
+  ) {
+    return this.jobService.updateJobReportStatus(id, body.status);
   }
 }
