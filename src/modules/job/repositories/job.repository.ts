@@ -571,29 +571,34 @@ export class JobRepository {
     })
   }
   async getAllJobReport(userId: number, status: ReportStatus, page: number, limit: number) {
-    const skip = (page - 1) * limit
-    return this.prisma.jobReport.findMany({
-      where: {
-        status: status,
-      },
-      skip: skip,
-      take: limit,
-      include: {
-        job: {
-          select: {
-            id: true,
-            title: true,
-            company: {
-              select: {
-                id: true,
-                name: true,
-                logoUrl: true,
+    const pageNum = Number(page) || 1;
+    const limitNum = Number(limit) || 10;
+    const skip = (pageNum - 1) * limitNum;
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.jobReport.findMany({
+        where: { status: status },
+        skip: skip,
+        take: Number(limit),
+        orderBy: { createdAt: 'desc' },
+        include: {
+          job: {
+            select: {
+              id: true,
+              title: true,
+              company: {
+                select: { id: true, name: true, logoUrl: true },
               },
             },
           },
+          // include người báo cáo
+          reporter: {
+            select: { id: true, fullName: true, email: true },
+          },
         },
-      },
-    })
+      }),
+      this.prisma.jobReport.count({ where: { status: status } }),
+    ])
+    return { data, total, page, limit }
   }
 
   async createJobReport(userId: number, dto: any) {

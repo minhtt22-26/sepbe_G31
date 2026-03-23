@@ -499,4 +499,9 @@ export class JobService {
     const createJobReport = await this.jobRepository.createJobReport(userId, dto)
     return { success: true }
   }
+
+  async updateJobReportStatus(reportId: number, status: ReportStatus) {
+    await this.jobRepository.changeJobReportStatus(reportId, status);
+    return { success: true };
+  }
 }
