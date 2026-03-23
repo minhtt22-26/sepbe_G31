@@ -35,7 +35,7 @@ import {
 } from 'src/modules/auth/decorators/auth.jwt.decorator'
 import { CompanyService } from 'src/modules/company/company.service'
 import { EnumUserRole } from 'src/generated/prisma/enums'
-import { JobStatus, ReportStatus } from 'src/generated/prisma/enums'
+import { ReportStatus } from 'src/generated/prisma/enums'
 
 @ApiTags('Job')
 @Controller('job')
