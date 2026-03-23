@@ -6,6 +6,9 @@ import {
 } from '@nestjs/common'
 import { AuthJwtAccessGuard } from '../guards/jwt/auth.jwt.access.guards'
 import { AuthJwtRefreshGuard } from '../guards/jwt/auth.jwt.refresh.guards'
+import { EnumUserRole } from 'src/generated/prisma/enums'
+import { AuthRoles } from './auth.role.decorator'
+import { AuthRoleGuard } from '../guards/role/auth.role.guard'
 
 //Bảo vệ route với access token
 export function AuthJwtAccessProtected(): MethodDecorator {
@@ -14,6 +17,14 @@ export function AuthJwtAccessProtected(): MethodDecorator {
 
 export function AuthJwtRefreshProtected(): MethodDecorator {
   return applyDecorators(UseGuards(AuthJwtRefreshGuard))
+}
+
+export function AuthRoleProtected(...roles: EnumUserRole[]): MethodDecorator {
+  return applyDecorators(
+    AuthJwtAccessProtected(),
+    AuthRoles(...roles),
+    UseGuards(AuthRoleGuard),
+  )
 }
 
 export const AuthJwtPayload = createParamDecorator(

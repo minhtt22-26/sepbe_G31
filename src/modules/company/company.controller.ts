@@ -25,10 +25,11 @@ import { CompanyRegisterDto } from './dtos/request/company.register'
 import { FileFieldsInterceptor } from '@nestjs/platform-express'
 import { UpdateCompanyDto } from './dtos/request/company.update'
 import { CompanyReviewDto } from './dtos/request/company.review'
-import { CompanyStatus } from 'src/generated/prisma/enums'
+import { CompanyStatus, EnumUserRole } from 'src/generated/prisma/enums'
 import {
   AuthJwtAccessProtected,
   AuthJwtPayload,
+  AuthRoleProtected,
 } from '../auth/decorators/auth.jwt.decorator'
 import { CompanySearchDto } from './dtos/request/company.search.request.dto'
 
@@ -43,6 +44,7 @@ export class CompanyController {
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: CompanyRegisterDto })
   @ApiBearerAuth('access-token')
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
   @UseInterceptors(
     FileFieldsInterceptor(
       [
@@ -94,6 +96,7 @@ export class CompanyController {
   }
 
   @Get('status/:status')
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
   @ApiOperation({ summary: 'List companies by status' })
   @ApiParam({
     name: 'status',
@@ -107,6 +110,7 @@ export class CompanyController {
 
   @Get('owner')
   @ApiOperation({ summary: 'Get company by owner' })
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
   @ApiResponse({ status: 200, description: 'Company retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Company not found' })
   @AuthJwtAccessProtected()
@@ -135,6 +139,7 @@ export class CompanyController {
   }
 
   @Patch('review/:id')
+  @AuthRoleProtected(EnumUserRole.WORKER)
   @ApiOperation({ summary: 'Approve or reject company' })
   @ApiParam({ name: 'id', type: Number, description: 'Company ID' })
   @ApiBody({ type: CompanyReviewDto })
@@ -145,60 +150,59 @@ export class CompanyController {
     return this.companyService.review(+id, body)
   }
 
-@Put('update/:id')
-@ApiOperation({ summary: 'Update company' })
-@ApiConsumes('multipart/form-data')
-@ApiParam({
-  name: 'id',
-  type: Number,
-  description: 'Company ID',
-})
-@ApiBody({ type: UpdateCompanyDto })
-@ApiResponse({ status: 200, description: 'Company updated successfully' })
-@UseInterceptors(
-  FileFieldsInterceptor(
-    [
-      { name: 'logo', maxCount: 1 },
-      { name: 'businessLicense', maxCount: 1 },
-    ],
-    {
-      limits: {
-        fileSize: 5 * 1024 * 1024,
-      },
-      fileFilter: (req, file, callback) => {
-        const allowedMimeTypes = [
-          'image/jpeg',
-          'image/png',
-          'application/pdf',
-        ];
+  @Put('update/:id')
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
+  @ApiOperation({ summary: 'Update company' })
+  @ApiConsumes('multipart/form-data')
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    description: 'Company ID',
+  })
+  @ApiBody({ type: UpdateCompanyDto })
+  @ApiResponse({ status: 200, description: 'Company updated successfully' })
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'logo', maxCount: 1 },
+        { name: 'businessLicense', maxCount: 1 },
+      ],
+      {
+        limits: {
+          fileSize: 5 * 1024 * 1024,
+        },
+        fileFilter: (req, file, callback) => {
+          const allowedMimeTypes = [
+            'image/jpeg',
+            'image/png',
+            'application/pdf',
+          ]
 
-        if (!allowedMimeTypes.includes(file.mimetype)) {
-          return callback(
-            new Error('Only JPG, PNG or PDF files are allowed'),
-            false,
-          );
-        }
+          if (!allowedMimeTypes.includes(file.mimetype)) {
+            return callback(
+              new Error('Only JPG, PNG or PDF files are allowed'),
+              false,
+            )
+          }
 
-        callback(null, true);
+          callback(null, true)
+        },
       },
+    ),
+  )
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  async update(
+    @Param('id') id: string,
+    @Body() body: UpdateCompanyDto,
+    @UploadedFiles()
+    files: {
+      logo?: Express.Multer.File[]
+      businessLicense?: Express.Multer.File[]
     },
-  ),
-)
-@AuthJwtAccessProtected()
-@ApiBearerAuth('access-token')
-
-async update(
-  @Param('id') id: string,
-  @Body() body: UpdateCompanyDto,
-  @UploadedFiles()
-  files: {
-    logo?: Express.Multer.File[];
-    businessLicense?: Express.Multer.File[];
-  },
-  @AuthJwtPayload() user: any
-) {
-  const ownerId = user.userId;
-  return this.companyService.update(+id, body, files, ownerId);
-}
-
+    @AuthJwtPayload() user: any,
+  ) {
+    const ownerId = user.userId
+    return this.companyService.update(+id, body, files, ownerId)
+  }
 }

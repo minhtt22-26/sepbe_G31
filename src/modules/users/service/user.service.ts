@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ForbiddenException,
+  forwardRef,
+  Inject,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -29,9 +31,14 @@ import { EmailService } from 'src/infrastructure/email/service/email.service'
 import { UserInfoRequestDto } from '../dtos/request/user.info.request.dto'
 import { UserChangePasswordRequestDto } from '../dtos/request/user.change-passwrod.dto'
 import { CloudinaryService } from 'src/infrastructure/cloudinary/cloudinary.service'
+import { WorkerProfileWithOccupation } from '../interfaces/worker-profile.interface'
+import { Logger } from '@nestjs/common'
+import { AIMatchingService } from 'src/modules/ai-matching/service/ai-matching.service'
 
 @Injectable()
 export class UserService {
+  private readonly logger = new Logger(UserService.name)
+
   constructor(
     private readonly authUtil: AuthUtil,
     private readonly authService: AuthService,
@@ -40,6 +47,9 @@ export class UserService {
     private readonly sessionService: SessionService,
     private readonly emailService: EmailService,
     private readonly cloudinaryService: CloudinaryService,
+    // private readonly embeddingQueueService: EmbeddingQueueService,
+    @Inject(forwardRef(() => AIMatchingService))
+    private readonly aiMatchingService: AIMatchingService,
   ) {}
 
   async signUp({
@@ -185,7 +195,13 @@ export class UserService {
         message: 'Hồ sơ của bạn đã tồn tại, vui lòng cập nhật thay vì tạo mới',
       })
     }
-    return this.userRepository.createProfile(userId, dto)
+    const profile = await this.userRepository.createProfile(userId, dto)
+
+    //this.embeddingQueueService.queueWorkerProfileEmbedding(userId)
+    // Gọi trực tiếp embedding (không qua queue)
+    await this.aiMatchingService.buildWorkerProfileEmbedding(userId)
+
+    return profile
   }
 
   async updateWorkerProfile(
@@ -198,7 +214,17 @@ export class UserService {
     //     message: 'Không tìm thấy hồ sơ người lao động',
     //   })
     // }
-    return this.userRepository.updateProfile(userId, dto)
+
+    const profile = await this.userRepository.updateProfile(userId, dto)
+
+    //await this.embeddingQueueService.queueWorkerProfileEmbedding(userId)
+    // .catch((err) =>
+    //   console.error('Failed to queue embedding worker profile', err),
+    // )
+    // Gọi trực tiếp embedding (không qua queue)
+    await this.aiMatchingService.buildWorkerProfileEmbedding(userId)
+
+    return profile
   }
 
   async updateInfoUser(
@@ -235,7 +261,7 @@ export class UserService {
     })
   }
 
-  async getWorkerProfile(userId: number): Promise<WorkerProfile> {
+  async getWorkerProfile(userId: number): Promise<WorkerProfileWithOccupation> {
     const profile = await this.userRepository.getWorkerProfile(userId)
     if (!profile) {
       throw new NotFoundException({

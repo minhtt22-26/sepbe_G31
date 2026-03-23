@@ -1,7 +1,10 @@
 import {
   Injectable,
   BadRequestException,
+  Logger,
   NotFoundException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common'
 import { JobRepository } from '../repositories/job.repository'
 import { CreateJobRequest } from '../dtos/request/create-job.request'
@@ -9,12 +12,19 @@ import { UpdateJobRequest } from '../dtos/request/update-job.request'
 import { JobApplicationStatus, JobStatus } from 'src/generated/prisma/enums'
 import { ApplyJobRequest } from '../dtos/request/apply-job.request'
 import { JOB_CONSTANTS } from '../constant/job.constant'
+import { AIMatchingService } from 'src/modules/ai-matching/service/ai-matching.service'
+// import { EmbeddingQueueService } from 'src/infrastructure/queue/embedding/service/embedding-queue.service'
 
 @Injectable()
 export class JobService {
+  private readonly logger = new Logger(JobService.name)
+
   constructor(
     private readonly jobRepository: JobRepository,
-  ) { }
+    // private readonly embeddingQueueService: EmbeddingQueueService,
+    @Inject(forwardRef(() => AIMatchingService))
+    private readonly aiMatchingService: AIMatchingService,
+  ) {}
 
   async searchJobs(q: any) {
     const keyword = q.keyword?.trim() || ''
@@ -89,14 +99,24 @@ export class JobService {
     }
   }
 
-  async getWistlist(userId: number, page?: number, limit?: number, skip?: number) {
+  async getWistlist(
+    userId: number,
+    page?: number,
+    limit?: number,
+    skip?: number,
+  ) {
     const where = {
-      userId: userId
+      userId: userId,
     }
     const orderBy = {
-      createdAt: 'desc'
+      createdAt: 'desc',
     }
-    const { items, total } = await this.jobRepository.getWishList(where, orderBy, limit || 10, skip || 0);
+    const { items, total } = await this.jobRepository.getWishList(
+      where,
+      orderBy,
+      limit || 10,
+      skip || 0,
+    )
     return {
       success: true,
       items,
@@ -104,34 +124,34 @@ export class JobService {
         page,
         limit,
         total,
-        totalPage: Math.ceil(total / (limit || 10))
-      }
+        totalPage: Math.ceil(total / (limit || 10)),
+      },
     }
   }
 
   async saveJob(userId: number, jobId: number) {
-    const job = await this.jobRepository.findJobById(jobId);
+    const job = await this.jobRepository.findJobById(jobId)
     if (!job) {
-      throw new NotFoundException('Job not found');
+      throw new NotFoundException('Job not found')
     }
 
-    const existing = await this.jobRepository.findSavedJob(userId, jobId);
+    const existing = await this.jobRepository.findSavedJob(userId, jobId)
     if (existing) {
-      return { success: true, message: 'Job already saved' };
+      return { success: true, message: 'Job already saved' }
     }
 
-    await this.jobRepository.saveJob(userId, jobId);
-    return { success: true, message: 'Job saved successfully' };
+    await this.jobRepository.saveJob(userId, jobId)
+    return { success: true, message: 'Job saved successfully' }
   }
 
   async unSaveJob(userId: number, jobId: number) {
-    const existing = await this.jobRepository.findSavedJob(userId, jobId);
+    const existing = await this.jobRepository.findSavedJob(userId, jobId)
     if (!existing) {
-      return { success: true, message: 'Job not saved yet' };
+      return { success: true, message: 'Job not saved yet' }
     }
 
-    await this.jobRepository.unSaveJob(userId, jobId);
-    return { success: true, message: 'Job unsaved successfully' };
+    await this.jobRepository.unSaveJob(userId, jobId)
+    return { success: true, message: 'Job unsaved successfully' }
   }
 
   async createJob(dto: CreateJobRequest, companyId: number) {
@@ -191,6 +211,10 @@ export class JobService {
         fields: dto.fields,
       })
 
+      //this.embeddingQueueService.queueJobEmbedding(created.id)
+      // Gọi trực tiếp embedding (không qua queue)
+      await this.aiMatchingService.buildJobEmbedding(created.id)
+
       // ==============================
       // 4️⃣ Return Response
       // ==============================
@@ -216,7 +240,16 @@ export class JobService {
       throw new Error('Job not found or unauthorized')
     }
 
-    return this.jobRepository.updateJobFull(jobId, dto)
+    const update = await this.jobRepository.updateJobFull(jobId, dto)
+
+    /* Queue-based (tạm comment):
+    this.embeddingQueueService.queueJobEmbedding(jobId)
+    */
+
+    // Gọi trực tiếp embedding (không qua queue)
+    await this.aiMatchingService.buildJobEmbedding(jobId)
+
+    return update
   }
 
   async getDetail(jobId: number) {
@@ -324,9 +357,9 @@ export class JobService {
           const selected =
             field.fieldType === 'checkbox'
               ? value
-                .split(',')
-                .map((item) => item.trim())
-                .filter(Boolean)
+                  .split(',')
+                  .map((item) => item.trim())
+                  .filter(Boolean)
               : [value]
 
           const hasInvalid = selected.some(

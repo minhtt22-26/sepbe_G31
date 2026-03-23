@@ -29,17 +29,22 @@ import { ApplyJobRequest } from '../dtos/request/apply-job.request'
 import {
   AuthJwtAccessProtected,
   AuthJwtPayload,
+  AuthRoleProtected,
 } from 'src/modules/auth/decorators/auth.jwt.decorator'
 import { CompanyService } from 'src/modules/company/company.service'
+import { EnumUserRole } from 'src/generated/prisma/enums'
 
 @ApiTags('Job')
 @Controller('job')
 export class JobController {
-  constructor(private readonly jobService: JobService, private readonly companyService: CompanyService) { }
+  constructor(
+    private readonly jobService: JobService,
+    private readonly companyService: CompanyService,
+  ) {}
 
   // Search jobs (Elastic)
   //api/job/search?keyword=abc&sectorId=2&workingShift=AFTERNOON&page=1&limit=10
-  @Get("search")
+  @Get('search')
   @ApiOperation({ summary: 'Search jobs' })
   @ApiResponse({ status: 200, description: 'Jobs retrieved successfully' })
   async search(@Query() q: JobSearchDto) {
@@ -47,69 +52,75 @@ export class JobController {
   }
 
   @AuthJwtAccessProtected()
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
   @ApiBearerAuth('access-token')
   @Get('get-for-employer')
   async getForEmployer(@AuthJwtPayload() user: any, @Query() q: JobSearchDto) {
     const ownerId = user.userId
-    const company = await this.companyService.findByOwnerId(ownerId);
-    q.companyId = company.id;
+    const company = await this.companyService.findByOwnerId(ownerId)
+    q.companyId = company.id
     return this.jobService.searchJobs(q)
   }
 
   @AuthJwtAccessProtected()
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Create new job' })
   @Post()
-  async create(
-    @AuthJwtPayload() user: any,
-    @Body() dto: CreateJobRequest,
-  ) {
+  async create(@AuthJwtPayload() user: any, @Body() dto: CreateJobRequest) {
     const ownerId = user.userId
-    const company = await this.companyService.findByOwnerId(ownerId);
-    return this.jobService.createJob(dto, company.id);
+    const company = await this.companyService.findByOwnerId(ownerId)
+    return this.jobService.createJob(dto, company.id)
   }
 
-  @Get("wishlist")
+  @Get('wishlist')
+  @AuthRoleProtected(EnumUserRole.WORKER)
   @ApiOperation({ summary: 'Get user wishlist' })
   @ApiResponse({ status: 200, description: 'Wishlist retrieved successfully' })
   @AuthJwtAccessProtected()
   @ApiBearerAuth('access-token')
   async getWishlist(
     @Query() q: WishlistRequestDto,
-    @AuthJwtPayload() user: any
+    @AuthJwtPayload() user: any,
   ) {
-    return this.jobService.getWistlist(user.userId, q.page, q.limit, q.skip);
+    return this.jobService.getWistlist(user.userId, q.page, q.limit, q.skip)
   }
 
+  @Get('employer/applications')
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
   @AuthJwtAccessProtected()
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Get applications for employer' })
-  @Get('employer/applications')
   async getApplicationsForEmployer(
     @AuthJwtPayload() user: any,
     @Query('jobId') jobId?: string,
   ) {
     const ownerId = user.userId
-    const company = await this.companyService.findByOwnerId(ownerId);
-    const parsedJobId = jobId ? parseInt(jobId, 10) : undefined;
+    const company = await this.companyService.findByOwnerId(ownerId)
+    const parsedJobId = jobId ? parseInt(jobId, 10) : undefined
     if (parsedJobId !== undefined && isNaN(parsedJobId)) {
       throw new BadRequestException('jobId must be a number')
     }
-    return this.jobService.getApplicationsForEmployer(company.id, parsedJobId);
+    return this.jobService.getApplicationsForEmployer(company.id, parsedJobId)
   }
 
+  @Put('applications/:applicationId/status')
   @AuthJwtAccessProtected()
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Update application status by employer' })
-  @Put('applications/:applicationId/status')
   async updateApplicationStatus(
     @AuthJwtPayload() user: any,
     @Param('applicationId', ParseIntPipe) applicationId: number,
     @Body() body: UpdateApplicationStatusRequest,
   ) {
-    const ownerId = user.userId;
-    const company = await this.companyService.findByOwnerId(ownerId);
-    return this.jobService.updateApplicationStatus(applicationId, company.id, body.status);
+    const ownerId = user.userId
+    const company = await this.companyService.findByOwnerId(ownerId)
+    return this.jobService.updateApplicationStatus(
+      applicationId,
+      company.id,
+      body.status,
+    )
   }
 
   // GET JOB DETAIL
@@ -120,12 +131,14 @@ export class JobController {
   }
 
   @Get(':id/apply-form')
+  @AuthRoleProtected(EnumUserRole.WORKER)
   @ApiOperation({ summary: 'Get apply form by job id' })
   async getApplyForm(@Param('id', ParseIntPipe) id: number) {
     return this.jobService.getApplyForm(id)
   }
 
   @Get('me/applications')
+  @AuthRoleProtected(EnumUserRole.WORKER)
   @ApiOperation({ summary: 'Get apply history for current user' })
   @ApiBearerAuth('access-token')
   @AuthJwtAccessProtected()
@@ -134,6 +147,7 @@ export class JobController {
   }
 
   @Post(':id/apply')
+  @AuthRoleProtected(EnumUserRole.WORKER)
   @ApiOperation({ summary: 'Apply job with form answers' })
   @ApiBearerAuth('access-token')
   @ApiParam({ name: 'id', type: Number, example: 1, description: 'Job ID' })
@@ -171,6 +185,7 @@ export class JobController {
   }
 
   @Patch(':id/cancel-apply')
+  @AuthRoleProtected(EnumUserRole.WORKER)
   @ApiOperation({ summary: 'Cancel applied job' })
   @ApiBearerAuth('access-token')
   @ApiParam({ name: 'id', type: Number, example: 1, description: 'Job ID' })
@@ -182,9 +197,10 @@ export class JobController {
     return this.jobService.cancelApplyJob(id, userId)
   }
 
-  @AuthJwtAccessProtected()
-  @ApiBearerAuth('access-token')
   @Put(':id')
+  @AuthJwtAccessProtected()
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
+  @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Update job' })
   async update(
     @AuthJwtPayload() user: any,
@@ -192,22 +208,23 @@ export class JobController {
     @Body() body: UpdateJobRequest,
   ) {
     const ownerId = user.userId
-    const company = await this.companyService.findByOwnerId(ownerId);
-    return this.jobService.updateJob(id, body, company.id);
+    const company = await this.companyService.findByOwnerId(ownerId)
+    return this.jobService.updateJob(id, body, company.id)
   }
 
-  @AuthJwtAccessProtected()
-  @ApiBearerAuth('access-token')
   // DELETE JOB
   @Delete(':id')
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Delete job (Soft delete)' })
   async delete(
     @AuthJwtPayload() user: any,
     @Param('id', ParseIntPipe) id: number,
   ) {
     const ownerId = user.userId
-    const company = await this.companyService.findByOwnerId(ownerId);
-    return this.jobService.deleteJob(id, company.id);
+    const company = await this.companyService.findByOwnerId(ownerId)
+    return this.jobService.deleteJob(id, company.id)
   }
 
   @Get(':id/related')
@@ -218,21 +235,23 @@ export class JobController {
 
   // wishlist endpoint previously here
 
-  @Post("save/:jobId")
+  @Post('save/:jobId')
+  @AuthRoleProtected(EnumUserRole.WORKER)
   @ApiOperation({ summary: 'Save a job' })
   @ApiResponse({ status: 201, description: 'Job saved successfully' })
   @AuthJwtAccessProtected()
   @ApiBearerAuth('access-token')
   async saveJob(@Param('jobId') jobId: string, @AuthJwtPayload() user: any) {
-    return this.jobService.saveJob(user.userId, +jobId);
+    return this.jobService.saveJob(user.userId, +jobId)
   }
 
-  @Delete("unsave/:jobId")
+  @Delete('unsave/:jobId')
+  @AuthRoleProtected(EnumUserRole.WORKER)
   @ApiOperation({ summary: 'Unsave a job' })
   @ApiResponse({ status: 200, description: 'Job unsaved successfully' })
   @AuthJwtAccessProtected()
   @ApiBearerAuth('access-token')
   async unSaveJob(@Param('jobId') jobId: string, @AuthJwtPayload() user: any) {
-    return this.jobService.unSaveJob(user.userId, +jobId);
+    return this.jobService.unSaveJob(user.userId, +jobId)
   }
 }

@@ -134,6 +134,16 @@ enum MessageStatus {
   READ
 }
 
+enum MatchingWeightKey {
+  SKILL_WEIGHT       // Trọng số độ khớp Kỹ năng (AI Vector)
+  BENEFIT_WEIGHT     // Trọng số độ khớp Phúc lợi/Mong muốn (AI Vector)
+  SALARY_WEIGHT      // Trọng số tiêu chí Lương
+  LOCATION_WEIGHT    // Trọng số tiêu chí Địa điểm
+  SHIFT_WEIGHT       // Trọng số tiêu chí Ca làm việc
+  GENDER_WEIGHT      // Trọng số tiêu chí Giới tính
+  AGE_WEIGHT         // Trọng số tiêu chí Độ tuổi
+}
+
 // =====================
 // USER & AUTH
 // =====================
@@ -236,18 +246,24 @@ model WorkerProfile {
   id     Int @id @default(autoincrement())
   userId Int @unique
 
+// --- HARD FILTER FIELDS 
   occupationId Int?
   shift        EnumShift?
 
   province String?
-
+  ward String?
   gender         EnumUserGender?
   birthYear      Int?
   expectedSalary Int?
   experienceYear Int?
 
+  // --- AI FUEL (Text thô để mang đi sinh Vector) ---
+  bio            String?         @db.Text // VD: "3 năm kinh nghiệm. Biết may 1 kim..."
+  desiredJobText String?         @db.Text // VD: "Tìm cty bao cơm, không ép tăng ca"
+
   // AI Embeddings for job matching (pgvector)
-  profileEmbedding   Unsupported("vector(768)")?
+  skillEmbedding   Unsupported("vector(3072)")? // Vector của (occupation + experienceYear + bio)
+  cultureEmbedding Unsupported("vector(3072)")? // Vector của (desiredJobText)
   embeddingUpdatedAt DateTime?
 
   user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -379,12 +395,15 @@ model Job {
   isBoosted      Boolean   @default(false)
   boostExpiredAt DateTime?
 
-  // AI Fields (pgvector)
-  jobEmbedding       Unsupported("vector(768)")?
-  embeddingUpdatedAt DateTime?
+  
   fraudScore         Float                       @default(0)
   fraudCheckedAt     DateTime?
   isFlagged          Boolean                     @default(false)
+
+    // --- AI EMBEDDINGS (Multi-Vector) ---
+  reqEmbedding      Unsupported("vector(3072)")? // Vector phần "Yêu cầu công việc" 
+  benefitEmbedding  Unsupported("vector(3072)")? // Vector phần "Quyền lợi"
+  embeddingUpdatedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -556,4 +575,12 @@ model ChatMessage {
   sender       User             @relation(fields: [senderId], references: [id])
   @@index([conversationId, createdAt])
   @@index([senderId])
+}
+
+model MatchingWeight {
+  id        Int      @id @default(autoincrement())
+  key       MatchingWeightKey @unique
+  label     String
+  weight    Float
+  updatedAt DateTime @updatedAt
 }

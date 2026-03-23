@@ -14,6 +14,7 @@ import { EmailModule } from './infrastructure/email/email.module'
 import { QueueModule } from './infrastructure/queue/queue.module'
 import { QueueTestModule } from './modules/queue-test/queue-test.module'
 import emailConfig from './config/email.config'
+import embeddingConfig from './config/embedding.config'
 import { JobModule } from './modules/job/job.module'
 import { CacheModule } from '@nestjs/cache-manager'
 import { redisStore } from 'cache-manager-redis-store'
@@ -21,11 +22,13 @@ import { OccupationModule } from './modules/occupation/occupation.module'
 import { SectorModule } from './modules/sector/sector.module'
 import { TermsConditionsModule } from './modules/terms-conditions/terms-conditions.module'
 import { ChatModule } from './modules/chat/chat.module'
+import { EmbeddingModule } from './modules/embedding/embedding.module'
+import { AIMatchingModule } from './modules/ai-matching/ai-matching.module'
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, authConfig, emailConfig],
+      load: [appConfig, authConfig, emailConfig, embeddingConfig],
       validate: validateEnv,
     }),
 
@@ -77,6 +80,8 @@ import { ChatModule } from './modules/chat/chat.module'
     SectorModule,
     TermsConditionsModule,
     ChatModule,
+    EmbeddingModule,
+    AIMatchingModule,
   ],
   controllers: [],
   providers: [],

@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common'
-import { EmailQueueService } from '../services/email-queue.service'
+import { EmailQueueService } from './service/email-queue.service'
 
 @Module({
   providers: [EmailQueueService],
