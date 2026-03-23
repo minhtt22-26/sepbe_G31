@@ -10,7 +10,6 @@ import {
   Put,
   BadRequestException,
   Query,
-  Delete,
 } from '@nestjs/common'
 import {
   ApiTags,
@@ -33,8 +32,6 @@ import {
   AuthRoleProtected,
 } from '../auth/decorators/auth.jwt.decorator'
 import { CompanySearchDto } from './dtos/request/company.search.request.dto'
-import { JobRatingDto, UpdateJobRatingDto } from './dtos/request/job.rating.dto'
-import { ReportReviewDto } from './dtos/request/report.review.dto'
 
 
 @Controller('company')
