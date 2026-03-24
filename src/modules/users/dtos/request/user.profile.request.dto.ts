@@ -55,11 +55,11 @@ export class WorkerProfileRequestDto {
 
   @IsOptional()
   @IsString()
-  @Length(10, 100)
+  @Length(10, 300)
   bio?: string
 
   @IsOptional()
   @IsString()
-  @Length(10, 100)
+  @Length(10, 300)
   desiredJobText?: string
 }
