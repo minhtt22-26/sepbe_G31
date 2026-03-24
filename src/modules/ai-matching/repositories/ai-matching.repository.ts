@@ -39,6 +39,7 @@ export class AIMatchingRepository {
         j."ageMax",
         j."isBoosted",
         j."expiredAt",
+        j."occupationId",
         o.name AS "occupationName",
         c.id AS "companyId",
         c.name AS "companyName",

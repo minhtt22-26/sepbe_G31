@@ -68,6 +68,8 @@ export class AIMatchingService {
       const locationScore = this.scoringService.calculateLocationScore(
         workerProfile.province,
         job.province,
+        workerProfile.ward,
+        job.district,
       )
 
       const shiftScore = this.scoringService.calculateShiftScore(
@@ -86,9 +88,17 @@ export class AIMatchingService {
         job.ageMax,
       )
 
+      const isSameOccupation = workerProfile.occupationId === job.occupationId
+
+      // Nếu cùng ngành nghề, skillScore nằm trong khoảng 0.8 - 1.0 (ưu tiên cao nhất)
+      // Nếu khác ngành nghề, skillScore nằm trong khoảng 0.0 - 0.5 (giảm độ ưu tiên)
+      const refinedSkillScore = isSameOccupation
+        ? 0.8 + job.skillScore * 0.2
+        : job.skillScore * 0.5
+
       const finalScore = this.scoringService.calculateFinalScore(
         {
-          skillScore: job.skillScore,
+          skillScore: refinedSkillScore,
           benefitScore: job.benefitScore,
           salaryScore,
           locationScore,

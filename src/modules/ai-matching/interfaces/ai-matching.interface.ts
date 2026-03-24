@@ -12,6 +12,7 @@ export interface IRawMatchedJob {
   workingShift: string | null
   isBoosted: boolean
   expiredAt: Date | null
+  occupationId: number
   occupationName: string
   companyId: number
   companyName: string

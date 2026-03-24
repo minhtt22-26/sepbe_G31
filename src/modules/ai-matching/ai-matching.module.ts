@@ -7,6 +7,7 @@ import { ScoringService } from './service/scoring.service'
 import { JobModule } from '../job/job.module'
 import { EmbeddingModule } from '../embedding/embedding.module'
 import { AuthModule } from '../auth/auth.module'
+import { ProvinceHelper } from 'src/common/helper/province.helper'
 
 @Module({
   imports: [
@@ -15,7 +16,12 @@ import { AuthModule } from '../auth/auth.module'
     forwardRef(() => JobModule),
     EmbeddingModule,
   ],
-  providers: [AIMatchingService, AIMatchingRepository, ScoringService],
+  providers: [
+    AIMatchingService,
+    AIMatchingRepository,
+    ScoringService,
+    ProvinceHelper,
+  ],
   controllers: [AIMatchingController],
   exports: [AIMatchingService, AIMatchingRepository],
 })
