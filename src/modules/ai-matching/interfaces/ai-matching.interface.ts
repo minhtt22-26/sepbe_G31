@@ -43,3 +43,28 @@ export interface IWorkerEmbeddings {
   skillEmbedding: number[]
   cultureEmbedding: number[] | null
 }
+
+export interface IJobEmbeddings {
+  reqEmbedding: number[]
+  benefitEmbedding: number[] | null
+}
+
+export interface IRawMatchedWorker {
+  userId: number
+  fullName: string
+  avatar: string | null
+  phone: string | null
+  occupationId: number | null
+  occupationName: string | null
+  province: string | null
+  ward: string | null
+  expectedSalary: number | null
+  shift: string | null
+  gender: string | null
+  birthYear: number | null
+  experienceYear: number | null
+  bio: string | null
+  desiredJobText: string | null
+  skillScore: number
+  cultureScore: number
+}

@@ -9,6 +9,7 @@ import { AIMatchingRepository } from '../repositories/ai-matching.repository'
 import { ScoringService } from './scoring.service'
 import { UserService } from 'src/modules/users/service/user.service'
 import { MatchedJobResponseDto } from '../dto/response/matched-job.response.dto'
+import { MatchedWorkerResponseDto } from '../dto/response/matched-worker.response.dto'
 import { JobService } from 'src/modules/job/service/job.service'
 import { EmbeddingService } from 'src/modules/embedding/service/embedding.service'
 import { EmbeddingTextBuilder } from 'src/modules/embedding/builder/embedding-text.builder'
@@ -212,6 +213,116 @@ export class AIMatchingService {
       skillEmbedding,
       cultureEmbedding,
     )
+  }
+
+  async getSuggestedWorkers(
+    jobId: number,
+    limit?: number,
+  ): Promise<MatchedWorkerResponseDto[]> {
+    const resolvedLimit = Math.min(limit ?? this.DEFAULT_LIMIT, this.MAX_LIMIT)
+
+    console.log(jobId)
+    const job = await this.jobService.getDetail(jobId)
+    if (!job) {
+      throw new NotFoundException('Job không tồn tại')
+    }
+
+    const embeddings = await this.aiMatchingRepository.getJobEmbeddings(jobId)
+    if (!embeddings?.reqEmbedding.length) {
+      throw new BadRequestException(
+        'Job chưa được xử lý embedding. Vui lòng cập nhật mô tả công việc.',
+      )
+    }
+
+    const weights = await this.aiMatchingRepository.getWeights()
+
+    const rawWorkers = await this.aiMatchingRepository.findMatchedWorkers(
+      embeddings.reqEmbedding,
+      embeddings.benefitEmbedding,
+      resolvedLimit,
+    )
+
+    const results = rawWorkers.map((worker) => {
+      const salaryScore = this.scoringService.calculateSalaryScore(
+        worker.expectedSalary,
+        job.salaryMin,
+        job.salaryMax,
+      )
+
+      const locationScore = this.scoringService.calculateLocationScore(
+        worker.province,
+        job.province,
+        worker.ward,
+        job.district,
+      )
+
+      const shiftScore = this.scoringService.calculateShiftScore(
+        worker.shift,
+        job.workingShift,
+      )
+
+      const genderScore = this.scoringService.calculateGenderScore(
+        worker.gender,
+        job.genderRequirement,
+      )
+
+      const ageScore = this.scoringService.calculateAgeScore(
+        worker.birthYear,
+        job.ageMin,
+        job.ageMax,
+      )
+
+      const isSameOccupation = worker.occupationId === job.occupationId
+      const refinedSkillScore = isSameOccupation
+        ? 0.8 + worker.skillScore * 0.2
+        : worker.skillScore * 0.5
+
+      const finalScore = this.scoringService.calculateFinalScore(
+        {
+          skillScore: refinedSkillScore,
+          benefitScore: worker.cultureScore,
+          salaryScore,
+          locationScore,
+          shiftScore,
+          genderScore,
+          ageScore,
+        },
+        weights,
+      )
+
+      return {
+        worker: {
+          userId: worker.userId,
+          fullName: worker.fullName,
+          avatar: worker.avatar,
+          phone: worker.phone,
+          province: worker.province,
+          ward: worker.ward,
+          gender: worker.gender,
+          birthYear: worker.birthYear,
+          expectedSalary: worker.expectedSalary,
+          shift: worker.shift,
+          experienceYear: worker.experienceYear,
+          bio: worker.bio,
+          desiredJobText: worker.desiredJobText,
+          occupationName: worker.occupationName,
+        },
+        scores: {
+          skillScore: worker.skillScore,
+          benefitScore: worker.cultureScore,
+          salaryScore,
+          locationScore,
+          shiftScore,
+          genderScore,
+          ageScore,
+          finalScore,
+        },
+      }
+    })
+
+    return results
+      .sort((a, b) => b.scores.finalScore - a.scores.finalScore)
+      .slice(0, resolvedLimit)
   }
 
   async getWeights(): Promise<IMatchingWeight[]> {

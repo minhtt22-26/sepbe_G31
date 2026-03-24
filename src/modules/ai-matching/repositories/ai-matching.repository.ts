@@ -3,6 +3,8 @@ import { PrismaService } from 'src/prisma.service'
 import {
   IMatchingWeight,
   IRawMatchedJob,
+  IRawMatchedWorker,
+  IJobEmbeddings,
   IWorkerEmbeddings,
 } from '../interfaces/ai-matching.interface'
 
@@ -178,5 +180,94 @@ export class AIMatchingRepository {
       benefitVector,
       jobId,
     )
+  }
+
+  async getJobEmbeddings(jobId: number): Promise<IJobEmbeddings | null> {
+    const rows = await this.prisma.$queryRawUnsafe<
+      Array<{
+        reqEmbedding: string | null
+        benefitEmbedding: string | null
+      }>
+    >(
+      `
+      SELECT 
+      "reqEmbedding"::text AS "reqEmbedding",
+      "benefitEmbedding"::text AS "benefitEmbedding"
+      FROM "Job"
+      WHERE id = $1
+      LIMIT 1
+      `,
+      jobId,
+    )
+
+    const row = rows[0]
+    if (!row?.reqEmbedding) {
+      return null
+    }
+
+    const req = this.parseVector(row.reqEmbedding)
+    if (!req?.length) {
+      return null
+    }
+
+    const benefit = this.parseVector(row.benefitEmbedding)
+
+    return {
+      reqEmbedding: req,
+      benefitEmbedding: benefit,
+    }
+  }
+
+  async findMatchedWorkers(
+    reqEmbedding: number[],
+    benefitEmbedding: number[] | null,
+    limit: number,
+  ): Promise<IRawMatchedWorker[]> {
+    const fetchLimit = limit * 3
+
+    const reqVector = `[${reqEmbedding.join(',')}]`
+    const benefitVector = benefitEmbedding
+      ? `[${benefitEmbedding.join(',')}]`
+      : null
+
+    const result = await this.prisma.$queryRawUnsafe<IRawMatchedWorker[]>(
+      `
+        SELECT 
+        wp."userId",
+        u."fullName",
+        u.avatar,
+        u.phone,
+        wp."occupationId",
+        o.name AS "occupationName",
+        wp.province,
+        wp.ward,
+        wp."expectedSalary",
+        wp.shift,
+        wp.gender,
+        wp."birthYear",
+        wp."experienceYear",
+        wp.bio,
+        wp."desiredJobText",
+        1 - (wp."skillEmbedding" <=> $1::vector) AS "skillScore",
+            CASE
+                WHEN wp."cultureEmbedding" IS NOT NULL AND $2::vector IS NOT NULL
+                THEN 1 - (wp."cultureEmbedding" <=> $2::vector)
+                ELSE 0
+            END AS "cultureScore"
+        FROM "WorkerProfile" wp
+        JOIN "User" u ON u.id = wp."userId"
+        LEFT JOIN "Occupation" o ON o.id = wp."occupationId"
+        WHERE wp."skillEmbedding" IS NOT NULL
+            AND u.status = 'ACTIVE'
+            AND u.role = 'WORKER'
+            ORDER BY (wp."skillEmbedding" <=> $1::vector) + (CASE WHEN wp."cultureEmbedding" IS NOT NULL AND $2::vector IS NOT NULL THEN wp."cultureEmbedding" <=> $2::vector ELSE 1 END)
+            LIMIT $3
+        `,
+      reqVector,
+      benefitVector,
+      fetchLimit,
+    )
+
+    return result
   }
 }
