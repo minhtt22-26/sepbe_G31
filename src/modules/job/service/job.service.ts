@@ -517,7 +517,7 @@ export class JobService {
     const update = await this.jobRepository.updateJobFull(jobId, dto)
 
     /* Queue-based (tạm comment):
-    this.embeddingQueueService.queueJobEmbedding(jobId)
+    // this.embeddingQueueService.queueJobEmbedding(jobId)
     */
 
     // Gọi trực tiếp embedding (không qua queue)

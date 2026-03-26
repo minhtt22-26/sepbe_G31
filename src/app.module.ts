@@ -17,8 +17,7 @@ import emailConfig from './config/email.config'
 import embeddingConfig from './config/embedding.config'
 import paymentConfig from './config/payment.config'
 import { JobModule } from './modules/job/job.module'
-import { CacheModule } from '@nestjs/cache-manager'
-import { redisStore } from 'cache-manager-redis-store'
+// import { redisStore } from 'cache-manager-redis-store'
 import { OccupationModule } from './modules/occupation/occupation.module'
 import { SectorModule } from './modules/sector/sector.module'
 import { TermsConditionsModule } from './modules/terms-conditions/terms-conditions.module'
@@ -40,36 +39,36 @@ import { AuthUserMiddleware } from './common/middleware/auth-user.middleware'
       validate: validateEnv,
     }),
 
-    CacheModule.registerAsync({
-      isGlobal: true,
-      inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => {
-        const redisUrl = configService.getOrThrow<string>('REDIS_URL')
-
-        try {
-          const store = await redisStore({
-            url: redisUrl,
-          })
-
-          if (!store || typeof store !== 'object') {
-            throw new Error('redisStore returned invalid object')
-          }
-
-          return {
-            store,
-            ttl: 600000,
-          }
-        } catch (error) {
-          console.error(
-            '[CACHE] ERROR initializing Redis:',
-            error?.message || error,
-          )
-          throw new Error(
-            `Cache initialization failed: ${error?.message || error}`,
-          )
-        }
-      },
-    }),
+    // CacheModule.registerAsync({
+    //   isGlobal: true,
+    //   inject: [ConfigService],
+    //   useFactory: async (configService: ConfigService) => {
+    //     const redisUrl = configService.getOrThrow<string>('REDIS_URL')
+    //
+    //     try {
+    //       const store = await redisStore({
+    //         url: redisUrl,
+    //       })
+    //
+    //       if (!store || typeof store !== 'object') {
+    //         throw new Error('redisStore returned invalid object')
+    //       }
+    //
+    //       return {
+    //         store,
+    //         ttl: 600000,
+    //       }
+    //     } catch (error) {
+    //       console.error(
+    //         '[CACHE] ERROR initializing Redis:',
+    //         error?.message || error,
+    //       )
+    //       throw new Error(
+    //         `Cache initialization failed: ${error?.message || error}`,
+    //       )
+    //     }
+    //   },
+    // }),
 
     // Queue module - import early to avoid circular dependencies
     QueueModule,
@@ -82,7 +81,7 @@ import { AuthUserMiddleware } from './common/middleware/auth-user.middleware'
     CompanyModule,
     NotificationsModule,
     EmailModule,
-    QueueTestModule,
+    // QueueTestModule,
     JobModule,
     OccupationModule,
     SectorModule,
