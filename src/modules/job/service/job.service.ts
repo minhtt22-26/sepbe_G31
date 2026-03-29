@@ -21,6 +21,7 @@ import {
 import { ApplyJobRequest } from '../dtos/request/apply-job.request'
 import { JOB_CONSTANTS } from '../constant/job.constant'
 import { AIMatchingService } from 'src/modules/ai-matching/service/ai-matching.service'
+import { JobModerationService, ModerationStatus } from './job-moderation.service'
 // import { EmbeddingQueueService } from 'src/infrastructure/queue/embedding/service/embedding-queue.service'
 import { JobReportDto } from '../dtos/job.report.request.dto'
 import { BoostCheckoutRequestDto } from '../dtos/request/boost-checkout.request'
@@ -41,6 +42,7 @@ export class JobService {
     // private readonly embeddingQueueService: EmbeddingQueueService,
     @Inject(forwardRef(() => AIMatchingService))
     private readonly aiMatchingService: AIMatchingService,
+    private readonly moderationService: JobModerationService,
   ) { }
 
   async searchJobs(q: any) {
@@ -424,7 +426,7 @@ export class JobService {
     // 2️⃣ Prepare Job Data
     // ==============================
 
-    const jobData = {
+    const jobData: any = {
       title: dto.title,
       description: dto.description,
       occupationId: dto.occupationId,
@@ -441,7 +443,32 @@ export class JobService {
       expiredAt: dto.expiredAt ? new Date(dto.expiredAt) : undefined, // hoặc set mặc định 30 ngày nếu muốn
 
       companyId,
-      status: JobStatus.WARNING, // hoặc ACTIVE nếu không cần duyệt
+      status: JobStatus.PUBLISHED, // Default to PUBLISHED
+    }
+
+    // AI CONTENT MODERATION
+    try {
+      this.logger.log(`Starting AI moderation for job: ${dto.title}`);
+      const moderationResult = await this.moderationService.moderateJob(
+        dto.title,
+        dto.description,
+      );
+
+      if (moderationResult.status !== ModerationStatus.PASS) {
+        this.logger.warn(
+          `AI REJECTED job as ${moderationResult.status}. Reason: ${moderationResult.reason}`,
+        );
+        throw new BadRequestException(
+          `Tin tuyển dụng bị từ chối do có dấu hiệu ${moderationResult.status === ModerationStatus.SPAM ? 'SPAM' : 'LỪA ĐẢO'} (AI detect): ${moderationResult.reason}. Vui lòng viết lại nội dung nghiêm túc hơn.`,
+        );
+      }
+    } catch (moderationError) {
+      if (moderationError instanceof BadRequestException) {
+        throw moderationError;
+      }
+      this.logger.error('Moderation failed:', moderationError);
+      // Fallback: Nếu AI lỗi kỹ thuật thì cho vào WARNING để manager check, không chặn user
+      jobData.status = JobStatus.WARNING;
     }
 
     // ==============================
@@ -465,6 +492,7 @@ export class JobService {
       return {
         success: true,
         data: created,
+        message: 'Đăng tin tuyển dụng thành công',
       }
     } catch (error) {
       const errorMessage =
@@ -747,5 +775,23 @@ export class JobService {
   async updateJobReportStatus(reportId: number, status: ReportStatus) {
     await this.jobRepository.changeJobReportStatus(reportId, status);
     return { success: true };
+  }
+  async getWarningJobs(page = 1, limit = 10) {
+    const { items, total } = await this.jobRepository.getWarningJobs(page, limit)
+    return {
+      success: true,
+      items,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPage: Math.ceil(total / limit),
+      },
+    }
+  }
+
+  async updateJobStatus(jobId: number, status: JobStatus) {
+    const updated = await this.jobRepository.updateJobStatus(jobId, status)
+    return { success: true, data: updated }
   }
 }

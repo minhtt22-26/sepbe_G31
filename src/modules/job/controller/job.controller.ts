@@ -37,8 +37,12 @@ import {
   AuthRoleProtected,
 } from 'src/modules/auth/decorators/auth.jwt.decorator'
 import { CompanyService } from 'src/modules/company/company.service'
-import { EnumUserRole } from 'src/generated/prisma/enums'
-import { ReportStatus } from 'src/generated/prisma/enums'
+import {
+  EnumUserRole,
+  JobApplicationStatus,
+  JobStatus,
+  ReportStatus,
+} from 'src/generated/prisma/enums'
 
 @ApiTags('Job')
 @Controller('job')
@@ -339,5 +343,22 @@ export class JobController {
     @Body() body: { status: ReportStatus },
   ) {
     return this.jobService.updateJobReportStatus(id, body.status);
+  }
+  @Get('moderation/warning')
+  @ApiOperation({ summary: 'Get jobs pending moderation (WARNING status)' })
+  async getWarningJobs(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.jobService.getWarningJobs(page || 1, limit || 10)
+  }
+
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Update job status by moderator' })
+  async updateJobStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('status', new ParseEnumPipe(JobStatus)) status: JobStatus,
+  ) {
+    return this.jobService.updateJobStatus(id, status)
   }
 }
