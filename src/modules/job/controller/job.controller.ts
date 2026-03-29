@@ -18,6 +18,7 @@ import { CreateJobRequest } from '../dtos/request/create-job.request'
 import { UpdateJobRequest } from '../dtos/request/update-job.request'
 import { UpdateApplicationStatusRequest } from '../dtos/request/update-application-status.request'
 import { JobSearchDto } from '../dtos/job.search.request.dto'
+import { GetJobsByEmployerDto } from '../dtos/request/get-jobs-employer.dto'
 import { WishlistRequestDto } from '../dtos/job.wishlist.request.dto'
 import { JobReportDto } from '../dtos/job.report.request.dto'
 import {
@@ -83,11 +84,10 @@ export class JobController {
   @AuthRoleProtected(EnumUserRole.EMPLOYER)
   @ApiBearerAuth('access-token')
   @Get('get-for-employer')
-  async getForEmployer(@AuthJwtPayload() user: any, @Query() q: JobSearchDto) {
+  async getForEmployer(@AuthJwtPayload() user: any, @Query() q: GetJobsByEmployerDto) {
     const ownerId = user.userId
     const company = await this.companyService.findByOwnerId(ownerId)
-    q.companyId = company.id
-    return this.jobService.searchJobs(q)
+    return this.jobService.getJobsByEmployer(company.id, q)
   }
 
   @AuthJwtAccessProtected()
