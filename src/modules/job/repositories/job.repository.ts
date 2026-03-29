@@ -757,4 +757,38 @@ export class JobRepository {
   }
   
   
+  async getWarningJobs(page: number, limit: number) {
+    const skip = (page - 1) * limit
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.job.findMany({
+        where: { status: JobStatus.WARNING },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          company: {
+            select: {
+              id: true,
+              name: true,
+              logoUrl: true,
+            },
+          },
+          occupation: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      }),
+      this.prisma.job.count({ where: { status: JobStatus.WARNING } }),
+    ])
+    return { items, total }
+  }
+
+  async updateJobStatus(jobId: number, status: JobStatus) {
+    return this.prisma.job.update({
+      where: { id: jobId },
+      data: { status },
+    })
+  }
 }
