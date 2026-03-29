@@ -39,7 +39,6 @@ import {
 import { CompanyService } from 'src/modules/company/company.service'
 import {
   EnumUserRole,
-  JobApplicationStatus,
   JobStatus,
   ReportStatus,
 } from 'src/generated/prisma/enums'
