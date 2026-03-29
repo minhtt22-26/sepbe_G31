@@ -6,5 +6,5 @@ export class UpdateApplicationStatusRequest {
   @ApiProperty({ enum: JobApplicationStatus, description: 'New status for the application' })
   @IsEnum(JobApplicationStatus)
   @IsNotEmpty()
-  status: JobApplicationStatus
+  status!: JobApplicationStatus
 }

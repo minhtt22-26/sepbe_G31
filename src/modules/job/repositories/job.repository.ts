@@ -1,5 +1,11 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
-import { JobApplicationStatus, ReportStatus } from 'src/generated/prisma/enums'
+import {
+  JobApplicationStatus,
+  OrderType,
+  PaymentMethod,
+  PaymentStatus,
+  ReportStatus,
+} from 'src/generated/prisma/enums'
 import { JobStatus } from 'src/generated/prisma/browser'
 import { PrismaService } from 'src/prisma.service'
 
@@ -49,10 +55,14 @@ export class JobRepository {
   }
 
   async searchJobs(where: any, orderBy: any, limit: number, offset: number) {
+    const resolvedOrderBy = Array.isArray(orderBy)
+      ? [{ isBoosted: 'desc' }, ...orderBy]
+      : [{ isBoosted: 'desc' }, orderBy]
+
     const [items, total] = await this.prisma.$transaction([
       this.prisma.job.findMany({
         where,
-        orderBy,
+        orderBy: resolvedOrderBy,
         take: limit,
         skip: offset,
         include: {
@@ -68,6 +78,126 @@ export class JobRepository {
       this.prisma.job.count({ where }),
     ])
     return { items, total }
+  }
+
+  async deactivateExpiredBoosts() {
+    return this.prisma.job.updateMany({
+      where: {
+        isBoosted: true,
+        boostExpiredAt: { lt: new Date() },
+      },
+      data: {
+        isBoosted: false,
+        boostExpiredAt: null,
+      },
+    })
+  }
+
+  async getBoostedJobs(limit: number, offset: number) {
+    const now = new Date()
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.job.findMany({
+        where: {
+          status: JobStatus.PUBLISHED,
+          isBoosted: true,
+          OR: [{ boostExpiredAt: null }, { boostExpiredAt: { gt: now } }],
+        },
+        orderBy: [{ boostExpiredAt: 'desc' }, { createdAt: 'desc' }],
+        take: limit,
+        skip: offset,
+        include: {
+          company: {
+            select: {
+              id: true,
+              name: true,
+              logoUrl: true,
+            },
+          },
+          occupation: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      }),
+      this.prisma.job.count({
+        where: {
+          status: JobStatus.PUBLISHED,
+          isBoosted: true,
+          OR: [{ boostExpiredAt: null }, { boostExpiredAt: { gt: now } }],
+        },
+      }),
+    ])
+
+    return { items, total }
+  }
+
+  async createBoostPaymentOrder(params: {
+    userId: number
+    jobId: number
+    amount: number
+    paymentMethod: PaymentMethod
+  }) {
+    return this.prisma.paymentOrder.create({
+      data: {
+        userId: params.userId,
+        orderType: OrderType.BOOST_JOB,
+        targetId: params.jobId,
+        amount: params.amount,
+        paymentMethod: params.paymentMethod,
+        status: PaymentStatus.PENDING,
+      },
+    })
+  }
+
+  async findPaymentOrderById(orderId: number) {
+    return this.prisma.paymentOrder.findUnique({
+      where: { id: orderId },
+    })
+  }
+
+  async activateBoostAfterPayment(params: {
+    orderId: number
+    jobId: number
+    durationDays: number
+    transactionCode?: string
+  }) {
+    const now = new Date()
+
+    return this.prisma.$transaction(async (tx) => {
+      const existingJob = await tx.job.findUnique({
+        where: { id: params.jobId },
+        select: { boostExpiredAt: true },
+      })
+
+      const baseDate =
+        existingJob?.boostExpiredAt && existingJob.boostExpiredAt > now
+          ? existingJob.boostExpiredAt
+          : now
+
+      const boostExpiredAt = new Date(baseDate)
+      boostExpiredAt.setDate(boostExpiredAt.getDate() + params.durationDays)
+
+      const order = await tx.paymentOrder.update({
+        where: { id: params.orderId },
+        data: {
+          status: PaymentStatus.COMPLETED,
+          transactionCode: params.transactionCode,
+        },
+      })
+
+      const job = await tx.job.update({
+        where: { id: params.jobId },
+        data: {
+          isBoosted: true,
+          boostExpiredAt,
+        },
+      })
+
+      return { order, job }
+    })
   }
 
   async deleteJob(jobId: number) {
@@ -221,6 +351,11 @@ export class JobRepository {
                 name: true,
               },
             },
+          },
+        },
+        _count: {
+          select: {
+            applications: true,
           },
         },
       },
@@ -622,4 +757,38 @@ export class JobRepository {
   }
   
   
+  async getWarningJobs(page: number, limit: number) {
+    const skip = (page - 1) * limit
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.job.findMany({
+        where: { status: JobStatus.WARNING },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          company: {
+            select: {
+              id: true,
+              name: true,
+              logoUrl: true,
+            },
+          },
+          occupation: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      }),
+      this.prisma.job.count({ where: { status: JobStatus.WARNING } }),
+    ])
+    return { items, total }
+  }
+
+  async updateJobStatus(jobId: number, status: JobStatus) {
+    return this.prisma.job.update({
+      where: { id: jobId },
+      data: { status },
+    })
+  }
 }

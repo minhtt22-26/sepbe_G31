@@ -5,29 +5,49 @@ import {
   NotFoundException,
   Inject,
   forwardRef,
+  UnauthorizedException,
 } from '@nestjs/common'
 import { JobRepository } from '../repositories/job.repository'
 import { CreateJobRequest } from '../dtos/request/create-job.request'
 import { UpdateJobRequest } from '../dtos/request/update-job.request'
-import { JobApplicationStatus, JobStatus, ReportStatus } from 'src/generated/prisma/enums'
+import {
+  JobApplicationStatus,
+  JobStatus,
+  OrderType,
+  PaymentMethod,
+  PaymentStatus,
+  ReportStatus,
+} from 'src/generated/prisma/enums'
 import { ApplyJobRequest } from '../dtos/request/apply-job.request'
 import { JOB_CONSTANTS } from '../constant/job.constant'
 import { AIMatchingService } from 'src/modules/ai-matching/service/ai-matching.service'
+import { JobModerationService, ModerationStatus } from './job-moderation.service'
 // import { EmbeddingQueueService } from 'src/infrastructure/queue/embedding/service/embedding-queue.service'
 import { JobReportDto } from '../dtos/job.report.request.dto'
+import { BoostCheckoutRequestDto } from '../dtos/request/boost-checkout.request'
+import { ConfirmBoostPaymentRequestDto } from '../dtos/request/confirm-boost-payment.request'
+import { SepayService } from './sepay.service'
 
 @Injectable()
 export class JobService {
   private readonly logger = new Logger(JobService.name)
+  private readonly BOOST_PRICE_BY_DAYS: Record<number, number> = {
+    7: 50000,
+    30: 300000,
+  }
 
   constructor(
     private readonly jobRepository: JobRepository,
+    private readonly sepayService: SepayService,
     // private readonly embeddingQueueService: EmbeddingQueueService,
     @Inject(forwardRef(() => AIMatchingService))
     private readonly aiMatchingService: AIMatchingService,
+    private readonly moderationService: JobModerationService,
   ) { }
 
   async searchJobs(q: any) {
+    await this.jobRepository.deactivateExpiredBoosts()
+
     const keyword = q.keyword?.trim() || ''
     const province = q.province?.trim() || ''
     const district = q.district
@@ -76,12 +96,12 @@ export class JobService {
     const sortBy = q.sortBy || 'newest'
     const orderBy =
       sortBy === 'salary_desc'
-        ? { salaryMax: 'desc' }
+        ? [{ salaryMax: 'desc' }, { createdAt: 'desc' }]
         : sortBy === 'salary_asc'
-          ? { salaryMax: 'asc' }
+          ? [{ salaryMax: 'asc' }, { createdAt: 'desc' }]
           : sortBy === 'view'
-            ? { viewCount: 'desc' }
-            : { createdAt: 'desc' }
+            ? [{ viewCount: 'desc' }, { createdAt: 'desc' }]
+            : [{ createdAt: 'desc' }]
     const { items, total } = await this.jobRepository.searchJobs(
       where,
       orderBy,
@@ -96,6 +116,230 @@ export class JobService {
         limit,
         total,
         totalPage: Math.ceil(total / limit),
+      },
+    }
+  }
+
+  async getBoostedJobs(page = 1, limit = 10) {
+    await this.jobRepository.deactivateExpiredBoosts()
+
+    const safePage = page > 0 ? page : 1
+    const safeLimit = Math.min(Math.max(limit, 1), 50)
+    const skip = (safePage - 1) * safeLimit
+
+    const { items, total } = await this.jobRepository.getBoostedJobs(
+      safeLimit,
+      skip,
+    )
+
+    return {
+      success: true,
+      items,
+      meta: {
+        page: safePage,
+        limit: safeLimit,
+        total,
+        totalPage: Math.ceil(total / safeLimit),
+      },
+    }
+  }
+
+  async createBoostCheckout(
+    jobId: number,
+    companyId: number,
+    body: BoostCheckoutRequestDto,
+  ) {
+    const job = await this.jobRepository.findJobById(jobId)
+    if (!job || job.companyId !== companyId) {
+      throw new NotFoundException('Job not found or unauthorized')
+    }
+
+    if (job.status !== JobStatus.PUBLISHED) {
+      throw new BadRequestException('Only published jobs can be boosted')
+    }
+
+    const packageDays = body.packageDays ?? 7
+    const defaultAmount = this.BOOST_PRICE_BY_DAYS[packageDays]
+
+    if (!defaultAmount) {
+      throw new BadRequestException('Package boost không hợp lệ')
+    }
+
+    if (body.paymentMethod && body.paymentMethod !== PaymentMethod.SEPAY) {
+      throw new BadRequestException('Hiện tại chỉ hỗ trợ thanh toán boost qua SEPAY')
+    }
+
+    const amount = body.amount ?? defaultAmount
+    if (amount <= 0) {
+      throw new BadRequestException('Số tiền thanh toán không hợp lệ')
+    }
+
+    const order = await this.jobRepository.createBoostPaymentOrder({
+      userId: job.company.ownerId,
+      jobId,
+      amount,
+      paymentMethod: body.paymentMethod ?? PaymentMethod.SEPAY,
+    })
+
+    const checkout = this.sepayService.buildBoostCheckout(order.id, amount)
+
+    return {
+      success: true,
+      data: {
+        paymentOrderId: order.id,
+        status: order.status,
+        amount: order.amount,
+        currency: order.currency,
+        paymentMethod: order.paymentMethod,
+        packageDays,
+        paymentCode: checkout.paymentCode,
+        paymentUrl: checkout.paymentUrl,
+        transferNote: checkout.transferNote,
+        bankCode: checkout.bankCode,
+        accountNumber: checkout.accountNumber,
+        accountName: checkout.accountName,
+      },
+      message: 'Đã tạo đơn boost. Hãy thanh toán bằng QR/chuyển khoản đúng nội dung để SePay tự xác nhận.',
+    }
+  }
+
+  async handleSepayWebhook(
+    authorizationHeader?: string,
+    payload?: Record<string, unknown>,
+  ) {
+    if (!this.sepayService.isValidWebhookAuthorization(authorizationHeader)) {
+      throw new UnauthorizedException('SePay webhook authorization không hợp lệ')
+    }
+
+    if (!payload || typeof payload !== 'object') {
+      throw new BadRequestException('Payload webhook không hợp lệ')
+    }
+
+    const transferType =
+      typeof payload.transferType === 'string'
+        ? payload.transferType.toLowerCase()
+        : ''
+    if (transferType !== 'in') {
+      return { success: true, message: 'Bỏ qua giao dịch không phải tiền vào' }
+    }
+
+    const orderId = this.sepayService.extractOrderIdFromPayload(payload)
+    if (!orderId) {
+      return { success: true, message: 'Bỏ qua giao dịch không chứa mã boost hợp lệ' }
+    }
+
+    const order = await this.jobRepository.findPaymentOrderById(orderId)
+    if (!order || order.orderType !== OrderType.BOOST_JOB) {
+      return { success: true, message: 'Không tìm thấy boost order tương ứng' }
+    }
+
+    if (order.paymentMethod !== PaymentMethod.SEPAY) {
+      return { success: true, message: 'Order không dùng phương thức SEPAY' }
+    }
+
+    if (order.status === PaymentStatus.COMPLETED) {
+      return { success: true, message: 'Order đã xử lý trước đó' }
+    }
+
+    if (!order.targetId) {
+      return { success: true, message: 'Order không có target job' }
+    }
+
+    const transferAmount = Number(payload.transferAmount ?? payload.amount ?? 0)
+    if (!Number.isFinite(transferAmount) || transferAmount < order.amount) {
+      return {
+        success: true,
+        message: 'Số tiền chưa đủ để kích hoạt boost',
+        data: {
+          paymentOrderId: order.id,
+          requiredAmount: order.amount,
+          transferAmount,
+        },
+      }
+    }
+
+    const durationDays = order.amount >= this.BOOST_PRICE_BY_DAYS[30] ? 30 : 7
+    const referenceCode =
+      typeof payload.referenceCode === 'string' ? payload.referenceCode : null
+    const rawTransactionCode =
+      typeof payload.transactionCode === 'string' ? payload.transactionCode : null
+    const webhookId =
+      typeof payload.id === 'number' || typeof payload.id === 'string'
+        ? String(payload.id)
+        : null
+
+    const transactionCode =
+      referenceCode || rawTransactionCode || webhookId || String(order.id)
+
+    const result = await this.jobRepository.activateBoostAfterPayment({
+      orderId: order.id,
+      jobId: order.targetId,
+      durationDays,
+      transactionCode,
+    })
+
+    return {
+      success: true,
+      message: 'Đã xác nhận thanh toán SePay và kích hoạt boost',
+      data: {
+        paymentOrderId: result.order.id,
+        jobId: result.job.id,
+        isBoosted: result.job.isBoosted,
+        boostExpiredAt: result.job.boostExpiredAt,
+      },
+    }
+  }
+
+  async confirmBoostPayment(
+    jobId: number,
+    companyId: number,
+    body: ConfirmBoostPaymentRequestDto,
+  ) {
+    const job = await this.jobRepository.findJobById(jobId)
+    if (!job || job.companyId !== companyId) {
+      throw new NotFoundException('Job not found or unauthorized')
+    }
+
+    const order = await this.jobRepository.findPaymentOrderById(body.paymentOrderId)
+
+    if (!order || order.targetId !== jobId) {
+      throw new NotFoundException('Payment order không tồn tại cho job này')
+    }
+
+    if (order.status === PaymentStatus.COMPLETED) {
+      return {
+        success: true,
+        message: 'Đơn thanh toán đã được xác nhận trước đó',
+        data: {
+          jobId,
+          isBoosted: job.isBoosted,
+          boostExpiredAt: job.boostExpiredAt,
+          paymentOrderId: order.id,
+        },
+      }
+    }
+
+    if (order.status !== PaymentStatus.PENDING) {
+      throw new BadRequestException('Chỉ đơn PENDING mới có thể xác nhận')
+    }
+
+    const durationDays = order.amount >= 300000 ? 30 : 7
+
+    const result = await this.jobRepository.activateBoostAfterPayment({
+      orderId: order.id,
+      jobId,
+      durationDays,
+      transactionCode: body.transactionCode,
+    })
+
+    return {
+      success: true,
+      message: 'Thanh toán thành công và đã kích hoạt boost cho job',
+      data: {
+        paymentOrderId: result.order.id,
+        jobId: result.job.id,
+        isBoosted: result.job.isBoosted,
+        boostExpiredAt: result.job.boostExpiredAt,
       },
     }
   }
@@ -182,7 +426,7 @@ export class JobService {
     // 2️⃣ Prepare Job Data
     // ==============================
 
-    const jobData = {
+    const jobData: any = {
       title: dto.title,
       description: dto.description,
       occupationId: dto.occupationId,
@@ -199,7 +443,32 @@ export class JobService {
       expiredAt: dto.expiredAt ? new Date(dto.expiredAt) : undefined, // hoặc set mặc định 30 ngày nếu muốn
 
       companyId,
-      status: JobStatus.WARNING, // hoặc ACTIVE nếu không cần duyệt
+      status: JobStatus.PUBLISHED, // Default to PUBLISHED
+    }
+
+    // AI CONTENT MODERATION
+    try {
+      this.logger.log(`Starting AI moderation for job: ${dto.title}`);
+      const moderationResult = await this.moderationService.moderateJob(
+        dto.title,
+        dto.description,
+      );
+
+      if (moderationResult.status !== ModerationStatus.PASS) {
+        this.logger.warn(
+          `AI REJECTED job as ${moderationResult.status}. Reason: ${moderationResult.reason}`,
+        );
+        throw new BadRequestException(
+          `Tin tuyển dụng bị từ chối do có dấu hiệu ${moderationResult.status === ModerationStatus.SPAM ? 'SPAM' : 'LỪA ĐẢO'} (AI detect): ${moderationResult.reason}. Vui lòng viết lại nội dung nghiêm túc hơn.`,
+        );
+      }
+    } catch (moderationError) {
+      if (moderationError instanceof BadRequestException) {
+        throw moderationError;
+      }
+      this.logger.error('Moderation failed:', moderationError);
+      // Fallback: Nếu AI lỗi kỹ thuật thì cho vào WARNING để manager check, không chặn user
+      jobData.status = JobStatus.WARNING;
     }
 
     // ==============================
@@ -223,11 +492,14 @@ export class JobService {
       return {
         success: true,
         data: created,
+        message: 'Đăng tin tuyển dụng thành công',
       }
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown prisma error'
       console.error(
         '\n\n==== PRISMA ERROR LOG ====\n',
-        error.message,
+        errorMessage,
         '\n==========================\n',
       )
       throw error
@@ -307,83 +579,84 @@ export class JobService {
   }
 
   async applyJob(jobId: number, userId: number, body: ApplyJobRequest) {
-    const jobWithForm = await this.jobRepository.findJobWithApplyForm(jobId)
-
-    if (!jobWithForm) {
+    // Check job exists and published
+    const job = await this.jobRepository.findJobById(jobId)
+    if (!job) {
       throw new NotFoundException('Job not found')
     }
 
-    if (jobWithForm.status !== JobStatus.PUBLISHED) {
+    if (job.status !== JobStatus.PUBLISHED) {
       throw new BadRequestException('Job is not available for apply')
     }
 
-    const form = jobWithForm.applyForms?.[0]
-
-    if (!form) {
-      throw new BadRequestException('Apply form has not been created')
-    }
-
+    // Get form if exists (optional now)
+    const jobWithForm = await this.jobRepository.findJobWithApplyForm(jobId)
+    const form = jobWithForm?.applyForms?.[0]
     const answers = body.answers || []
-    const answerByFieldId = new Map<number, string>()
 
-    for (const answer of answers) {
-      if (answerByFieldId.has(answer.fieldId)) {
+    // Validate answers only if form exists
+    if (form && form.fields.length > 0) {
+      const answerByFieldId = new Map<number, string>()
+
+      for (const answer of answers) {
+        if (answerByFieldId.has(answer.fieldId)) {
+          throw new BadRequestException(
+            `Duplicate answer for fieldId ${answer.fieldId}`,
+          )
+        }
+        answerByFieldId.set(answer.fieldId, answer.value?.trim())
+      }
+
+      for (const field of form.fields) {
+        const value = answerByFieldId.get(field.id)
+
+        if (field.isRequired && !value) {
+          throw new BadRequestException(`Field "${field.label}" is required`)
+        }
+
+        if (value && field.options) {
+          let parsedOptions: string[] = []
+
+          try {
+            const raw = JSON.parse(field.options)
+            if (Array.isArray(raw)) {
+              parsedOptions = raw.map((item: any) => String(item))
+            }
+          } catch {
+            parsedOptions = []
+          }
+
+          if (parsedOptions.length > 0) {
+            const selected =
+              field.fieldType === 'checkbox'
+                ? value
+                  .split(',')
+                  .map((item) => item.trim())
+                  .filter(Boolean)
+                : [value]
+
+            const hasInvalid = selected.some(
+              (item) => !parsedOptions.includes(item),
+            )
+
+            if (hasInvalid) {
+              throw new BadRequestException(
+                `Field "${field.label}" has invalid option`,
+              )
+            }
+          }
+        }
+      }
+
+      const invalidField = answers.find(
+        (answer) => !form.fields.some((field) => field.id === answer.fieldId),
+      )
+
+      if (invalidField) {
         throw new BadRequestException(
-          `Duplicate answer for fieldId ${answer.fieldId}`,
+          `fieldId ${invalidField.fieldId} does not belong to apply form`,
         )
       }
-      answerByFieldId.set(answer.fieldId, answer.value?.trim())
-    }
-
-    for (const field of form.fields) {
-      const value = answerByFieldId.get(field.id)
-
-      if (field.isRequired && !value) {
-        throw new BadRequestException(`Field "${field.label}" is required`)
-      }
-
-      if (value && field.options) {
-        let parsedOptions: string[] = []
-
-        try {
-          const raw = JSON.parse(field.options)
-          if (Array.isArray(raw)) {
-            parsedOptions = raw.map((item: any) => String(item))
-          }
-        } catch {
-          parsedOptions = []
-        }
-
-        if (parsedOptions.length > 0) {
-          const selected =
-            field.fieldType === 'checkbox'
-              ? value
-                .split(',')
-                .map((item) => item.trim())
-                .filter(Boolean)
-              : [value]
-
-          const hasInvalid = selected.some(
-            (item) => !parsedOptions.includes(item),
-          )
-
-          if (hasInvalid) {
-            throw new BadRequestException(
-              `Field "${field.label}" has invalid option`,
-            )
-          }
-        }
-      }
-    }
-
-    const invalidField = answers.find(
-      (answer) => !form.fields.some((field) => field.id === answer.fieldId),
-    )
-
-    if (invalidField) {
-      throw new BadRequestException(
-        `fieldId ${invalidField.fieldId} does not belong to apply form`,
-      )
     }
 
     const payloadAnswers = answers.map((answer) => ({
@@ -502,5 +775,23 @@ export class JobService {
   async updateJobReportStatus(reportId: number, status: ReportStatus) {
     await this.jobRepository.changeJobReportStatus(reportId, status);
     return { success: true };
+  }
+  async getWarningJobs(page = 1, limit = 10) {
+    const { items, total } = await this.jobRepository.getWarningJobs(page, limit)
+    return {
+      success: true,
+      items,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPage: Math.ceil(total / limit),
+      },
+    }
+  }
+
+  async updateJobStatus(jobId: number, status: JobStatus) {
+    const updated = await this.jobRepository.updateJobStatus(jobId, status)
+    return { success: true, data: updated }
   }
 }
