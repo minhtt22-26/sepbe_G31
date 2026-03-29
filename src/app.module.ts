@@ -15,6 +15,7 @@ import { QueueModule } from './infrastructure/queue/queue.module'
 import { QueueTestModule } from './modules/queue-test/queue-test.module'
 import emailConfig from './config/email.config'
 import embeddingConfig from './config/embedding.config'
+import paymentConfig from './config/payment.config'
 import { JobModule } from './modules/job/job.module'
 import { CacheModule } from '@nestjs/cache-manager'
 import { redisStore } from 'cache-manager-redis-store'
@@ -28,7 +29,7 @@ import { AIMatchingModule } from './modules/ai-matching/ai-matching.module'
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, authConfig, emailConfig, embeddingConfig],
+      load: [appConfig, authConfig, emailConfig, embeddingConfig, paymentConfig],
       validate: validateEnv,
     }),
 

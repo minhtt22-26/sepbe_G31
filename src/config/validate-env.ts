@@ -32,6 +32,26 @@ class EnvironmentVariables {
   @IsString()
   JWT_SECRET?: string
 
+  @IsOptional()
+  @IsString()
+  SEPAY_WEBHOOK_API_KEY?: string
+
+  @IsOptional()
+  @IsString()
+  SEPAY_BANK_CODE?: string
+
+  @IsOptional()
+  @IsString()
+  SEPAY_ACCOUNT_NUMBER?: string
+
+  @IsOptional()
+  @IsString()
+  SEPAY_ACCOUNT_NAME?: string
+
+  @IsOptional()
+  @IsString()
+  SEPAY_ORDER_PREFIX?: string
+
   @IsString()
   REDIS_URL: string
 }

@@ -1,10 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
 import {
-    ArrayNotEmpty,
     IsArray,
     IsInt,
     IsNotEmpty,
+    IsOptional,
     IsString,
     Min,
     ValidateNested,
@@ -24,10 +24,10 @@ export class ApplyJobAnswerRequest {
 }
 
 export class ApplyJobRequest {
-    @ApiProperty({ type: [ApplyJobAnswerRequest] })
+    @ApiProperty({ type: [ApplyJobAnswerRequest], required: false })
     @IsArray()
-    @ArrayNotEmpty()
+    @IsOptional()
     @ValidateNested({ each: true })
     @Type(() => ApplyJobAnswerRequest)
-    answers: ApplyJobAnswerRequest[]
+    answers?: ApplyJobAnswerRequest[]
 }

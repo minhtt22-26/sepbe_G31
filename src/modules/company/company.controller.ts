@@ -98,7 +98,7 @@ export class CompanyController {
   }
 
   @Get('status/:status')
-  @AuthRoleProtected(EnumUserRole.EMPLOYER)
+  @AuthRoleProtected(EnumUserRole.EMPLOYER, EnumUserRole.MANAGER)
   @ApiOperation({ summary: 'List companies by status' })
   @ApiParam({
     name: 'status',

@@ -11,6 +11,7 @@ import {
   ParseIntPipe,
   ParseEnumPipe,
   BadRequestException,
+  Headers,
 } from '@nestjs/common'
 import { JobService } from '../service/job.service'
 import { CreateJobRequest } from '../dtos/request/create-job.request'
@@ -28,6 +29,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger'
 import { ApplyJobRequest } from '../dtos/request/apply-job.request'
+import { BoostCheckoutRequestDto } from '../dtos/request/boost-checkout.request'
+import { ConfirmBoostPaymentRequestDto } from '../dtos/request/confirm-boost-payment.request'
 import {
   AuthJwtAccessProtected,
   AuthJwtPayload,
@@ -52,6 +55,25 @@ export class JobController {
   @ApiResponse({ status: 200, description: 'Jobs retrieved successfully' })
   async search(@Query() q: JobSearchDto) {
     return this.jobService.searchJobs(q)
+  }
+
+  @Get('boosted')
+  @ApiOperation({ summary: 'Get boosted jobs' })
+  @ApiResponse({ status: 200, description: 'Boosted jobs retrieved successfully' })
+  async getBoostedJobs(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.jobService.getBoostedJobs(Number(page) || 1, Number(limit) || 10)
+  }
+
+  @Post('boost/sepay/webhook')
+  @ApiOperation({ summary: 'SePay webhook callback for boost payments' })
+  async handleSepayWebhook(
+    @Headers('authorization') authorization?: string,
+    @Body() body?: Record<string, unknown>,
+  ) {
+    return this.jobService.handleSepayWebhook(authorization, body)
   }
 
   @AuthJwtAccessProtected()
@@ -150,7 +172,6 @@ export class JobController {
   }
 
   @Post(':id/apply')
-  @AuthRoleProtected(EnumUserRole.WORKER)
   @ApiOperation({ summary: 'Apply job with form answers' })
   @ApiBearerAuth('access-token')
   @ApiParam({ name: 'id', type: Number, example: 1, description: 'Job ID' })
@@ -188,7 +209,6 @@ export class JobController {
   }
 
   @Patch(':id/cancel-apply')
-  @AuthRoleProtected(EnumUserRole.WORKER)
   @ApiOperation({ summary: 'Cancel applied job' })
   @ApiBearerAuth('access-token')
   @ApiParam({ name: 'id', type: Number, example: 1, description: 'Job ID' })
@@ -213,6 +233,36 @@ export class JobController {
     const ownerId = user.userId
     const company = await this.companyService.findByOwnerId(ownerId)
     return this.jobService.updateJob(id, body, company.id)
+  }
+
+  @Post(':id/boost/checkout')
+  @AuthJwtAccessProtected()
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Create boost payment order for a job' })
+  async createBoostCheckout(
+    @AuthJwtPayload() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: BoostCheckoutRequestDto,
+  ) {
+    const ownerId = user.userId
+    const company = await this.companyService.findByOwnerId(ownerId)
+    return this.jobService.createBoostCheckout(id, company.id, body)
+  }
+
+  @Post(':id/boost/confirm')
+  @AuthJwtAccessProtected()
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Confirm boost payment and activate boosted job' })
+  async confirmBoostPayment(
+    @AuthJwtPayload() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: ConfirmBoostPaymentRequestDto,
+  ) {
+    const ownerId = user.userId
+    const company = await this.companyService.findByOwnerId(ownerId)
+    return this.jobService.confirmBoostPayment(id, company.id, body)
   }
 
   // DELETE JOB
