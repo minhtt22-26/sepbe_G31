@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common'
 import {
-  CompanyStatus,
   JobApplicationStatus,
   JobStatus,
   PaymentStatus,
