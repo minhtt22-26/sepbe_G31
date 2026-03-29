@@ -30,12 +30,19 @@ import { AdminModule } from './modules/admin/admin.module'
 import { APP_GUARD } from '@nestjs/core'
 import { UserStatusGuard } from './common/guards/user-status.guard'
 import { AuthUserMiddleware } from './common/middleware/auth-user.middleware'
+import { StatisticsModule } from './modules/statistics/statistics.module'
 @Module({
   imports: [
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, authConfig, emailConfig, embeddingConfig, paymentConfig],
+      load: [
+        appConfig,
+        authConfig,
+        emailConfig,
+        embeddingConfig,
+        paymentConfig,
+      ],
       validate: validateEnv,
     }),
 
@@ -90,6 +97,7 @@ import { AuthUserMiddleware } from './common/middleware/auth-user.middleware'
     EmbeddingModule,
     AIMatchingModule,
     AdminModule,
+    StatisticsModule,
   ],
   controllers: [],
   providers: [
