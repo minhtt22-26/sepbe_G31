@@ -4,8 +4,11 @@ import {
   Get,
   Post,
   Put,
+  Query,
   UploadedFile,
   UseInterceptors,
+  Param,
+  ParseIntPipe,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { ApiBearerAuth, ApiConsumes, ApiOperation } from '@nestjs/swagger'
@@ -13,6 +16,7 @@ import { UserService } from '../service/user.service'
 import { UserSignUpRequestDto } from '../dtos/request/user.sign-up.request.dto'
 import { UserLoginResponseDto } from '../dtos/response/user.login.response.dto'
 import { UserLoginRequestDto } from '../dtos/request/user.login.request.dto'
+import { UserListRequestDto } from '../dtos/request/user.list.request.dto'
 import {
   AuthJwtRefreshProtected,
   AuthJwtPayload,
@@ -32,10 +36,10 @@ import { WorkerProfileRequestDto } from '../dtos/request/user.profile.request.dt
 import { UserInfoRequestDto } from '../dtos/request/user.info.request.dto'
 import { UserChangePasswordRequestDto } from '../dtos/request/user.change-passwrod.dto'
 import { WorkerProfileWithOccupation } from '../interfaces/worker-profile.interface'
-
+import { UserUpdateStatusRequestDto } from '../dtos/request/user.update-status.request.dto'
 @Controller('user')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(private readonly userService: UserService) { }
 
   @Post('sign-up')
   async signUp(@Body() body: UserSignUpRequestDto): Promise<void> {
@@ -215,5 +219,18 @@ export class UserController {
     @AuthJwtPayload('userId') userId: number,
   ): Promise<User> {
     return await this.userService.userDeleteAccount(userId)
+  }
+
+  @Get('list')
+  async getUserList(@Query() query: UserListRequestDto) {
+    return await this.userService.getUserList(query)
+  }
+
+  @Put(':userId/status')
+  async updateUserStatus(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Body() body: UserUpdateStatusRequestDto,
+  ): Promise<User> {
+    return await this.userService.updateUserStatus(userId, body.status)
   }
 }
