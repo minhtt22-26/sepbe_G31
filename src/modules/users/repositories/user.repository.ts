@@ -15,13 +15,14 @@ import { HelperService } from 'src/common/helper/service/helper.service'
 import { WorkerProfileRequestDto } from '../dtos/request/user.profile.request.dto'
 import { UserInfoRequestDto } from '../dtos/request/user.info.request.dto'
 import { WorkerProfileWithOccupation } from '../interfaces/worker-profile.interface'
+import { UserListRequestDto } from '../dtos/request/user.list.request.dto'
 
 @Injectable()
 export class UserRepository {
   constructor(
     private readonly prisma: PrismaService,
     private readonly helperService: HelperService,
-  ) {}
+  ) { }
 
   async findUserWithByEmail(email: string): Promise<User | null> {
     return this.prisma.user.findUnique({
@@ -261,6 +262,67 @@ export class UserRepository {
         status: EnumUserStatus.DELETED,
         email: email ? `deleted_${timestamp}_${email}` : null,
         userName: userName ? `deleted_${timestamp}_${userName}` : null,
+      },
+    })
+  }
+
+  async getUserList(filters: UserListRequestDto) {
+    const { page, role, status, fromDate, toDate } = filters
+    const limit = 20
+    const skip = (page - 1) * limit
+
+    const andConditions: Prisma.UserWhereInput[] = [
+      { role: { not: EnumUserRole.ADMIN } },
+    ]
+
+    if (role) {
+      andConditions.push({ role })
+    }
+
+    if (status) {
+      andConditions.push({ status })
+    }
+
+    if (fromDate || toDate) {
+      const createdAtFilter: Prisma.DateTimeFilter = {}
+      if (fromDate) {
+        createdAtFilter.gte = new Date(fromDate)
+      }
+      if (toDate) {
+        createdAtFilter.lte = new Date(toDate)
+      }
+      andConditions.push({ createdAt: createdAtFilter })
+    }
+
+    const where: Prisma.UserWhereInput = { AND: andConditions }
+
+    const [users, totalItems] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.user.count({ where }),
+    ])
+
+    return {
+      users,
+      totalItems,
+      totalPages: Math.ceil(totalItems / limit),
+      page,
+      size: limit,
+    }
+  }
+  async updateUserStatus(
+    userId: number,
+    status: EnumUserStatus,
+  ): Promise<User> {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        status,
+        updatedAt: new Date(),
       },
     })
   }

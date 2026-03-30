@@ -12,6 +12,7 @@ import { UserSignUpRequestDto } from '../dtos/request/user.sign-up.request.dto'
 import { AuthUtil } from 'src/modules/auth/utils/auth.utils'
 import { UserLoginRequestDto } from '../dtos/request/user.login.request.dto'
 import { UserLoginResponseDto } from '../dtos/response/user.login.response.dto'
+import { UserListRequestDto } from '../dtos/request/user.list.request.dto'
 import {
   EnumUserLoginWith,
   EnumUserRole,
@@ -50,7 +51,7 @@ export class UserService {
     // private readonly embeddingQueueService: EmbeddingQueueService,
     @Inject(forwardRef(() => AIMatchingService))
     private readonly aiMatchingService: AIMatchingService,
-  ) {}
+  ) { }
 
   async signUp({
     userName,
@@ -517,5 +518,47 @@ export class UserService {
     )
 
     return userUpdate
+  }
+
+  async getUserList(filters: UserListRequestDto) {
+    const result = await this.userRepository.getUserList(filters)
+
+    const data = result.users.map((user) => ({
+      id: user.id,
+      name: user.fullName,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      createdDate: user.createdAt.toISOString(),
+    }))
+
+    return {
+      data,
+      page: result.page,
+      size: result.size,
+      totalItems: result.totalItems,
+      totalPages: result.totalPages,
+    }
+  }
+  async updateUserStatus(userId: number, status: EnumUserStatus): Promise<User> {
+    const user = await this.userRepository.findOneById(userId)
+
+    if (!user) {
+      throw new NotFoundException({
+        message: 'Không tìm thấy người dùng này', // User not found
+      })
+    }
+
+    if (status !== EnumUserStatus.ACTIVE && status !== EnumUserStatus.DELETED) {
+      throw new BadRequestException({
+        message: 'Trạng thái không hợp lệ', // Invalid status value
+      })
+    }
+
+    if (user.status === status) {
+      return user
+    }
+
+    return this.userRepository.updateUserStatus(userId, status)
   }
 }
