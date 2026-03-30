@@ -7,6 +7,7 @@ import {
   forwardRef,
   UnauthorizedException,
 } from '@nestjs/common'
+import { Cron, CronExpression } from '@nestjs/schedule'
 import { JobRepository } from '../repositories/job.repository'
 import { CreateJobRequest } from '../dtos/request/create-job.request'
 import { UpdateJobRequest } from '../dtos/request/update-job.request'
@@ -794,4 +795,17 @@ export class JobService {
     const updated = await this.jobRepository.updateJobStatus(jobId, status)
     return { success: true, data: updated }
   }
+
+  @Cron(CronExpression.EVERY_HOUR)
+  async handleExpiredJobs() {
+    try {
+      const result = await this.jobRepository.markExpiredJobs();
+      if (result.count > 0) {
+        this.logger.log(`Auto-expired ${result.count} jobs`);
+      }
+    } catch (error) {
+      this.logger.error('Error auto-expiring jobs', error);
+    }
+  }
+
 }
