@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { appConfig } from './config/app.config'
 import { HealthModule } from './modules/health/health.module'
@@ -25,6 +25,9 @@ import { TermsConditionsModule } from './modules/terms-conditions/terms-conditio
 import { ChatModule } from './modules/chat/chat.module'
 import { EmbeddingModule } from './modules/embedding/embedding.module'
 import { AIMatchingModule } from './modules/ai-matching/ai-matching.module'
+import { APP_GUARD } from '@nestjs/core'
+import { UserStatusGuard } from './common/guards/user-status.guard'
+import { AuthUserMiddleware } from './common/middleware/auth-user.middleware'
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -85,6 +88,15 @@ import { AIMatchingModule } from './modules/ai-matching/ai-matching.module'
     AIMatchingModule,
   ],
   controllers: [],
-  providers: [],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: UserStatusGuard,
+    },
+  ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(AuthUserMiddleware).forRoutes('*')
+  }
+}
