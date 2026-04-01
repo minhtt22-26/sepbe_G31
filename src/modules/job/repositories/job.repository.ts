@@ -549,6 +549,7 @@ export class JobRepository {
                 experienceYear: true,
                 expectedSalary: true,
                 shift: true,
+                bio: true,
                 occupation: {
                   select: {
                     name: true,
@@ -755,8 +756,23 @@ export class JobRepository {
       }
     })
   }
-  
-  
+
+  async markExpiredJobs() {
+    return this.prisma.job.updateMany({
+      where: {
+        expiredAt: {
+          lt: new Date(),
+        },
+        status: {
+          notIn: [JobStatus.EXPIRED, JobStatus.DELETED],
+        },
+      },
+      data: {
+        status: JobStatus.EXPIRED,
+      },
+    });
+  }
+
   async getWarningJobs(page: number, limit: number) {
     const skip = (page - 1) * limit
     const [items, total] = await this.prisma.$transaction([

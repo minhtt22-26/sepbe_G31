@@ -268,6 +268,7 @@ export class JobController {
     return this.jobService.confirmBoostPayment(id, company.id, body)
   }
 
+
   // DELETE JOB
   @Delete(':id')
   @AuthRoleProtected(EnumUserRole.EMPLOYER)

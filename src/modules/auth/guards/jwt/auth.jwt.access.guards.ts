@@ -14,12 +14,13 @@ export class AuthJwtAccessGuard extends
         super()
     }
 
-    handleRequest<T = IAuthAccessTokenPayload>(
+    // @ts-ignore
+    async handleRequest<T = IAuthAccessTokenPayload>(
         err: Error,
         user: IAuthAccessTokenPayload,
         info: Error,
-    ): T {
-        return this.authService.validateJwtAccessGuard(err, user, info) as T
+    ): Promise<T> {
+        return (await this.authService.validateJwtAccessGuard(err, user, info)) as T
     }
 
 

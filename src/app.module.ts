@@ -25,11 +25,15 @@ import { TermsConditionsModule } from './modules/terms-conditions/terms-conditio
 import { ChatModule } from './modules/chat/chat.module'
 import { EmbeddingModule } from './modules/embedding/embedding.module'
 import { AIMatchingModule } from './modules/ai-matching/ai-matching.module'
+import { ScheduleModule } from '@nestjs/schedule'
+import { AdminModule } from './modules/admin/admin.module'
+
 import { APP_GUARD } from '@nestjs/core'
 import { UserStatusGuard } from './common/guards/user-status.guard'
 import { AuthUserMiddleware } from './common/middleware/auth-user.middleware'
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
       load: [appConfig, authConfig, emailConfig, embeddingConfig, paymentConfig],
@@ -86,6 +90,7 @@ import { AuthUserMiddleware } from './common/middleware/auth-user.middleware'
     ChatModule,
     EmbeddingModule,
     AIMatchingModule,
+    AdminModule,
   ],
   controllers: [],
   providers: [
