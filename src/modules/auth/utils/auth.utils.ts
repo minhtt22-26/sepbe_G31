@@ -184,6 +184,16 @@ export class AuthUtil {
     return this.jwtService.decode<T>(token)
   }
 
+  async verifyAccessToken<T extends object = IAuthAccessTokenPayload>(
+    token: string,
+  ): Promise<T> {
+    return this.jwtService.verifyAsync<T>(token, {
+      secret: this.jwtAccessTokenSecret,
+      audience: this.jwtAudience,
+      issuer: this.jwtIssuer,
+    })
+  }
+
   //Password
 
   //Password Hash

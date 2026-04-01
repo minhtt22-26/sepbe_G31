@@ -3,9 +3,10 @@ import { TermsConditionsController } from './controller/terms-conditions.control
 import { TermsConditionsService } from './service/terms-conditions.service'
 import { TermsConditionsRepository } from './repositories/terms-conditions.repository'
 import { PrismaModule } from 'src/prisma.module'
+import { AuthModule } from '../auth/auth.module'
 
 @Module({
-    imports: [PrismaModule],
+    imports: [PrismaModule, AuthModule],
     controllers: [TermsConditionsController],
     providers: [TermsConditionsService, TermsConditionsRepository],
     exports: [TermsConditionsService],
