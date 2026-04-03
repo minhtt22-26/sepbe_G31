@@ -1,5 +1,5 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common'
-import { ConfigModule, ConfigService } from '@nestjs/config'
+import { ConfigModule } from '@nestjs/config'
 import { appConfig } from './config/app.config'
 import { HealthModule } from './modules/health/health.module'
 import { AuthModule } from './modules/auth/auth.module'
@@ -47,7 +47,7 @@ import { StatisticsModule } from './modules/statistics/statistics.module'
       validate: validateEnv,
     }),
 
-/*
+    /*
     CacheModule.registerAsync({
       isGlobal: true,
       inject: [ConfigService],

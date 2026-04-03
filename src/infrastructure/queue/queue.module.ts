@@ -1,16 +1,4 @@
 import { Global, Module } from '@nestjs/common'
-import { BullModule } from '@nestjs/bull'
-import { ConfigService } from '@nestjs/config'
-import {
-  EmailQueueService,
-  QUEUE_EMAIL,
-} from './email/service/email-queue.service'
-import { EmailQueueProcessor } from './email/processors/email-queue.processor'
-import {
-  EmbeddingQueueService,
-  QUEUE_EMBEDDING,
-} from './embedding/service/embedding-queue.service'
-import { EmbeddingQueueProcessor } from './embedding/processors/embedding-queue.processors'
 import { AIMatchingModule } from 'src/modules/ai-matching/ai-matching.module'
 
 @Global()
@@ -48,6 +36,8 @@ import { AIMatchingModule } from 'src/modules/ai-matching/ai-matching.module'
     // EmbeddingQueueService,
     // EmbeddingQueueProcessor,
   ],
-  exports: [/* EmailQueueService, EmbeddingQueueService */],
+  exports: [
+    /* EmailQueueService, EmbeddingQueueService */
+  ],
 })
 export class QueueModule {}
