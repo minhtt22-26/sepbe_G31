@@ -56,7 +56,6 @@ class EnvironmentVariables {
   REDIS_URL: string
 }
 
-
 export function validateEnv(config: Record<string, unknown>) {
   const validatedConfig = plainToInstance(EnvironmentVariables, config, {
     enableImplicitConversion: true,

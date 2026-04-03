@@ -16,6 +16,7 @@ import { AIMatchingModule } from 'src/modules/ai-matching/ai-matching.module'
 @Global()
 @Module({
   imports: [
+    /*
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
@@ -38,14 +39,15 @@ import { AIMatchingModule } from 'src/modules/ai-matching/ai-matching.module'
         name: QUEUE_EMBEDDING,
       },
     ),
+    */
     AIMatchingModule,
   ],
   providers: [
-    EmailQueueService,
-    EmailQueueProcessor,
-    EmbeddingQueueService,
-    EmbeddingQueueProcessor,
+    // EmailQueueService,
+    // EmailQueueProcessor,
+    // EmbeddingQueueService,
+    // EmbeddingQueueProcessor,
   ],
-  exports: [EmailQueueService, EmbeddingQueueService],
+  exports: [/* EmailQueueService, EmbeddingQueueService */],
 })
 export class QueueModule {}
