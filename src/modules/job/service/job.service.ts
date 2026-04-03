@@ -20,9 +20,13 @@ import {
   ReportStatus,
 } from 'src/generated/prisma/enums'
 import { ApplyJobRequest } from '../dtos/request/apply-job.request'
+import { GetJobsByEmployerDto } from '../dtos/request/get-jobs-employer.dto'
 import { JOB_CONSTANTS } from '../constant/job.constant'
 import { AIMatchingService } from 'src/modules/ai-matching/service/ai-matching.service'
-import { JobModerationService, ModerationStatus } from './job-moderation.service'
+import {
+  JobModerationService,
+  ModerationStatus,
+} from './job-moderation.service'
 // import { EmbeddingQueueService } from 'src/infrastructure/queue/embedding/service/embedding-queue.service'
 import { JobReportDto } from '../dtos/job.report.request.dto'
 import { BoostCheckoutRequestDto } from '../dtos/request/boost-checkout.request'
@@ -44,7 +48,7 @@ export class JobService {
     @Inject(forwardRef(() => AIMatchingService))
     private readonly aiMatchingService: AIMatchingService,
     private readonly moderationService: JobModerationService,
-  ) { }
+  ) {}
 
   async searchJobs(q: any) {
     await this.jobRepository.deactivateExpiredBoosts()
@@ -167,7 +171,9 @@ export class JobService {
     }
 
     if (body.paymentMethod && body.paymentMethod !== PaymentMethod.SEPAY) {
-      throw new BadRequestException('Hiện tại chỉ hỗ trợ thanh toán boost qua SEPAY')
+      throw new BadRequestException(
+        'Hiện tại chỉ hỗ trợ thanh toán boost qua SEPAY',
+      )
     }
 
     const amount = body.amount ?? defaultAmount
@@ -200,7 +206,8 @@ export class JobService {
         accountNumber: checkout.accountNumber,
         accountName: checkout.accountName,
       },
-      message: 'Đã tạo đơn boost. Hãy thanh toán bằng QR/chuyển khoản đúng nội dung để SePay tự xác nhận.',
+      message:
+        'Đã tạo đơn boost. Hãy thanh toán bằng QR/chuyển khoản đúng nội dung để SePay tự xác nhận.',
     }
   }
 
@@ -209,7 +216,9 @@ export class JobService {
     payload?: Record<string, unknown>,
   ) {
     if (!this.sepayService.isValidWebhookAuthorization(authorizationHeader)) {
-      throw new UnauthorizedException('SePay webhook authorization không hợp lệ')
+      throw new UnauthorizedException(
+        'SePay webhook authorization không hợp lệ',
+      )
     }
 
     if (!payload || typeof payload !== 'object') {
@@ -226,7 +235,10 @@ export class JobService {
 
     const orderId = this.sepayService.extractOrderIdFromPayload(payload)
     if (!orderId) {
-      return { success: true, message: 'Bỏ qua giao dịch không chứa mã boost hợp lệ' }
+      return {
+        success: true,
+        message: 'Bỏ qua giao dịch không chứa mã boost hợp lệ',
+      }
     }
 
     const order = await this.jobRepository.findPaymentOrderById(orderId)
@@ -263,7 +275,9 @@ export class JobService {
     const referenceCode =
       typeof payload.referenceCode === 'string' ? payload.referenceCode : null
     const rawTransactionCode =
-      typeof payload.transactionCode === 'string' ? payload.transactionCode : null
+      typeof payload.transactionCode === 'string'
+        ? payload.transactionCode
+        : null
     const webhookId =
       typeof payload.id === 'number' || typeof payload.id === 'string'
         ? String(payload.id)
@@ -301,7 +315,9 @@ export class JobService {
       throw new NotFoundException('Job not found or unauthorized')
     }
 
-    const order = await this.jobRepository.findPaymentOrderById(body.paymentOrderId)
+    const order = await this.jobRepository.findPaymentOrderById(
+      body.paymentOrderId,
+    )
 
     if (!order || order.targetId !== jobId) {
       throw new NotFoundException('Payment order không tồn tại cho job này')
@@ -449,27 +465,27 @@ export class JobService {
 
     // AI CONTENT MODERATION
     try {
-      this.logger.log(`Starting AI moderation for job: ${dto.title}`);
+      this.logger.log(`Starting AI moderation for job: ${dto.title}`)
       const moderationResult = await this.moderationService.moderateJob(
         dto.title,
         dto.description,
-      );
+      )
 
       if (moderationResult.status !== ModerationStatus.PASS) {
         this.logger.warn(
           `AI REJECTED job as ${moderationResult.status}. Reason: ${moderationResult.reason}`,
-        );
+        )
         throw new BadRequestException(
           `Tin tuyển dụng bị từ chối do có dấu hiệu ${moderationResult.status === ModerationStatus.SPAM ? 'SPAM' : 'LỪA ĐẢO'} (AI detect): ${moderationResult.reason}. Vui lòng viết lại nội dung nghiêm túc hơn.`,
-        );
+        )
       }
     } catch (moderationError) {
       if (moderationError instanceof BadRequestException) {
-        throw moderationError;
+        throw moderationError
       }
-      this.logger.error('Moderation failed:', moderationError);
+      this.logger.error('Moderation failed:', moderationError)
       // Fallback: Nếu AI lỗi kỹ thuật thì cho vào WARNING để manager check, không chặn user
-      jobData.status = JobStatus.WARNING;
+      jobData.status = JobStatus.WARNING
     }
 
     // ==============================
@@ -517,7 +533,7 @@ export class JobService {
     const update = await this.jobRepository.updateJobFull(jobId, dto)
 
     /* Queue-based (tạm comment):
-    this.embeddingQueueService.queueJobEmbedding(jobId)
+    // this.embeddingQueueService.queueJobEmbedding(jobId)
     */
 
     // Gọi trực tiếp embedding (không qua queue)
@@ -631,9 +647,9 @@ export class JobService {
             const selected =
               field.fieldType === 'checkbox'
                 ? value
-                  .split(',')
-                  .map((item) => item.trim())
-                  .filter(Boolean)
+                    .split(',')
+                    .map((item) => item.trim())
+                    .filter(Boolean)
                 : [value]
 
             const hasInvalid = selected.some(
@@ -690,8 +706,13 @@ export class JobService {
     return { success: true, data: applications }
   }
 
-  async updateApplicationStatus(applicationId: number, companyId: number, status: JobApplicationStatus) {
-    const application = await this.jobRepository.findApplicationById(applicationId)
+  async updateApplicationStatus(
+    applicationId: number,
+    companyId: number,
+    status: JobApplicationStatus,
+  ) {
+    const application =
+      await this.jobRepository.findApplicationById(applicationId)
     if (!application) {
       throw new NotFoundException('Application not found')
     }
@@ -750,10 +771,20 @@ export class JobService {
     return relatedJobs
   }
 
-  async getAllJobReport(userId: number, status: ReportStatus, page: number, limit: number) {
-    const allJobReports = await this.jobRepository.getAllJobReport(userId, status, page, limit)
+  async getAllJobReport(
+    userId: number,
+    status: ReportStatus,
+    page: number,
+    limit: number,
+  ) {
+    const allJobReports = await this.jobRepository.getAllJobReport(
+      userId,
+      status,
+      page,
+      limit,
+    )
     if (!allJobReports) {
-      throw new NotFoundException("The job report list is empty!")
+      throw new NotFoundException('The job report list is empty!')
     }
     return allJobReports
   }
@@ -765,20 +796,54 @@ export class JobService {
       throw new NotFoundException('Job not found')
     }
 
-    const existingReport = await this.jobRepository.findJobReport(userId, dto.jobId)
+    const existingReport = await this.jobRepository.findJobReport(
+      userId,
+      dto.jobId,
+    )
     if (existingReport) {
       throw new BadRequestException('You have already reported this job')
     }
 
-    return this.jobRepository.createJobReport(userId, dto);
+    return this.jobRepository.createJobReport(userId, dto)
   }
 
   async updateJobReportStatus(reportId: number, status: ReportStatus) {
-    await this.jobRepository.changeJobReportStatus(reportId, status);
-    return { success: true };
+    await this.jobRepository.changeJobReportStatus(reportId, status)
+    return { success: true }
+  }
+
+  async getJobsByEmployer(companyId: number, query: GetJobsByEmployerDto) {
+    const page = query.page || 1
+    const limit = query.limit || 10
+    const skip = (page - 1) * limit
+    const status = query.status
+    const fetchAll = query.fetchAll
+
+    const { items, total } = await this.jobRepository.getJobsByCompanyId({
+      companyId,
+      status,
+      limit: fetchAll ? undefined : limit,
+      skip: fetchAll ? undefined : skip,
+    })
+
+    return {
+      success: true,
+      items,
+      meta: fetchAll
+        ? undefined
+        : {
+            page,
+            limit,
+            total,
+            totalPage: Math.ceil(total / limit),
+          },
+    }
   }
   async getWarningJobs(page = 1, limit = 10) {
-    const { items, total } = await this.jobRepository.getWarningJobs(page, limit)
+    const { items, total } = await this.jobRepository.getWarningJobs(
+      page,
+      limit,
+    )
     return {
       success: true,
       items,
@@ -799,13 +864,12 @@ export class JobService {
   @Cron(CronExpression.EVERY_HOUR)
   async handleExpiredJobs() {
     try {
-      const result = await this.jobRepository.markExpiredJobs();
+      const result = await this.jobRepository.markExpiredJobs()
       if (result.count > 0) {
-        this.logger.log(`Auto-expired ${result.count} jobs`);
+        this.logger.log(`Auto-expired ${result.count} jobs`)
       }
     } catch (error) {
-      this.logger.error('Error auto-expiring jobs', error);
+      this.logger.error('Error auto-expiring jobs', error)
     }
   }
-
 }

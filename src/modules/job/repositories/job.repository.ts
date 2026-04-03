@@ -11,7 +11,7 @@ import { PrismaService } from 'src/prisma.service'
 
 @Injectable()
 export class JobRepository {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
   async createJobWithForm(data: any) {
     const occupation = await this.prisma.occupation.findUnique({
       where: { id: data.jobData.occupationId },
@@ -73,6 +73,18 @@ export class JobRepository {
               logoUrl: true,
             },
           },
+          occupation: {
+            select: {
+              id: true,
+              name: true,
+              sector: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
         },
       }),
       this.prisma.job.count({ where }),
@@ -129,6 +141,45 @@ export class JobRepository {
           OR: [{ boostExpiredAt: null }, { boostExpiredAt: { gt: now } }],
         },
       }),
+    ])
+
+    return { items, total }
+  }
+
+  async getJobsByCompanyId(params: {
+    companyId: number
+    status?: JobStatus
+    limit?: number
+    skip?: number
+  }) {
+    const { companyId, status, limit, skip } = params
+
+    const where: any = {
+      companyId,
+      status: status ? status : { not: JobStatus.DELETED },
+    }
+
+    const queryArgs: any = {
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        occupation: {
+          select: { id: true, name: true },
+        },
+        _count: {
+          select: { applications: true },
+        },
+      },
+    }
+
+    if (limit !== undefined && skip !== undefined) {
+      queryArgs.take = limit
+      queryArgs.skip = skip
+    }
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.job.findMany(queryArgs),
+      this.prisma.job.count({ where }),
     ])
 
     return { items, total }
@@ -583,7 +634,10 @@ export class JobRepository {
     })
   }
 
-  async updateApplicationStatus(applicationId: number, status: JobApplicationStatus) {
+  async updateApplicationStatus(
+    applicationId: number,
+    status: JobApplicationStatus,
+  ) {
     return this.prisma.jobApplication.update({
       where: { id: applicationId },
       data: { status },
@@ -706,10 +760,15 @@ export class JobRepository {
       },
     })
   }
-  async getAllJobReport(userId: number, status: ReportStatus, page: number, limit: number) {
-    const pageNum = Number(page) || 1;
-    const limitNum = Number(limit) || 10;
-    const skip = (pageNum - 1) * limitNum;
+  async getAllJobReport(
+    userId: number,
+    status: ReportStatus,
+    page: number,
+    limit: number,
+  ) {
+    const pageNum = Number(page) || 1
+    const limitNum = Number(limit) || 10
+    const skip = (pageNum - 1) * limitNum
     const [data, total] = await this.prisma.$transaction([
       this.prisma.jobReport.findMany({
         where: { status: status },
@@ -752,8 +811,8 @@ export class JobRepository {
     return this.prisma.jobReport.update({
       where: { id: jobId },
       data: {
-        status: status
-      }
+        status: status,
+      },
     })
   }
 
@@ -770,7 +829,7 @@ export class JobRepository {
       data: {
         status: JobStatus.EXPIRED,
       },
-    });
+    })
   }
 
   async getWarningJobs(page: number, limit: number) {

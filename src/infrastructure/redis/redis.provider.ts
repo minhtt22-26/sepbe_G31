@@ -20,7 +20,7 @@ export const redisProvider: Provider = {
     client.on('connect', () => console.log('[Redis] ✓ Connected to Redis'))
     client.on('ready', () => console.log('[Redis] ✓ Redis ready'))
 
-    await client.connect()
+    // await client.connect()
     return client
   },
   inject: [ConfigService],

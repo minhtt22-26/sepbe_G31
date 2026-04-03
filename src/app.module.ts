@@ -11,14 +11,13 @@ import { UserModule } from './modules/users/user.module'
 import { CompanyModule } from './modules/company/company.module'
 import { NotificationsModule } from './modules/notifications/notifications.module'
 import { EmailModule } from './infrastructure/email/email.module'
-import { QueueModule } from './infrastructure/queue/queue.module'
-import { QueueTestModule } from './modules/queue-test/queue-test.module'
+// import { QueueModule } from './infrastructure/queue/queue.module'
+// import { QueueTestModule } from './modules/queue-test/queue-test.module'
 import emailConfig from './config/email.config'
 import embeddingConfig from './config/embedding.config'
 import paymentConfig from './config/payment.config'
 import { JobModule } from './modules/job/job.module'
-import { CacheModule } from '@nestjs/cache-manager'
-import { redisStore } from 'cache-manager-redis-store'
+// import { redisStore } from 'cache-manager-redis-store'
 import { OccupationModule } from './modules/occupation/occupation.module'
 import { SectorModule } from './modules/sector/sector.module'
 import { TermsConditionsModule } from './modules/terms-conditions/terms-conditions.module'
@@ -31,15 +30,24 @@ import { AdminModule } from './modules/admin/admin.module'
 import { APP_GUARD } from '@nestjs/core'
 import { UserStatusGuard } from './common/guards/user-status.guard'
 import { AuthUserMiddleware } from './common/middleware/auth-user.middleware'
+import { StatisticsModule } from './modules/statistics/statistics.module'
+// import { CacheModule } from '@nestjs/cache-manager'
 @Module({
   imports: [
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, authConfig, emailConfig, embeddingConfig, paymentConfig],
+      load: [
+        appConfig,
+        authConfig,
+        emailConfig,
+        embeddingConfig,
+        paymentConfig,
+      ],
       validate: validateEnv,
     }),
 
+/*
     CacheModule.registerAsync({
       isGlobal: true,
       inject: [ConfigService],
@@ -67,12 +75,17 @@ import { AuthUserMiddleware } from './common/middleware/auth-user.middleware'
           throw new Error(
             `Cache initialization failed: ${error?.message || error}`,
           )
+          // return {
+          //   store: 'memory',
+          //   ttl: 600000,
+          // }
         }
       },
     }),
+    */
 
     // Queue module - import early to avoid circular dependencies
-    QueueModule,
+    // QueueModule,
 
     HealthModule,
     AuthModule,
@@ -82,7 +95,7 @@ import { AuthUserMiddleware } from './common/middleware/auth-user.middleware'
     CompanyModule,
     NotificationsModule,
     EmailModule,
-    QueueTestModule,
+    // QueueTestModule,
     JobModule,
     OccupationModule,
     SectorModule,
@@ -91,6 +104,7 @@ import { AuthUserMiddleware } from './common/middleware/auth-user.middleware'
     EmbeddingModule,
     AIMatchingModule,
     AdminModule,
+    StatisticsModule,
   ],
   controllers: [],
   providers: [

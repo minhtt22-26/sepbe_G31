@@ -25,6 +25,16 @@ export class AIMatchingController {
     return this.aiMatchingService.getMatchedJobs(userId, Number(limit) || 10)
   }
 
+  @Get('workers')
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
+  async getSuggestedWorkers(
+    @Query('jobId') jobId: number,
+    @Query('limit') limit?: number,
+  ) {
+    console.log(jobId)
+    return this.aiMatchingService.getSuggestedWorkers(jobId, limit || 10)
+  }
+
   @Get('weights')
   @AuthRoleProtected(EnumUserRole.ADMIN)
   async getWeights() {

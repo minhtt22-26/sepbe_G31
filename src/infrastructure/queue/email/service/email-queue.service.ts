@@ -13,7 +13,9 @@ export interface SendEmailJobData {
 
 @Injectable()
 export class EmailQueueService {
-  constructor(@InjectQueue(QUEUE_EMAIL) private emailQueue: Queue<SendEmailJobData>) {}
+  constructor(
+    @InjectQueue(QUEUE_EMAIL) private emailQueue: Queue<SendEmailJobData>,
+  ) {}
 
   async addSendEmailJob(data: SendEmailJobData) {
     console.log('[QUEUE] Adding email job to queue:', data.to)

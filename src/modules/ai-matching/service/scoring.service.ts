@@ -3,9 +3,12 @@ import {
   IMatchingWeight,
   IScoreComponents,
 } from '../interfaces/ai-matching.interface'
+import { ProvinceHelper } from 'src/common/helper/province.helper'
 
 @Injectable()
 export class ScoringService {
+  constructor(private readonly provinceHelper: ProvinceHelper) {}
+
   calculateSalaryScore(
     expectedSalary: number | null,
     salaryMin: number | null,
@@ -41,12 +44,32 @@ export class ScoringService {
   calculateLocationScore(
     workerProvince: string | null,
     jobProvince: string | null,
+    workerWard: string | null = null,
+    jobDistrict: string | null = null,
   ): number {
     if (workerProvince == null || jobProvince == null) {
       return 0.5
     }
 
-    return workerProvince === jobProvince ? 1.0 : 0.0
+    const provinceScore = this.provinceHelper.calculateProvinceProximity(
+      workerProvince,
+      jobProvince,
+    )
+
+    if (provinceScore === 1.0) {
+      // Cùng tỉnh, check đến quận/huyện
+      if (
+        workerWard != null &&
+        jobDistrict != null &&
+        workerWard === jobDistrict
+      ) {
+        return 1.0
+      }
+      return 0.5 // Khác quận/huyện nhưng cùng tỉnh
+    }
+
+    // Khác tỉnh nhưng có thể cùng vùng (trả về 0.2 hoặc 0.0 từ helper)
+    return provinceScore
   }
 
   calculateGenderScore(
