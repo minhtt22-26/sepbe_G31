@@ -104,6 +104,7 @@ export class JobController {
   @Get('wishlist')
   @ApiOperation({ summary: 'Get user wishlist' })
   @ApiResponse({ status: 200, description: 'Wishlist retrieved successfully' })
+  @AuthRoleProtected(EnumUserRole.WORKER)
   @AuthJwtAccessProtected()
   @ApiBearerAuth('access-token')
   async getWishlist(
@@ -294,6 +295,7 @@ export class JobController {
   @Post('save/:jobId')
   @ApiOperation({ summary: 'Save a job' })
   @ApiResponse({ status: 201, description: 'Job saved successfully' })
+  @AuthRoleProtected(EnumUserRole.WORKER)
   @AuthJwtAccessProtected()
   @ApiBearerAuth('access-token')
   async saveJob(@Param('jobId') jobId: string, @AuthJwtPayload() user: any) {
@@ -303,6 +305,7 @@ export class JobController {
   @Delete('unsave/:jobId')
   @ApiOperation({ summary: 'Unsave a job' })
   @ApiResponse({ status: 200, description: 'Job unsaved successfully' })
+  @AuthRoleProtected(EnumUserRole.WORKER)
   @AuthJwtAccessProtected()
   @ApiBearerAuth('access-token')
   async unSaveJob(@Param('jobId') jobId: string, @AuthJwtPayload() user: any) {
