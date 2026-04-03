@@ -48,7 +48,7 @@ export class JobService {
     @Inject(forwardRef(() => AIMatchingService))
     private readonly aiMatchingService: AIMatchingService,
     private readonly moderationService: JobModerationService,
-  ) {}
+  ) { }
 
   async searchJobs(q: any) {
     await this.jobRepository.deactivateExpiredBoosts()
@@ -465,19 +465,21 @@ export class JobService {
 
     // AI CONTENT MODERATION
     try {
-      this.logger.log(`Starting AI moderation for job: ${dto.title}`)
-      const moderationResult = await this.moderationService.moderateJob(
-        dto.title,
-        dto.description,
-      )
+      this.logger.log(`Starting AI moderation for job: ${dto.title}`);
+      const moderationResult = await this.moderationService.moderateJob({ ...jobData, fields: dto.fields });
 
-      if (moderationResult.status !== ModerationStatus.PASS) {
+      if (moderationResult.status === ModerationStatus.SPAM) {
         this.logger.warn(
-          `AI REJECTED job as ${moderationResult.status}. Reason: ${moderationResult.reason}`,
-        )
+          `AI REJECTED job as SPAM. Reason: ${moderationResult.reason}`,
+        );
         throw new BadRequestException(
-          `Tin tuyển dụng bị từ chối do có dấu hiệu ${moderationResult.status === ModerationStatus.SPAM ? 'SPAM' : 'LỪA ĐẢO'} (AI detect): ${moderationResult.reason}. Vui lòng viết lại nội dung nghiêm túc hơn.`,
-        )
+          `Tin tuyển dụng bị từ chối do có dấu hiệu SPAM (AI detect): ${moderationResult.reason}. Vui lòng kiểm tra và viết lại nội dung nghiêm túc.`,
+        );
+      } else if (moderationResult.status === ModerationStatus.SCAM) {
+        this.logger.warn(
+          `AI FLAGGED job as SCAM. Reason: ${moderationResult.reason}`,
+        );
+        jobData.status = JobStatus.WARNING;
       }
     } catch (moderationError) {
       if (moderationError instanceof BadRequestException) {
@@ -509,7 +511,10 @@ export class JobService {
       return {
         success: true,
         data: created,
-        message: 'Đăng tin tuyển dụng thành công',
+        message:
+          created.status === JobStatus.WARNING
+            ? 'Tin của bạn đã được lưu nhưng đang chờ duyệt do có dấu hiệu nghi vấn (AI detect)'
+            : 'Đăng tin tuyển dụng thành công',
       }
     } catch (error) {
       const errorMessage =
@@ -647,9 +652,9 @@ export class JobService {
             const selected =
               field.fieldType === 'checkbox'
                 ? value
-                    .split(',')
-                    .map((item) => item.trim())
-                    .filter(Boolean)
+                  .split(',')
+                  .map((item) => item.trim())
+                  .filter(Boolean)
                 : [value]
 
             const hasInvalid = selected.some(
@@ -832,11 +837,11 @@ export class JobService {
       meta: fetchAll
         ? undefined
         : {
-            page,
-            limit,
-            total,
-            totalPage: Math.ceil(total / limit),
-          },
+          page,
+          limit,
+          total,
+          totalPage: Math.ceil(total / limit),
+        },
     }
   }
   async getWarningJobs(page = 1, limit = 10) {

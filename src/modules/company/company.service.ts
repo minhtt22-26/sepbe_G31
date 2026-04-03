@@ -180,7 +180,7 @@ export class CompanyService {
         userId: company.ownerId,
         title,
         message,
-        link: `/company/${company.id}`,
+        link: `/employer`,
       },
     })
 

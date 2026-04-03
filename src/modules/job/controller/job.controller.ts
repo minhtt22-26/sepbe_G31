@@ -102,7 +102,6 @@ export class JobController {
   }
 
   @Get('wishlist')
-  @AuthRoleProtected(EnumUserRole.WORKER)
   @ApiOperation({ summary: 'Get user wishlist' })
   @ApiResponse({ status: 200, description: 'Wishlist retrieved successfully' })
   @AuthJwtAccessProtected()
@@ -293,7 +292,6 @@ export class JobController {
   // wishlist endpoint previously here
 
   @Post('save/:jobId')
-  @AuthRoleProtected(EnumUserRole.WORKER)
   @ApiOperation({ summary: 'Save a job' })
   @ApiResponse({ status: 201, description: 'Job saved successfully' })
   @AuthJwtAccessProtected()
@@ -303,7 +301,6 @@ export class JobController {
   }
 
   @Delete('unsave/:jobId')
-  @AuthRoleProtected(EnumUserRole.WORKER)
   @ApiOperation({ summary: 'Unsave a job' })
   @ApiResponse({ status: 200, description: 'Job unsaved successfully' })
   @AuthJwtAccessProtected()
