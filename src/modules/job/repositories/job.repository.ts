@@ -11,7 +11,7 @@ import { PrismaService } from 'src/prisma.service'
 
 @Injectable()
 export class JobRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
   async createJobWithForm(data: any) {
     const occupation = await this.prisma.occupation.findUnique({
       where: { id: data.jobData.occupationId },
@@ -807,13 +807,37 @@ export class JobRepository {
       },
     })
   }
-  async changeJobReportStatus(jobId, status: ReportStatus) {
-    return this.prisma.jobReport.update({
-      where: { id: jobId },
-      data: {
-        status: status,
+  async changeJobReportStatus(reportId: number, status: ReportStatus) {
+    const report = await this.prisma.jobReport.update({
+      where: { id: reportId },
+      data: { status: status },
+      include: {
+        job: true,
       },
     })
+
+    let title = '';
+    let message = '';
+    if (status === ReportStatus.RESOLVED) {
+      title = 'Báo cáo đã được giải quyết';
+      message = `Báo cáo của bạn về công việc "${report.job.title}" đã được giải quyết. Cảm ơn bạn đã đóng góp.`;
+    } else if (status === ReportStatus.REJECTED) {
+      title = 'Báo cáo không được chấp nhận';
+      message = `Báo cáo của bạn về công việc "${report.job.title}" không được chấp nhận do không phát hiện vi phạm.`;
+    }
+
+    if (title) {
+      await this.prisma.notification.create({
+        data: {
+          userId: report.reporterId,
+          title,
+          message,
+          link: `/job/${report.jobId}`,
+        },
+      });
+    }
+
+    return report;
   }
 
   async markExpiredJobs() {
@@ -861,9 +885,37 @@ export class JobRepository {
   }
 
   async updateJobStatus(jobId: number, status: JobStatus) {
-    return this.prisma.job.update({
+    const job = await this.prisma.job.update({
       where: { id: jobId },
       data: { status },
+      include: { company: true },
     })
+
+    let title = '';
+    let message = '';
+
+    if (status === JobStatus.PUBLISHED) {
+      title = 'Tin tuyển dụng đã được duyệt';
+      message = `Tin tuyển dụng "${job.title}" của bạn đã được quản trị viên phê duyệt.`;
+    } else if (status === JobStatus.DELETED || status as any === 'REJECTED') {
+      title = 'Tin tuyển dụng bị từ chối/gỡ bỏ';
+      message = `Tin tuyển dụng "${job.title}" của bạn đã bị từ chối hoặc gỡ bỏ do vi phạm quy định.`;
+    } else if (status === JobStatus.WARNING) {
+      title = 'Tin tuyển dụng bị tạm ngưng';
+      message = `Tin tuyển dụng "${job.title}" đang chờ kiểm duyệt thủ công do có dấu hiệu nghi ngờ.`;
+    }
+
+    if (title && job.company) {
+      await this.prisma.notification.create({
+        data: {
+          userId: job.company.ownerId,
+          title,
+          message,
+          link: `/employer`,
+        },
+      });
+    }
+
+    return job;
   }
 }
