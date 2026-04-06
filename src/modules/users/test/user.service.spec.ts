@@ -19,6 +19,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { CloudinaryService } from 'src/infrastructure/cloudinary/cloudinary.service'
+import { AIMatchingService } from 'src/modules/ai-matching/service/ai-matching.service'
 
 describe('UserService', () => {
   let service: UserService
@@ -82,6 +83,9 @@ describe('UserService', () => {
   const mockCloudinaryService = {
     uploadFile: jest.fn(),
   }
+  const mockAIMatchingService = {
+    buildWorkerProfileEmbedding: jest.fn(),
+  }
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -94,6 +98,7 @@ describe('UserService', () => {
         { provide: SessionService, useValue: mockSessionService },
         { provide: EmailService, useValue: mockEmailService },
         { provide: CloudinaryService, useValue: mockCloudinaryService },
+        { provide: AIMatchingService, useValue: mockAIMatchingService },
       ],
     }).compile()
 
@@ -332,12 +337,17 @@ describe('UserService', () => {
         )
       })
 
-      it('Abnormal: should throw NotFoundException when profile does not exist', async () => {
+      it('Abnormal: should still update when profile lookup returns null', async () => {
         mockUserRepository.getWorkerProfile.mockResolvedValue(null)
+        mockUserRepository.updateProfile.mockResolvedValue(mockProfile)
 
-        await expect(
-          service.updateWorkerProfile(userId, profileDto),
-        ).rejects.toThrow(NotFoundException)
+        const result = await service.updateWorkerProfile(userId, profileDto)
+
+        expect(result).toEqual(mockProfile)
+        expect(userRepository.updateProfile).toHaveBeenCalledWith(
+          userId,
+          profileDto,
+        )
       })
 
       it('Boundary: should throw Error when repository.updateProfile fails', async () => {

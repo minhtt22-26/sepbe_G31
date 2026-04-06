@@ -3,6 +3,9 @@ import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { JobRepository } from '../repositories/job.repository'
 import { JobApplicationStatus, JobStatus } from 'src/generated/prisma/enums'
 import { JobService } from '../service/job.service'
+import { SepayService } from '../service/sepay.service'
+import { AIMatchingService } from 'src/modules/ai-matching/service/ai-matching.service'
+import { JobModerationService } from '../service/job-moderation.service'
 
 jest.mock('src/prisma.service', () => ({
   PrismaService: class {},
@@ -18,6 +21,21 @@ const jobRepositoryMock = {
   getRelatedJobs: jest.fn(),
 }
 
+const sepayServiceMock = {
+  buildBoostCheckout: jest.fn(),
+  ensureCheckoutConfig: jest.fn(),
+  extractOrderIdFromPayload: jest.fn(),
+  isValidWebhookAuthorization: jest.fn(),
+}
+
+const aiMatchingServiceMock = {
+  syncJobApplications: jest.fn(),
+}
+
+const jobModerationServiceMock = {
+  moderateJobContent: jest.fn(),
+}
+
 describe('JobService', () => {
   let service: JobService
 
@@ -28,6 +46,18 @@ describe('JobService', () => {
         {
           provide: JobRepository,
           useValue: jobRepositoryMock,
+        },
+        {
+          provide: SepayService,
+          useValue: sepayServiceMock,
+        },
+        {
+          provide: AIMatchingService,
+          useValue: aiMatchingServiceMock,
+        },
+        {
+          provide: JobModerationService,
+          useValue: jobModerationServiceMock,
         },
       ],
     }).compile()
@@ -73,6 +103,10 @@ describe('JobService', () => {
   })
 
   it('applyJob should throw if required field is missing', async () => {
+    jobRepositoryMock.findJobById.mockResolvedValue({
+      id: 1,
+      status: JobStatus.PUBLISHED,
+    })
     jobRepositoryMock.findJobWithApplyForm.mockResolvedValue({
       id: 1,
       title: 'Công nhân may',
@@ -101,6 +135,10 @@ describe('JobService', () => {
   })
 
   it('applyJob should call repository when payload is valid', async () => {
+    jobRepositoryMock.findJobById.mockResolvedValue({
+      id: 1,
+      status: JobStatus.PUBLISHED,
+    })
     jobRepositoryMock.findJobWithApplyForm.mockResolvedValue({
       id: 1,
       title: 'Công nhân may',

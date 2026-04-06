@@ -99,7 +99,7 @@ describe('CompanyController', () => {
     expect(companyServiceMock.update).toHaveBeenCalledWith(2, body, files, 1);
   });
 
-  it('review() should call service.review', async () => {
+  it('updateStatus() should call service.review', async () => {
     const body = {
       status: CompanyStatus.APPROVED,
     } as any;
@@ -107,7 +107,7 @@ describe('CompanyController', () => {
 
     companyServiceMock.review.mockResolvedValue(expected);
 
-    const result = await controller.review('3', body);
+    const result = await controller.updateStatus('3', body);
 
     expect(result).toBe(expected);
     expect(companyServiceMock.review).toHaveBeenCalledWith(3, body);
