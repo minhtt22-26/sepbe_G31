@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { JobService } from '../service/job.service'
 import { JobController } from '../controller/job.controller'
+import { CompanyService } from 'src/modules/company/company.service'
 
 jest.mock('src/prisma.service', () => ({
   PrismaService: class {},
@@ -15,6 +16,10 @@ const jobServiceMock = {
   getRelatedJobs: jest.fn(),
 }
 
+const companyServiceMock = {
+  findByOwnerId: jest.fn(),
+}
+
 describe('JobController', () => {
   let controller: JobController
 
@@ -25,6 +30,10 @@ describe('JobController', () => {
         {
           provide: JobService,
           useValue: jobServiceMock,
+        },
+        {
+          provide: CompanyService,
+          useValue: companyServiceMock,
         },
       ],
     }).compile()

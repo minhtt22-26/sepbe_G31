@@ -3,6 +3,8 @@ import { BadRequestException } from '@nestjs/common'
 import { JobService } from '../service/job.service'
 import { JobRepository } from '../repositories/job.repository'
 import { AIMatchingService } from 'src/modules/ai-matching/service/ai-matching.service'
+import { SepayService } from '../service/sepay.service'
+import { JobModerationService } from '../service/job-moderation.service'
 import { JobStatus, JobApplicationStatus } from 'src/generated/prisma/enums'
 
 describe('JobService - Apply without form', () => {
@@ -19,6 +21,17 @@ describe('JobService - Apply without form', () => {
     buildJobEmbedding: jest.fn(),
   }
 
+  const mockSepayService = {
+    buildBoostCheckout: jest.fn(),
+    ensureCheckoutConfig: jest.fn(),
+    extractOrderIdFromPayload: jest.fn(),
+    isValidWebhookAuthorization: jest.fn(),
+  }
+
+  const mockJobModerationService = {
+    moderateJobContent: jest.fn(),
+  }
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -31,11 +44,24 @@ describe('JobService - Apply without form', () => {
           provide: AIMatchingService,
           useValue: mockAIMatchingService,
         },
+        {
+          provide: SepayService,
+          useValue: mockSepayService,
+        },
+        {
+          provide: JobModerationService,
+          useValue: mockJobModerationService,
+        },
       ],
     }).compile()
 
     service = module.get<JobService>(JobService)
     jobRepository = module.get<JobRepository>(JobRepository)
+
+    mockJobRepository.findJobById.mockResolvedValue({
+      id: 1,
+      status: JobStatus.PUBLISHED,
+    })
   })
 
   afterEach(() => {

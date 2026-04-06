@@ -1,30 +1,33 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { SepayService } from '../service/sepay.service'
-import { ConfigService } from '@nestjs/config'
+import paymentConfig from 'src/config/payment.config'
 
 describe('SepayService', () => {
   let service: SepayService
 
-  const mockConfigService = {
-    get: jest.fn((key) => {
-      const config: Record<string, any> = {
-        'payment.sepayBankCode': 'BIDV',
-        'payment.sepayAccountNumber': '0123456789',
-        'payment.sepayAccountName': 'Test Company',
-        'payment.sepayOrderPrefix': 'BOOST',
-        'payment.sepayWebhookApiKey': 'test-api-key',
-      }
-      return config[key]
-    }),
+  let paymentCfg: {
+    sepayBankCode: string | null
+    sepayAccountNumber: string | null
+    sepayAccountName: string | null
+    sepayOrderPrefix: string
+    sepayWebhookApiKey: string | null
   }
 
   beforeEach(async () => {
+    paymentCfg = {
+      sepayBankCode: 'BIDV',
+      sepayAccountNumber: '0123456789',
+      sepayAccountName: 'Test Company',
+      sepayOrderPrefix: 'BOOST',
+      sepayWebhookApiKey: 'test-api-key',
+    }
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SepayService,
         {
-          provide: ConfigService,
-          useValue: mockConfigService,
+          provide: paymentConfig.KEY,
+          useValue: paymentCfg,
         },
       ],
     }).compile()
@@ -42,19 +45,13 @@ describe('SepayService', () => {
     })
 
     it('should throw when bankCode is missing', () => {
-      mockConfigService.get.mockImplementation((key) => {
-        if (key === 'payment.sepayBankCode') return null
-        return 'value'
-      })
+      paymentCfg.sepayBankCode = null
 
       expect(() => service.ensureCheckoutConfig()).toThrow()
     })
 
     it('should throw when accountNumber is missing', () => {
-      mockConfigService.get.mockImplementation((key) => {
-        if (key === 'payment.sepayAccountNumber') return null
-        return 'value'
-      })
+      paymentCfg.sepayAccountNumber = null
 
       expect(() => service.ensureCheckoutConfig()).toThrow()
     })
@@ -78,21 +75,19 @@ describe('SepayService', () => {
     it('should include accountName in URL when provided', () => {
       const result = service.buildBoostCheckout(2, 50000)
 
-      expect(result.paymentUrl).toContain('Test%20Company')
+      expect(result.paymentUrl).toMatch(/accountName=Test(?:%20|\+)Company/)
     })
 
     it('should not throw when accountName is null', () => {
-      mockConfigService.get.mockImplementation((key) => {
-        if (key === 'payment.sepayAccountName') return null
-        return 'value'
-      })
+      paymentCfg.sepayAccountName = null
 
       const result = service.buildBoostCheckout(3, 50000)
       expect(result.accountName).toBeNull()
     })
 
     it('should throw when config is invalid', () => {
-      mockConfigService.get.mockImplementation(() => null)
+      paymentCfg.sepayBankCode = null
+      paymentCfg.sepayAccountNumber = null
 
       expect(() => service.buildBoostCheckout(1, 100000)).toThrow()
     })
@@ -100,10 +95,7 @@ describe('SepayService', () => {
 
   describe('isValidWebhookAuthorization', () => {
     it('should return true when no webhook API key is configured', () => {
-      mockConfigService.get.mockImplementation((key) => {
-        if (key === 'payment.sepayWebhookApiKey') return null
-        return 'value'
-      })
+      paymentCfg.sepayWebhookApiKey = null
 
       const result = service.isValidWebhookAuthorization('any-key')
       expect(result).toBe(true)
@@ -183,10 +175,7 @@ describe('SepayService', () => {
     })
 
     it('should handle custom prefix', () => {
-      mockConfigService.get.mockImplementation((key) => {
-        if (key === 'payment.sepayOrderPrefix') return 'JOB'
-        return 'value'
-      })
+      paymentCfg.sepayOrderPrefix = 'JOB'
 
       const payload = { code: 'JOB888', content: '', description: '' }
       const result = service.extractOrderIdFromPayload(payload)

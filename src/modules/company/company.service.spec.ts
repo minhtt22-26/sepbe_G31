@@ -5,6 +5,7 @@ import { PrismaService } from 'src/prisma.service';
 import { REDIS_CLIENT } from 'src/infrastructure/redis/redis.provider';
 import { CloudinaryService } from 'src/infrastructure/cloudinary/cloudinary.service';
 import { CompanyStatus } from 'src/generated/prisma/enums';
+import { CompanyRepository } from './company.repository';
 
 jest.mock('src/prisma.service', () => ({
   PrismaService: class {},
@@ -33,6 +34,10 @@ const redisMock = {
   get: jest.fn(),
   setEx: jest.fn(),
 };
+
+const companyRepositoryMock = {
+  searchCompaies: jest.fn(),
+};
 describe('CompanyService', () => {
   let service: CompanyService;
 
@@ -42,6 +47,7 @@ describe('CompanyService', () => {
         CompanyService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: CloudinaryService, useValue: cloudinaryMock },
+        { provide: CompanyRepository, useValue: companyRepositoryMock },
         { provide: REDIS_CLIENT, useValue: redisMock },
       ],
     }).compile();

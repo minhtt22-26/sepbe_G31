@@ -4,6 +4,7 @@ import { JobService } from '../service/job.service'
 import { JobRepository } from '../repositories/job.repository'
 import { SepayService } from '../service/sepay.service'
 import { AIMatchingService } from 'src/modules/ai-matching/service/ai-matching.service'
+import { JobModerationService } from '../service/job-moderation.service'
 import { JobStatus, PaymentMethod, PaymentStatus, OrderType } from 'src/generated/prisma/enums'
 
 describe('JobService - Boost Features', () => {
@@ -28,6 +29,10 @@ describe('JobService - Boost Features', () => {
     buildJobEmbedding: jest.fn(),
   }
 
+  const mockJobModerationService = {
+    moderateJobContent: jest.fn(),
+  }
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -43,6 +48,10 @@ describe('JobService - Boost Features', () => {
         {
           provide: AIMatchingService,
           useValue: mockAIMatchingService,
+        },
+        {
+          provide: JobModerationService,
+          useValue: mockJobModerationService,
         },
       ],
     }).compile()
