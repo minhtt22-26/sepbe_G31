@@ -6,7 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "prebuild": "npm run lint || true",
+    "prebuild": "npm run lint || echo lint failed, continue build",
     "build": "tsc -p tsconfig.build.json && nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" --max-warnings=0",
     "start": "nest start",

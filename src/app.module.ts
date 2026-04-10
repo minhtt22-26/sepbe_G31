@@ -26,6 +26,7 @@ import { EmbeddingModule } from './modules/embedding/embedding.module'
 import { AIMatchingModule } from './modules/ai-matching/ai-matching.module'
 import { ScheduleModule } from '@nestjs/schedule'
 import { AdminModule } from './modules/admin/admin.module'
+import { InterviewInvitationModule } from './modules/interview-invitation/interview-invitation.module'
 
 import { APP_GUARD } from '@nestjs/core'
 import { UserStatusGuard } from './common/guards/user-status.guard'
@@ -105,6 +106,7 @@ import { StatisticsModule } from './modules/statistics/statistics.module'
     AIMatchingModule,
     AdminModule,
     StatisticsModule,
+    InterviewInvitationModule,
   ],
   controllers: [],
   providers: [

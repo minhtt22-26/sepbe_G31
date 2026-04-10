@@ -134,6 +134,22 @@ enum MessageStatus {
   READ
 }
 
+enum InterviewInvitationStatus {
+  PENDING // Chờ worker phản hồi
+  ACCEPTED // Worker đã chấp nhận
+  REJECTED // Worker từ chối
+  CANCELLED // Employer hủy
+  EXPIRED // Hết hạn
+}
+
+enum CampaignStatus {
+  DRAFT // Đang soạn
+  SCHEDULED // Sắp gửi (định lịch)
+  IN_PROGRESS // Đang gửi
+  COMPLETED // Đã gửi xong
+  CANCELLED // Đã hủy
+}
+
 enum MatchingWeightKey {
   SKILL_WEIGHT       // Trọng số độ khớp Kỹ năng (AI Vector)
   BENEFIT_WEIGHT     // Trọng số độ khớp Phúc lợi/Mong muốn (AI Vector)
@@ -182,6 +198,7 @@ model User {
   reportedJobs       JobReport[]           @relation("JobReporter")
   reportedReviews    CompanyReviewReport[] @relation("ReviewReporter")
   notifications      Notification[]
+  interviewInvitations InterviewInvitation[]
 
   conversationsAsUser1 ChatConversation[] @relation("ChatUser1")
   conversationsAsUser2 ChatConversation[] @relation("ChatUser2")
@@ -292,6 +309,7 @@ model Company {
   owner              User            @relation("CompanyOwner", fields: [ownerId], references: [id])
   jobs               Job[]
   reviews            CompanyReview[]
+  interviewCampaigns InterviewInvitationCampaign[]
 
   @@index([ownerId])
   @@index([status])
@@ -575,6 +593,57 @@ model ChatMessage {
   sender       User             @relation(fields: [senderId], references: [id])
   @@index([conversationId, createdAt])
   @@index([senderId])
+}
+
+// =====================
+// INTERVIEW INVITATIONS
+// =====================
+
+model InterviewInvitationCampaign {
+  id               Int              @id @default(autoincrement())
+  companyId        Int
+  jobId            Int?
+  title            String           // Tên chiến dịch (vd: "Mời phỏng vấn - Công nhân lắp ráp")
+  description      String?          @db.Text
+  message          String           @db.Text // Nội dung tin nhắn gửi đi
+  totalCount       Int              @default(0) // Tổng số worker được gửi
+  acceptedCount    Int              @default(0) // Số người đã chấp nhận
+  rejectedCount    Int              @default(0) // Số người từ chối
+  pendingCount     Int              @default(0) // Số chưa phản hồi
+  status           CampaignStatus   @default(DRAFT)
+  scheduledAt      DateTime?        // Thời gian dự kiến gửi (nếu SCHEDULED)
+  sentAt           DateTime?        // Thời gian thực tế bắt đầu gửi
+  completedAt      DateTime?        // Thời gian hoàn thành
+  expiresAt        DateTime?        // Hạn chót worker có thể phản hồi
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  company     Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invitations InterviewInvitation[]
+
+  @@index([companyId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model InterviewInvitation {
+  id               Int                       @id @default(autoincrement())
+  campaignId       Int
+  workerId         Int
+  status           InterviewInvitationStatus @default(PENDING)
+  responseMessage  String?                   // Lý do từ chối (nếu worker từ chối)
+  respondedAt      DateTime?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  campaign InterviewInvitationCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  worker   User                         @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, workerId])
+  @@index([campaignId])
+  @@index([workerId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model MatchingWeight {
