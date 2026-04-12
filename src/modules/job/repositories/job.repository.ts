@@ -638,7 +638,7 @@ export class JobRepository {
     applicationId: number,
     status: JobApplicationStatus,
   ) {
-    return this.prisma.jobApplication.update({
+    const app = await this.prisma.jobApplication.update({
       where: { id: applicationId },
       data: { status },
       include: {
@@ -650,6 +650,37 @@ export class JobRepository {
         },
       },
     })
+
+    let title = '';
+    let message = '';
+
+    switch (status as any) {
+      case 'VIEWED':
+        title = 'Hồ sơ đã được xem';
+        message = `Nhà tuyển dụng đã xem hồ sơ của bạn cho vị trí "${app.job.title}".`;
+        break;
+      case 'SUITABLE':
+        title = 'Hồ sơ phù hợp';
+        message = `Hồ sơ của bạn cho vị trí "${app.job.title}" được đánh giá là phù hợp!`;
+        break;
+      case 'UNSUITABLE':
+        title = 'Hồ sơ chưa phù hợp';
+        message = `Rất tiếc, hồ sơ của bạn cho vị trí "${app.job.title}" chưa phù hợp ở thời điểm hiện tại.`;
+        break;
+    }
+
+    if (title && app.userId) {
+      await this.prisma.notification.create({
+        data: {
+          userId: app.userId,
+          title,
+          message,
+          link: `/job/${app.jobId}`,
+        },
+      });
+    }
+
+    return app;
   }
 
   async findApplicationById(applicationId: number) {
