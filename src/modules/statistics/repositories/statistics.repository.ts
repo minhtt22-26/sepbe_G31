@@ -65,7 +65,7 @@ export class StatisticsRepository {
     }
   }
 
-  async getApplicationFunnel(
+  async getApplication(
     companyId: number,
     jobId?: number,
   ): Promise<ApplicationFunnelResponseDto> {

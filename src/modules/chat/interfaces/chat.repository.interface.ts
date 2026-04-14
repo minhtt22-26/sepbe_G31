@@ -17,32 +17,4 @@ export type ChatConversationWithDetails = ChatConversation & {
   }
 }
 
-export abstract class IChatRepository {
-  abstract findConversationById(id: number): Promise<ChatConversation | null>
 
-  abstract findOrCreateConversation(
-    user1Id: number,
-    user2Id: number,
-  ): Promise<ChatConversation>
-
-  abstract getUserConversations(
-    userId: number,
-  ): Promise<ChatConversationWithDetails[]>
-
-  abstract createMessage(
-    conversationId: number,
-    senderId: number,
-    content: string,
-  ): Promise<ChatMessage>
-
-  abstract getMessages(
-    conversationId: number,
-    limit: number,
-    cursor?: number,
-  ): Promise<ChatMessage[]>
-
-  abstract markMessagesAsRead(
-    userId: number,
-    conversationId: number,
-  ): Promise<void>
-}

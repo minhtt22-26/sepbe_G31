@@ -21,11 +21,11 @@ export class StatisticsController {
 
   @Get('employer/application-funnel')
   @AuthRoleProtected(EnumUserRole.EMPLOYER)
-  async getApplicationFunnel(
+  async getApplication(
     @AuthJwtPayload('userId') userId: number,
     @Query('jobId') jobId?: number,
   ) {
-    return this.statisticService.getApplicationFunnel(userId, jobId)
+    return this.statisticService.getApplication(userId, jobId)
   }
 
   @Get('employer/payments')

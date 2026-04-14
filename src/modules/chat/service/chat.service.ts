@@ -7,7 +7,7 @@ import {
 import { HelperService } from 'src/common/helper/service/helper.service'
 import { ChatConversationRequestDto } from '../dtos/request/chat.create.request.dto'
 import { ChatConversationBaseResponseDto } from '../dtos/response/chat.conversation-base.response.dto'
-import { IChatRepository } from '../interfaces/chat.repository.interface'
+import { ChatRepository } from '../repositories/chat.repository'
 import { UserRepository } from 'src/modules/users/repositories/user.repository'
 import { ChatConversationResponseDto } from '../dtos/response/chat.conversation.response.dto'
 import { ChatSendMessageRequestDto } from '../dtos/request/chat.send-message.request.dto'
@@ -17,7 +17,7 @@ import { ChatGetMessageRequestDto } from '../dtos/request/chat.get-message.reque
 @Injectable()
 export class ChatService {
   constructor(
-    private readonly chatRepository: IChatRepository,
+    private readonly chatRepository: ChatRepository,
     private readonly userRepository: UserRepository,
     private readonly helperService: HelperService,
   ) {}
@@ -26,22 +26,22 @@ export class ChatService {
     userId: number,
     dto: ChatConversationRequestDto,
   ): Promise<ChatConversationBaseResponseDto> {
-    const { participantId } = dto
+    const { recipientId } = dto
 
-    if (userId === participantId) {
+    if (userId === recipientId) {
       throw new BadRequestException(
         'Bạn không thể bắt đầu cuộc trò chuyện với chính bạn',
       )
     }
 
-    const participant = await this.userRepository.findOneById(participantId)
-    if (!participant) {
+    const recipient = await this.userRepository.findOneById(recipientId)
+    if (!recipient) {
       throw new NotFoundException('Người dùng không tồn tại')
     }
 
     const { user1Id, user2Id } = this.helperService.getConversationUserIds(
       userId,
-      participantId,
+      recipientId,
     )
 
     const conversation = await this.chatRepository.findOrCreateConversation(
@@ -51,7 +51,7 @@ export class ChatService {
 
     return {
       id: conversation.id,
-      participantId,
+      recipientId,
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
     }
