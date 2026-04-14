@@ -284,7 +284,15 @@ export class JobRepository {
       }
 
       if (!fields || !Array.isArray(fields)) {
-        throw new Error('Fields are required')
+        const updatedJob = await tx.job.findUnique({
+          where: { id: jobId },
+          include: {
+            applyForms: {
+              include: { fields: true },
+            },
+          },
+        })
+        return { success: true, data: updatedJob }
       }
 
       const existingFields = form.fields

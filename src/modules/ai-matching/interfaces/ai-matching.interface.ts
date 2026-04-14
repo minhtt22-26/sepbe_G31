@@ -1,4 +1,4 @@
-import { MatchingWeightKey } from 'src/generated/prisma/enums'
+import { MatchingConfigKey } from 'src/generated/prisma/enums'
 
 export interface IRawMatchedJob {
   id: number
@@ -24,9 +24,9 @@ export interface IRawMatchedJob {
   benefitScore: number
 }
 
-export interface IMatchingWeight {
-  key: MatchingWeightKey
-  weight: number
+export interface IMatchingConfig {
+  key: MatchingConfigKey
+  value: number
 }
 
 export interface IScoreComponents {

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import {
-  IMatchingWeight,
+  IMatchingConfig,
   IScoreComponents,
 } from '../interfaces/ai-matching.interface'
 import { ProvinceHelper } from 'src/common/helper/province.helper'
@@ -125,9 +125,9 @@ export class ScoringService {
 
   calculateFinalScore(
     scores: IScoreComponents,
-    weights: IMatchingWeight[],
+    configs: IMatchingConfig[],
   ): number {
-    const weightMap = new Map(weights.map((w) => [w.key, w.weight]))
+    const weightMap = new Map(configs.map((c) => [c.key, c.value]))
 
     const result =
       (weightMap.get('SKILL_WEIGHT') ?? 0) * scores.skillScore +

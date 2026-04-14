@@ -13,12 +13,13 @@ import { MatchedWorkerResponseDto } from '../dto/response/matched-worker.respons
 import { JobService } from 'src/modules/job/service/job.service'
 import { EmbeddingService } from 'src/modules/embedding/service/embedding.service'
 import { EmbeddingTextBuilder } from 'src/modules/embedding/builder/embedding-text.builder'
-import { IMatchingWeight } from '../interfaces/ai-matching.interface'
+import { IMatchingConfig } from '../interfaces/ai-matching.interface'
 
 @Injectable()
 export class AIMatchingService {
   private readonly DEFAULT_LIMIT = 20
   private readonly MAX_LIMIT = 100
+  private readonly DEFAULT_MIN_SCORE_THRESHOLD = 0
 
   constructor(
     @Inject(forwardRef(() => JobService))
@@ -30,6 +31,13 @@ export class AIMatchingService {
     private readonly aiMatchingRepository: AIMatchingRepository,
     private readonly embeddingTextBuilder: EmbeddingTextBuilder,
   ) {}
+
+  private getMinScoreThreshold(configs: IMatchingConfig[]): number {
+    const thresholdConfig = configs.find(
+      (c) => c.key === 'MIN_SCORE_THRESHOLD',
+    )
+    return thresholdConfig?.value ?? this.DEFAULT_MIN_SCORE_THRESHOLD
+  }
 
   async getMatchedJobs(
     userId: number,
@@ -51,7 +59,8 @@ export class AIMatchingService {
       )
     }
 
-    const weights = await this.aiMatchingRepository.getWeights()
+    const configs = await this.aiMatchingRepository.getConfigs()
+    const minScoreThreshold = this.getMinScoreThreshold(configs)
 
     const rawJobs = await this.aiMatchingRepository.findMatchedJobs(
       embeddings.skillEmbedding,
@@ -107,7 +116,7 @@ export class AIMatchingService {
           genderScore,
           ageScore,
         },
-        weights,
+        configs,
       )
 
       return {
@@ -144,6 +153,7 @@ export class AIMatchingService {
     })
 
     return results
+      .filter((r) => r.scores.finalScore >= minScoreThreshold)
       .sort((a, b) => b.scores.finalScore - a.scores.finalScore)
       .slice(0, resolvedLimit)
   }
@@ -221,7 +231,6 @@ export class AIMatchingService {
   ): Promise<MatchedWorkerResponseDto[]> {
     const resolvedLimit = Math.min(limit ?? this.DEFAULT_LIMIT, this.MAX_LIMIT)
 
-    console.log(jobId)
     const job = await this.jobService.getDetail(jobId)
     if (!job) {
       throw new NotFoundException('Job không tồn tại')
@@ -234,7 +243,8 @@ export class AIMatchingService {
       )
     }
 
-    const weights = await this.aiMatchingRepository.getWeights()
+    const configs = await this.aiMatchingRepository.getConfigs()
+    const minScoreThreshold = this.getMinScoreThreshold(configs)
 
     const rawWorkers = await this.aiMatchingRepository.findMatchedWorkers(
       embeddings.reqEmbedding,
@@ -287,7 +297,7 @@ export class AIMatchingService {
           genderScore,
           ageScore,
         },
-        weights,
+        configs,
       )
 
       return {
@@ -321,21 +331,43 @@ export class AIMatchingService {
     })
 
     return results
+      .filter((r) => r.scores.finalScore >= minScoreThreshold)
       .sort((a, b) => b.scores.finalScore - a.scores.finalScore)
       .slice(0, resolvedLimit)
   }
 
-  async getWeights(): Promise<IMatchingWeight[]> {
-    return this.aiMatchingRepository.getWeights()
+  async getConfigs(): Promise<IMatchingConfig[]> {
+    return this.aiMatchingRepository.getConfigs()
   }
 
-  async updateWeights(weights: IMatchingWeight[]): Promise<IMatchingWeight[]> {
-    const totalWeight = weights.reduce((sum, item) => sum + item.weight, 0)
+  async updateConfigs(configs: IMatchingConfig[]): Promise<IMatchingConfig[]> {
+    const weightConfigs = configs.filter(
+      (c) => c.key !== 'MIN_SCORE_THRESHOLD',
+    )
 
-    if (Math.abs(totalWeight - 1) > 0.0001) {
-      throw new BadRequestException('Tổng các trọng số phải chính xác bằng 1')
+    if (weightConfigs.length > 0) {
+      const totalWeight = weightConfigs.reduce(
+        (sum, item) => sum + item.value,
+        0,
+      )
+
+      if (Math.abs(totalWeight - 1) > 0.0001) {
+        throw new BadRequestException(
+          'Tổng các trọng số phải chính xác bằng 1',
+        )
+      }
     }
 
-    return this.aiMatchingRepository.updateWeights(weights)
+    const thresholdConfig = configs.find(
+      (c) => c.key === 'MIN_SCORE_THRESHOLD',
+    )
+
+    if (thresholdConfig && (thresholdConfig.value < 0 || thresholdConfig.value > 1)) {
+      throw new BadRequestException(
+        'Ngưỡng điểm tối thiểu phải nằm trong khoảng 0 - 1 (tương ứng 0% - 100%)',
+      )
+    }
+
+    return this.aiMatchingRepository.updateConfigs(configs)
   }
 }

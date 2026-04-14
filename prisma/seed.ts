@@ -10,7 +10,7 @@ import {
   ReviewStatus,
   ReportReason,
   ReportStatus,
-  MatchingWeightKey,
+  MatchingConfigKey,
 } from '../src/generated/prisma/client'
 
 import { PrismaPg } from '@prisma/adapter-pg'
@@ -1038,21 +1038,22 @@ async function main() {
   // ======================
   // MATCHING WEIGHT
   // ======================
-  console.log('⚖️ Tạo trọng số matching...')
+  console.log('⚖️ Tạo cấu hình matching...')
 
-  await prisma.matchingWeight.createMany({
+  await prisma.matchingConfig.createMany({
     data: [
-      { key: MatchingWeightKey.SKILL_WEIGHT, label: 'Kỹ năng', weight: 0.4 },
-      { key: MatchingWeightKey.BENEFIT_WEIGHT, label: 'Phúc lợi', weight: 0.2 },
-      { key: MatchingWeightKey.SALARY_WEIGHT, label: 'Lương', weight: 0.15 },
-      { key: MatchingWeightKey.LOCATION_WEIGHT, label: 'Địa điểm', weight: 0.1 },
-      { key: MatchingWeightKey.SHIFT_WEIGHT, label: 'Ca làm', weight: 0.05 },
-      { key: MatchingWeightKey.GENDER_WEIGHT, label: 'Giới tính', weight: 0.05 },
-      { key: MatchingWeightKey.AGE_WEIGHT, label: 'Độ tuổi', weight: 0.05 },
+      { key: MatchingConfigKey.SKILL_WEIGHT, label: 'Kỹ năng', value: 0.4 },
+      { key: MatchingConfigKey.BENEFIT_WEIGHT, label: 'Phúc lợi', value: 0.2 },
+      { key: MatchingConfigKey.SALARY_WEIGHT, label: 'Lương', value: 0.15 },
+      { key: MatchingConfigKey.LOCATION_WEIGHT, label: 'Địa điểm', value: 0.1 },
+      { key: MatchingConfigKey.SHIFT_WEIGHT, label: 'Ca làm', value: 0.05 },
+      { key: MatchingConfigKey.GENDER_WEIGHT, label: 'Giới tính', value: 0.05 },
+      { key: MatchingConfigKey.AGE_WEIGHT, label: 'Độ tuổi', value: 0.05 },
+      { key: MatchingConfigKey.MIN_SCORE_THRESHOLD, label: 'Ngưỡng điểm tối thiểu (%)', value: 0.3 },
     ],
   })
 
-  console.log('✅ Đã tạo trọng số matching')
+  console.log('✅ Đã tạo cấu hình matching')
   console.log('🎉 Seed hoàn tất!')
 }
 
