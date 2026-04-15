@@ -1,6 +1,6 @@
 export class ChatConversationBaseResponseDto {
   id: number
-  participantId: number
+  recipientId: number
   createdAt: Date
   updatedAt: Date
 }

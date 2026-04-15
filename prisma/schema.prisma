@@ -150,14 +150,15 @@ enum CampaignStatus {
   CANCELLED // Đã hủy
 }
 
-enum MatchingWeightKey {
-  SKILL_WEIGHT       // Trọng số độ khớp Kỹ năng (AI Vector)
-  BENEFIT_WEIGHT     // Trọng số độ khớp Phúc lợi/Mong muốn (AI Vector)
-  SALARY_WEIGHT      // Trọng số tiêu chí Lương
-  LOCATION_WEIGHT    // Trọng số tiêu chí Địa điểm
-  SHIFT_WEIGHT       // Trọng số tiêu chí Ca làm việc
-  GENDER_WEIGHT      // Trọng số tiêu chí Giới tính
-  AGE_WEIGHT         // Trọng số tiêu chí Độ tuổi
+enum MatchingConfigKey {
+  SKILL_WEIGHT           // Trọng số độ khớp Kỹ năng (AI Vector)
+  BENEFIT_WEIGHT         // Trọng số độ khớp Phúc lợi/Mong muốn (AI Vector)
+  SALARY_WEIGHT          // Trọng số tiêu chí Lương
+  LOCATION_WEIGHT        // Trọng số tiêu chí Địa điểm
+  SHIFT_WEIGHT           // Trọng số tiêu chí Ca làm việc
+  GENDER_WEIGHT          // Trọng số tiêu chí Giới tính
+  AGE_WEIGHT             // Trọng số tiêu chí Độ tuổi
+  MIN_SCORE_THRESHOLD    // Ngưỡng điểm tối thiểu (%) để hiển thị kết quả matching
 }
 
 // =====================
@@ -646,10 +647,11 @@ model InterviewInvitation {
   @@index([createdAt])
 }
 
-model MatchingWeight {
+model MatchingConfig {
   id        Int      @id @default(autoincrement())
-  key       MatchingWeightKey @unique
+  key       MatchingConfigKey @unique
   label     String
-  weight    Float
+  value     Float
   updatedAt DateTime @updatedAt
 }
+

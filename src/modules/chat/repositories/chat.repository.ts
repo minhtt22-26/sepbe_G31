@@ -5,13 +5,9 @@ import {
   ChatMessage,
   MessageStatus,
 } from 'src/generated/prisma/client'
-import {
-  ChatConversationWithDetails,
-  IChatRepository,
-} from '../interfaces/chat.repository.interface'
-
+import { ChatConversationWithDetails } from '../interfaces/chat.repository.interface'
 @Injectable()
-export class ChatRepository implements IChatRepository {
+export class ChatRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async findConversationById(id: number): Promise<ChatConversation | null> {

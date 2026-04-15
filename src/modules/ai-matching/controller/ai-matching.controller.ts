@@ -5,7 +5,7 @@ import {
   AuthRoleProtected,
 } from 'src/modules/auth/decorators/auth.jwt.decorator'
 import { EnumUserRole } from 'src/generated/prisma/enums'
-import { UpdateWeightsRequestDto } from '../dto/request/update-weight.request.dto'
+import { UpdateConfigsRequestDto } from '../dto/request/update-config.request.dto'
 
 @Controller('ai-matching')
 export class AIMatchingController {
@@ -31,19 +31,18 @@ export class AIMatchingController {
     @Query('jobId') jobId: number,
     @Query('limit') limit?: number,
   ) {
-    console.log(jobId)
     return this.aiMatchingService.getSuggestedWorkers(jobId, limit || 10)
   }
 
-  @Get('weights')
+  @Get('configs')
   @AuthRoleProtected(EnumUserRole.ADMIN)
-  async getWeights() {
-    return this.aiMatchingService.getWeights()
+  async getConfigs() {
+    return this.aiMatchingService.getConfigs()
   }
 
-  @Put('weights')
+  @Put('configs')
   @AuthRoleProtected(EnumUserRole.ADMIN)
-  async updateWeights(@Body() dto: UpdateWeightsRequestDto) {
-    return this.aiMatchingService.updateWeights(dto.weights)
+  async updateConfigs(@Body() dto: UpdateConfigsRequestDto) {
+    return this.aiMatchingService.updateConfigs(dto.configs)
   }
 }

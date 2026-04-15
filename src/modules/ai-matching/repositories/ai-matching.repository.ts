@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/prisma.service'
 import {
-  IMatchingWeight,
+  IMatchingConfig,
   IRawMatchedJob,
   IRawMatchedWorker,
   IJobEmbeddings,
@@ -69,21 +69,23 @@ export class AIMatchingRepository {
     return result
   }
 
-  async getWeights(): Promise<IMatchingWeight[]> {
-    return this.prisma.matchingWeight.findMany()
+  async getConfigs(): Promise<IMatchingConfig[]> {
+    return this.prisma.matchingConfig.findMany()
   }
 
-  async updateWeights(weights: IMatchingWeight[]): Promise<IMatchingWeight[]> {
+  async updateConfigs(
+    configs: IMatchingConfig[],
+  ): Promise<IMatchingConfig[]> {
     await this.prisma.$transaction(
-      weights.map(({ key, weight }) =>
-        this.prisma.matchingWeight.update({
+      configs.map(({ key, value }) =>
+        this.prisma.matchingConfig.update({
           where: { key },
-          data: { weight },
+          data: { value },
         }),
       ),
     )
 
-    return this.getWeights()
+    return this.getConfigs()
   }
 
   private parseVector(text: string | null): number[] | null {
