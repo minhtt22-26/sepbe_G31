@@ -70,6 +70,16 @@ Copy-Item .env.example .env
 - JWT settings (`AUTH_JWT_*`)
 - email settings (`EMAIL_*`)
 - cloudinary settings (`CLOUDINARY_*`)
+- SePay settings (`SEPAY_*`) for boost payment
+
+SePay required vars for boost checkout:
+- `SEPAY_BANK_CODE`
+- `SEPAY_ACCOUNT_NUMBER`
+
+Optional but recommended:
+- `SEPAY_ACCOUNT_NAME`
+- `SEPAY_WEBHOOK_API_KEY`
+- `SEPAY_ORDER_PREFIX`
 
 Note:
 - `APP_PORT` defaults to `4000` in `.env.example`.
