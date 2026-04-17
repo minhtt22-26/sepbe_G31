@@ -34,6 +34,8 @@ import {
   AuthRoleProtected,
 } from '../auth/decorators/auth.jwt.decorator'
 import { CompanySearchDto } from './dtos/request/company.search.request.dto'
+import { UpdateReviewReportStatusDto } from './dtos/request/update.review.report.status.dto'
+import { ReportStatus } from 'src/generated/prisma/enums'
 
 
 @Controller('company')
@@ -221,6 +223,50 @@ export class CompanyController {
     @Body() dto: any,
   ) {
     return this.companyService.reportReview(reviewId, userId, dto)
+  }
+
+  // ================= MANAGER: REVIEW REPORT MODERATION =================
+
+  @Get('reviews/reports/all')
+  @AuthRoleProtected(EnumUserRole.MANAGER)
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'List reported reviews for manager' })
+  getReviewReports(
+    @Query('status') status?: ReportStatus,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.companyService.getReviewReports(
+      status,
+      Number(page) || 1,
+      Number(limit) || 50,
+    )
+  }
+
+  @Patch('reviews/reports/:id/status')
+  @AuthRoleProtected(EnumUserRole.MANAGER)
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Manager approves or rejects a review report' })
+  updateReviewReportStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateReviewReportStatusDto,
+  ) {
+    return this.companyService.updateReviewReportStatus(
+      id,
+      dto.status,
+      dto.managerNote,
+    )
+  }
+
+  @Patch('reviews/:reviewId/hide')
+  @AuthRoleProtected(EnumUserRole.MANAGER)
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Manager hides an inappropriate review' })
+  hideReview(@Param('reviewId', ParseIntPipe) reviewId: number) {
+    return this.companyService.hideReviewByManager(reviewId)
   }
 
   @Put('update/:id')
