@@ -241,9 +241,20 @@ export class JobService {
       throw new BadRequestException('Payload webhook không hợp lệ')
     }
 
+    const normalizedPayload =
+      payload.data && typeof payload.data === 'object'
+        ? (payload.data as Record<string, unknown>)
+        : payload
+
+    this.logger.debug(
+      `SePay webhook payload keys: ${Object.keys(normalizedPayload).join(',')}`,
+    )
+
     const transferType =
-      typeof payload.transferType === 'string'
-        ? payload.transferType.toLowerCase()
+      typeof normalizedPayload.transferType === 'string'
+        ? normalizedPayload.transferType.toLowerCase()
+        : typeof normalizedPayload.transfer_type === 'string'
+          ? normalizedPayload.transfer_type.toLowerCase()
         : ''
     if (transferType !== 'in') {
       this.logger.log(
@@ -252,7 +263,7 @@ export class JobService {
       return { success: true, message: 'Bỏ qua giao dịch không phải tiền vào' }
     }
 
-    const orderId = this.sepayService.extractOrderIdFromPayload(payload)
+    const orderId = this.sepayService.extractOrderIdFromPayload(normalizedPayload)
     if (!orderId) {
       this.logger.warn('SePay webhook ignored: cannot extract BOOST order id')
       return {
@@ -286,7 +297,13 @@ export class JobService {
       return { success: true, message: 'Order không có target job' }
     }
 
-    const transferAmount = Number(payload.transferAmount ?? payload.amount ?? 0)
+    const transferAmount = Number(
+      normalizedPayload.transferAmount ??
+      normalizedPayload.transfer_amount ??
+      normalizedPayload.amount ??
+      normalizedPayload.amount_in ??
+      0,
+    )
     if (!Number.isFinite(transferAmount) || transferAmount < order.amount) {
       this.logger.warn(
         `SePay webhook ignored: insufficient amount (orderId=${order.id}, required=${order.amount}, transfer=${transferAmount})`,
@@ -307,14 +324,21 @@ export class JobService {
         ? this.BOOST_LONG_DAYS
         : this.BOOST_SHORT_DAYS
     const referenceCode =
-      typeof payload.referenceCode === 'string' ? payload.referenceCode : null
+      typeof normalizedPayload.referenceCode === 'string'
+        ? normalizedPayload.referenceCode
+        : typeof normalizedPayload.reference_code === 'string'
+          ? normalizedPayload.reference_code
+          : null
     const rawTransactionCode =
-      typeof payload.transactionCode === 'string'
-        ? payload.transactionCode
+      typeof normalizedPayload.transactionCode === 'string'
+        ? normalizedPayload.transactionCode
+        : typeof normalizedPayload.transaction_code === 'string'
+          ? normalizedPayload.transaction_code
         : null
     const webhookId =
-      typeof payload.id === 'number' || typeof payload.id === 'string'
-        ? String(payload.id)
+      typeof normalizedPayload.id === 'number' ||
+      typeof normalizedPayload.id === 'string'
+        ? String(normalizedPayload.id)
         : null
 
     const transactionCode =
