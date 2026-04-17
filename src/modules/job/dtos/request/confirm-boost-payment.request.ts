@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { IsInt, IsOptional, IsString, Min } from 'class-validator'
+import { IsInt, IsNotEmpty, IsString, Min } from 'class-validator'
 import { Type } from 'class-transformer'
 
 export class ConfirmBoostPaymentRequestDto {
@@ -10,10 +10,10 @@ export class ConfirmBoostPaymentRequestDto {
   paymentOrderId!: number
 
   @ApiProperty({
-    required: false,
-    description: 'Mã giao dịch từ cổng thanh toán (nếu có)',
+    required: true,
+    description: 'Mã giao dịch từ cổng thanh toán',
   })
-  @IsOptional()
   @IsString()
+  @IsNotEmpty()
   transactionCode?: string
 }

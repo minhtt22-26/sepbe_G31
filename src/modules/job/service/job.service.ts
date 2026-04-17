@@ -36,9 +36,20 @@ import { SepayService } from './sepay.service'
 @Injectable()
 export class JobService {
   private readonly logger = new Logger(JobService.name)
+  private readonly BOOST_SHORT_DAYS = 7
+  private readonly BOOST_LONG_DAYS = 30
   private readonly BOOST_PRICE_BY_DAYS: Record<number, number> = {
-    7: 50000,
-    30: 300000,
+    7: 10000,
+    30: 20000,
+  }
+
+  private shuffleBoostedJobs<T>(items: T[]): T[] {
+    const shuffled = [...items]
+    for (let i = shuffled.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    }
+    return shuffled
   }
 
   constructor(
@@ -136,10 +147,11 @@ export class JobService {
       safeLimit,
       skip,
     )
+    const randomizedItems = this.shuffleBoostedJobs(items)
 
     return {
       success: true,
-      items,
+      items: randomizedItems,
       meta: {
         page: safePage,
         limit: safeLimit,
@@ -163,7 +175,7 @@ export class JobService {
       throw new BadRequestException('Only published jobs can be boosted')
     }
 
-    const packageDays = body.packageDays ?? 7
+    const packageDays = body.packageDays ?? this.BOOST_SHORT_DAYS
     const defaultAmount = this.BOOST_PRICE_BY_DAYS[packageDays]
 
     if (!defaultAmount) {
@@ -215,13 +227,17 @@ export class JobService {
     authorizationHeader?: string,
     payload?: Record<string, unknown>,
   ) {
+    this.logger.log('SePay webhook received')
+
     if (!this.sepayService.isValidWebhookAuthorization(authorizationHeader)) {
+      this.logger.warn('SePay webhook rejected: invalid authorization header')
       throw new UnauthorizedException(
         'SePay webhook authorization không hợp lệ',
       )
     }
 
     if (!payload || typeof payload !== 'object') {
+      this.logger.warn('SePay webhook rejected: invalid payload')
       throw new BadRequestException('Payload webhook không hợp lệ')
     }
 
@@ -230,11 +246,15 @@ export class JobService {
         ? payload.transferType.toLowerCase()
         : ''
     if (transferType !== 'in') {
+      this.logger.log(
+        `SePay webhook ignored: transferType=${transferType || '(empty)'}`,
+      )
       return { success: true, message: 'Bỏ qua giao dịch không phải tiền vào' }
     }
 
     const orderId = this.sepayService.extractOrderIdFromPayload(payload)
     if (!orderId) {
+      this.logger.warn('SePay webhook ignored: cannot extract BOOST order id')
       return {
         success: true,
         message: 'Bỏ qua giao dịch không chứa mã boost hợp lệ',
@@ -243,23 +263,34 @@ export class JobService {
 
     const order = await this.jobRepository.findPaymentOrderById(orderId)
     if (!order || order.orderType !== OrderType.BOOST_JOB) {
+      this.logger.warn(
+        `SePay webhook ignored: order not found or not BOOST_JOB (orderId=${orderId})`,
+      )
       return { success: true, message: 'Không tìm thấy boost order tương ứng' }
     }
 
     if (order.paymentMethod !== PaymentMethod.SEPAY) {
+      this.logger.warn(
+        `SePay webhook ignored: payment method mismatch (orderId=${order.id}, method=${order.paymentMethod})`,
+      )
       return { success: true, message: 'Order không dùng phương thức SEPAY' }
     }
 
     if (order.status === PaymentStatus.COMPLETED) {
+      this.logger.log(`SePay webhook ignored: order already completed (orderId=${order.id})`)
       return { success: true, message: 'Order đã xử lý trước đó' }
     }
 
     if (!order.targetId) {
+      this.logger.warn(`SePay webhook ignored: order has no targetId (orderId=${order.id})`)
       return { success: true, message: 'Order không có target job' }
     }
 
     const transferAmount = Number(payload.transferAmount ?? payload.amount ?? 0)
     if (!Number.isFinite(transferAmount) || transferAmount < order.amount) {
+      this.logger.warn(
+        `SePay webhook ignored: insufficient amount (orderId=${order.id}, required=${order.amount}, transfer=${transferAmount})`,
+      )
       return {
         success: true,
         message: 'Số tiền chưa đủ để kích hoạt boost',
@@ -271,7 +302,10 @@ export class JobService {
       }
     }
 
-    const durationDays = order.amount >= this.BOOST_PRICE_BY_DAYS[30] ? 30 : 7
+    const durationDays =
+      order.amount >= this.BOOST_PRICE_BY_DAYS[this.BOOST_LONG_DAYS]
+        ? this.BOOST_LONG_DAYS
+        : this.BOOST_SHORT_DAYS
     const referenceCode =
       typeof payload.referenceCode === 'string' ? payload.referenceCode : null
     const rawTransactionCode =
@@ -292,6 +326,10 @@ export class JobService {
       durationDays,
       transactionCode,
     })
+
+    this.logger.log(
+      `SePay webhook processed successfully: orderId=${result.order.id}, jobId=${result.job.id}`,
+    )
 
     return {
       success: true,
@@ -340,7 +378,10 @@ export class JobService {
       throw new BadRequestException('Chỉ đơn PENDING mới có thể xác nhận')
     }
 
-    const durationDays = order.amount >= 300000 ? 30 : 7
+    const durationDays =
+      order.amount >= this.BOOST_PRICE_BY_DAYS[this.BOOST_LONG_DAYS]
+        ? this.BOOST_LONG_DAYS
+        : this.BOOST_SHORT_DAYS
 
     const result = await this.jobRepository.activateBoostAfterPayment({
       orderId: order.id,
