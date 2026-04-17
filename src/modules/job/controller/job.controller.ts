@@ -99,6 +99,17 @@ export class JobController {
     return this.jobService.handleSepayWebhook(authorization, body)
   }
 
+  @Get('boost/sepay/webhook/ping')
+  @ApiOperation({ summary: 'Ping endpoint to verify webhook deployment' })
+  async pingSepayWebhook() {
+    return {
+      success: true,
+      message: 'SePay webhook endpoint is reachable',
+      path: '/api/job/boost/sepay/webhook',
+      method: 'POST',
+    }
+  }
+
   @AuthJwtAccessProtected()
   @AuthRoleProtected(EnumUserRole.EMPLOYER)
   @ApiBearerAuth('access-token')
