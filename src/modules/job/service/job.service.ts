@@ -463,7 +463,7 @@ export class JobService {
       status: JobStatus.PUBLISHED, // Default to PUBLISHED
     }
 
-    // AI CONTENT MODERATION
+    // AI CONTENT MODERATION (chỉ phát hiện SPAM)
     try {
       this.logger.log(`Starting AI moderation for job: ${dto.title}`);
       const moderationResult = await this.moderationService.moderateJob({ ...jobData, fields: dto.fields });
@@ -475,19 +475,13 @@ export class JobService {
         throw new BadRequestException(
           `Tin tuyển dụng bị từ chối do có dấu hiệu SPAM (AI detect): ${moderationResult.reason}. Vui lòng kiểm tra và viết lại nội dung nghiêm túc.`,
         );
-      } else if (moderationResult.status === ModerationStatus.SCAM) {
-        this.logger.warn(
-          `AI FLAGGED job as SCAM. Reason: ${moderationResult.reason}`,
-        );
-        jobData.status = JobStatus.WARNING;
       }
     } catch (moderationError) {
       if (moderationError instanceof BadRequestException) {
         throw moderationError
       }
-      this.logger.error('Moderation failed:', moderationError)
-      // Fallback: Nếu AI lỗi kỹ thuật thì cho vào WARNING để manager check, không chặn user
-      jobData.status = JobStatus.WARNING
+      // AI lỗi kỹ thuật → không chặn user, cho đăng bình thường
+      this.logger.error('Moderation failed, bypassing AI check:', moderationError)
     }
 
     // ==============================
@@ -511,10 +505,7 @@ export class JobService {
       return {
         success: true,
         data: created,
-        message:
-          created.status === JobStatus.WARNING
-            ? 'Tin của bạn đã được lưu nhưng đang chờ duyệt do có dấu hiệu nghi vấn (AI detect)'
-            : 'Đăng tin tuyển dụng thành công',
+        message: 'Đăng tin tuyển dụng thành công',
       }
     } catch (error) {
       const errorMessage =

@@ -383,7 +383,7 @@ export class CompanyService {
 
   async getReviewsByCompanyId(companyId: number) {
     const reviews = await this.prisma.companyReview.findMany({
-      where: { companyId },
+      where: { companyId, status: 'ACTIVE' },
       include: {
         user: { select: { id: true, fullName: true, avatar: true } },
       },
@@ -458,6 +458,85 @@ export class CompanyService {
         reason: dto.reason,
         description: dto.description,
       },
+    })
+  }
+
+  // ================= MANAGER: REVIEW REPORT MODERATION =================
+
+  /**
+   * UC 2.14.6 — List reported reviews for manager (with status filter + pagination).
+   */
+  async getReviewReports(
+    status: 'PENDING' | 'RESOLVED' | 'REJECTED' | undefined,
+    page = 1,
+    limit = 50,
+  ) {
+    const where = status ? { status } : {}
+    const safePage = Math.max(1, Number(page) || 1)
+    const safeLimit = Math.min(Math.max(1, Number(limit) || 50), 100)
+
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.companyReviewReport.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (safePage - 1) * safeLimit,
+        take: safeLimit,
+        include: {
+          reporter: { select: { id: true, fullName: true, email: true } },
+          review: {
+            include: {
+              user: { select: { id: true, fullName: true, email: true } },
+              company: { select: { id: true, name: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.companyReviewReport.count({ where }),
+    ])
+
+    return {
+      data,
+      total,
+      page: safePage,
+      limit: safeLimit,
+      totalPages: Math.ceil(total / safeLimit),
+    }
+  }
+
+  /**
+   * UC 2.14.6 — Approve or reject a review report (manager updates status).
+   */
+  async updateReviewReportStatus(
+    reportId: number,
+    status: 'PENDING' | 'RESOLVED' | 'REJECTED',
+    managerNote?: string,
+  ) {
+    const report = await this.prisma.companyReviewReport.findUnique({
+      where: { id: reportId },
+    })
+    if (!report) throw new NotFoundException('Review report not found')
+
+    return this.prisma.companyReviewReport.update({
+      where: { id: reportId },
+      data: {
+        status,
+        managerNote: managerNote ?? report.managerNote ?? null,
+      },
+    })
+  }
+
+  /**
+   * UC 2.14.7 — Hide an inappropriate review (soft-delete via ReviewStatus.DELETED).
+   */
+  async hideReviewByManager(reviewId: number) {
+    const review = await this.prisma.companyReview.findUnique({
+      where: { id: reviewId },
+    })
+    if (!review) throw new NotFoundException('Review not found')
+
+    return this.prisma.companyReview.update({
+      where: { id: reviewId },
+      data: { status: 'DELETED' },
     })
   }
 }
