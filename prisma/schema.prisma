@@ -161,6 +161,27 @@ enum MatchingConfigKey {
   MIN_SCORE_THRESHOLD    // Ngưỡng điểm tối thiểu (%) để hiển thị kết quả matching
 }
 
+enum SupportTicketStatus {
+  NEW
+  IN_PROGRESS
+  WAITING_CUSTOMER
+  RESOLVED
+}
+
+enum SupportTicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum SupportTicketChannel {
+  CHAT
+  EMAIL
+  PHONE
+  OTHER
+}
+
 // =====================
 // USER & AUTH
 // =====================
@@ -568,6 +589,28 @@ model TermsConditions {
   updatedAt   DateTime @updatedAt
 
   @@index([effectiveAt])
+}
+
+model SupportTicket {
+  id           Int                   @id @default(autoincrement())
+  ticketCode   String                @unique
+  customerName String
+  contact      String
+  subject      String
+  description  String?
+  channel      SupportTicketChannel  @default(CHAT)
+  priority     SupportTicketPriority @default(MEDIUM)
+  status       SupportTicketStatus   @default(NEW)
+  assigneeName String?
+  internalNote String?
+  resolvedAt   DateTime?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  @@index([status])
+  @@index([priority])
+  @@index([channel])
+  @@index([createdAt])
 }
 
 model ChatConversation {
