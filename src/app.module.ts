@@ -32,6 +32,7 @@ import { APP_GUARD } from '@nestjs/core'
 import { UserStatusGuard } from './common/guards/user-status.guard'
 import { AuthUserMiddleware } from './common/middleware/auth-user.middleware'
 import { StatisticsModule } from './modules/statistics/statistics.module'
+import { SupportModule } from './modules/support/support.module'
 // import { CacheModule } from '@nestjs/cache-manager'
 @Module({
   imports: [
@@ -107,6 +108,7 @@ import { StatisticsModule } from './modules/statistics/statistics.module'
     AdminModule,
     StatisticsModule,
     InterviewInvitationModule,
+    SupportModule,
   ],
   controllers: [],
   providers: [

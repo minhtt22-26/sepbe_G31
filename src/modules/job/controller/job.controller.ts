@@ -24,6 +24,7 @@ import { JobReportDto } from '../dtos/job.report.request.dto'
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiHeader,
   ApiOperation,
   ApiParam,
   ApiResponse,
@@ -72,12 +73,41 @@ export class JobController {
   }
 
   @Post('boost/sepay/webhook')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        transferType: { type: 'string', example: 'in' },
+        content: { type: 'string', example: 'BOOST123' },
+        transferAmount: { type: 'number', example: 10000 },
+        referenceCode: { type: 'string', example: 'BOOST123' },
+        transactionCode: { type: 'string', example: 'TXN123456' },
+      },
+      additionalProperties: true,
+    },
+  })
+  @ApiHeader({
+    name: 'authorization',
+    required: true,
+    description: 'SePay webhook auth header. Format: apikey <SEPAY_WEBHOOK_API_KEY>',
+  })
   @ApiOperation({ summary: 'SePay webhook callback for boost payments' })
   async handleSepayWebhook(
     @Headers('authorization') authorization?: string,
     @Body() body?: Record<string, unknown>,
   ) {
     return this.jobService.handleSepayWebhook(authorization, body)
+  }
+
+  @Get('boost/sepay/webhook/ping')
+  @ApiOperation({ summary: 'Ping endpoint to verify webhook deployment' })
+  async pingSepayWebhook() {
+    return {
+      success: true,
+      message: 'SePay webhook endpoint is reachable',
+      path: '/api/job/boost/sepay/webhook',
+      method: 'POST',
+    }
   }
 
   @AuthJwtAccessProtected()

@@ -56,22 +56,52 @@ export class SepayService {
 
     const normalized = authorizationHeader.trim().toLowerCase()
     const expected = `apikey ${this.paymentCfg.sepayWebhookApiKey}`.toLowerCase()
-    return normalized === expected
+    const expectedKey = this.paymentCfg.sepayWebhookApiKey.trim().toLowerCase()
+
+    return normalized === expected || normalized === expectedKey
   }
 
   extractOrderIdFromPayload(payload: Record<string, unknown>): number | null {
-    const source = [payload.code, payload.content, payload.description]
-      .filter((v) => typeof v === 'string')
-      .join(' ')
+    const candidates = [
+      payload.code,
+      payload.content,
+      payload.description,
+      payload.transferContent,
+      payload.transfer_content,
+      payload.addInfo,
+      payload.add_info,
+      payload.referenceCode,
+      payload.reference_code,
+      payload.transactionCode,
+      payload.transaction_code,
+      payload.orderCode,
+      payload.order_code,
+      payload.memo,
+      payload.note,
+    ]
+      .filter((value): value is string => typeof value === 'string')
+      .map((value) => value.trim())
+      .filter(Boolean)
 
-    const prefix = this.paymentCfg.sepayOrderPrefix
-    const regex = new RegExp(`${prefix}(\\d+)`, 'i')
-    const match = source.match(regex)
-    if (!match) {
-      return null
+    const prefix = this.paymentCfg.sepayOrderPrefix.trim()
+    const normalizedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const patterns = [
+      new RegExp(`${normalizedPrefix}\\s*[-_]?\\s*(\\d+)`, 'i'),
+      new RegExp(`\\b${normalizedPrefix}(\\d+)\\b`, 'i'),
+    ]
+
+    for (const candidate of candidates) {
+      for (const pattern of patterns) {
+        const match = candidate.match(pattern)
+        if (!match) continue
+
+        const id = Number(match[1])
+        if (Number.isFinite(id) && id > 0) {
+          return id
+        }
+      }
     }
 
-    const id = Number(match[1])
-    return Number.isFinite(id) && id > 0 ? id : null
+    return null
   }
 }

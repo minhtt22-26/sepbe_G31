@@ -181,5 +181,17 @@ describe('SepayService', () => {
       const result = service.extractOrderIdFromPayload(payload)
       expect(result).toBe(888)
     })
+
+    it('should extract orderId when prefix is separated by spaces', () => {
+      const payload = { code: 'BOOST 123', content: '', description: '' }
+      const result = service.extractOrderIdFromPayload(payload)
+      expect(result).toBe(123)
+    })
+
+    it('should extract orderId when prefix is separated by hyphen', () => {
+      const payload = { code: 'BOOST-456', content: '', description: '' }
+      const result = service.extractOrderIdFromPayload(payload)
+      expect(result).toBe(456)
+    })
   })
 })

@@ -114,7 +114,7 @@ export class JobRepository {
         where: {
           status: JobStatus.PUBLISHED,
           isBoosted: true,
-          OR: [{ boostExpiredAt: null }, { boostExpiredAt: { gt: now } }],
+          boostExpiredAt: { gt: now },
         },
         orderBy: [{ boostExpiredAt: 'desc' }, { createdAt: 'desc' }],
         take: limit,
@@ -139,7 +139,7 @@ export class JobRepository {
         where: {
           status: JobStatus.PUBLISHED,
           isBoosted: true,
-          OR: [{ boostExpiredAt: null }, { boostExpiredAt: { gt: now } }],
+          boostExpiredAt: { gt: now },
         },
       }),
     ])
