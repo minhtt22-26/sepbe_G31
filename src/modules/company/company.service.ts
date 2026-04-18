@@ -8,7 +8,12 @@ import {
 import { CloudinaryService } from 'src/infrastructure/cloudinary/cloudinary.service'
 import { PrismaService } from 'src/prisma.service'
 import { CompanyRegisterDto } from './dtos/request/company.register'
-import { CompanyStatus, EnumUserRole } from 'src/generated/prisma/enums'
+import {
+  CompanyStatus,
+  EnumUserRole,
+  ReportStatus,
+  ReviewStatus,
+} from 'src/generated/prisma/enums'
 import { UpdateCompanyDto } from './dtos/request/company.update'
 import { CompanyReviewDto } from './dtos/request/company.review'
 import { REDIS_CLIENT } from 'src/infrastructure/redis/redis.provider'
@@ -352,7 +357,42 @@ export class CompanyService {
       skip,
     )
 
-    return createPaginatedResult(items, total, dto.page!, dto.limit!)
+    let enrichedItems = items
+    if (items.length > 0) {
+      const ids = items.map((c) => c.id)
+      const stats = await this.prisma.companyReview.groupBy({
+        by: ['companyId'],
+        where: {
+          companyId: { in: ids },
+          status: ReviewStatus.ACTIVE,
+        },
+        _avg: { rating: true },
+        _count: { _all: true },
+      })
+      const statMap = new Map(
+        stats.map((s) => [
+          s.companyId,
+          {
+            reviewAvg: s._avg.rating,
+            reviewCount: s._count._all,
+          },
+        ]),
+      )
+      enrichedItems = items.map((c) => {
+        const s = statMap.get(c.id)
+        const avg = s?.reviewAvg
+        return {
+          ...c,
+          reviewAvg:
+            avg != null && !Number.isNaN(Number(avg))
+              ? Math.round(Number(avg) * 10) / 10
+              : null,
+          reviewCount: s?.reviewCount ?? 0,
+        }
+      })
+    }
+
+    return createPaginatedResult(enrichedItems, total, dto.page!, dto.limit!)
   }
 
   // ================= COMPANY REVIEWS =================
@@ -537,16 +577,51 @@ export class CompanyService {
   ) {
     const report = await this.prisma.companyReviewReport.findUnique({
       where: { id: reportId },
+      include: {
+        review: {
+          select: {
+            id: true,
+            company: { select: { id: true, name: true } },
+          },
+        },
+      },
     })
     if (!report) throw new NotFoundException('Review report not found')
 
-    return this.prisma.companyReviewReport.update({
+    const updated = await this.prisma.companyReviewReport.update({
       where: { id: reportId },
       data: {
         status,
         managerNote: managerNote ?? report.managerNote ?? null,
       },
     })
+
+    if (
+      status === ReportStatus.RESOLVED ||
+      status === ReportStatus.REJECTED
+    ) {
+      const companyName = report.review?.company?.name ?? 'công ty'
+      const companyId = report.review?.company?.id
+      const title =
+        status === ReportStatus.RESOLVED
+          ? 'Báo cáo đánh giá đã được xử lý'
+          : 'Báo cáo đánh giá không được chấp nhận'
+      const message =
+        status === ReportStatus.RESOLVED
+          ? `Báo cáo của bạn về đánh giá tại "${companyName}" đã được xử lý. Cảm ơn bạn đã đóng góp.`
+          : `Báo cáo của bạn về đánh giá tại "${companyName}" không được chấp nhận do không phát hiện vi phạm.`
+
+      await this.prisma.notification.create({
+        data: {
+          userId: report.reporterId,
+          title,
+          message,
+          link: companyId != null ? `/company/${companyId}` : '/profile',
+        },
+      })
+    }
+
+    return updated
   }
 
   /**
