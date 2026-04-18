@@ -436,6 +436,9 @@ export class CompanyService {
   async reportReview(reviewId: number, userId: number, dto: any) {
     const review = await this.prisma.companyReview.findUnique({
       where: { id: reviewId },
+      include: {
+        company: { select: { id: true, name: true } },
+      },
     })
     if (!review) throw new NotFoundException('Review not found')
 
@@ -451,7 +454,7 @@ export class CompanyService {
     if (existingReport)
       throw new BadRequestException('You have already reported this review')
 
-    return this.prisma.companyReviewReport.create({
+    const created = await this.prisma.companyReviewReport.create({
       data: {
         reviewId,
         reporterId: userId,
@@ -459,6 +462,27 @@ export class CompanyService {
         description: dto.description,
       },
     })
+
+    const managers = await this.prisma.user.findMany({
+      where: { role: EnumUserRole.MANAGER },
+      select: { id: true },
+    })
+
+    const companyName = review.company?.name || 'Công ty'
+    await Promise.all(
+      managers.map((m) =>
+        this.prisma.notification.create({
+          data: {
+            userId: m.id,
+            title: 'Có báo cáo đánh giá mới',
+            message: `(${created.id}) ${companyName}`,
+            link: `/manager?tab=review_reports`,
+          },
+        }),
+      ),
+    )
+
+    return created
   }
 
   // ================= MANAGER: REVIEW REPORT MODERATION =================
