@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import {
+  EnumUserRole,
   JobApplicationStatus,
   OrderType,
   PaymentMethod,
@@ -245,7 +246,21 @@ export class JobRepository {
           isBoosted: true,
           boostExpiredAt,
         },
+        include: {
+          company: { select: { ownerId: true } },
+        },
       })
+
+      if (job.company?.ownerId) {
+        await tx.notification.create({
+          data: {
+            userId: job.company.ownerId,
+            title: 'Thanh toán đẩy tin thành công',
+            message: `(${params.durationDays} ngày) ${job.title}`,
+            link: `/employer`,
+          },
+        })
+      }
 
       return { order, job }
     })
@@ -527,7 +542,7 @@ export class JobRepository {
         })),
       })
 
-      return tx.jobApplication.findUnique({
+      const application = await tx.jobApplication.findUnique({
         where: {
           id: applicationId,
         },
@@ -535,6 +550,55 @@ export class JobRepository {
           answers: true,
         },
       })
+
+      const jobRow = await tx.job.findUnique({
+        where: { id: data.jobId },
+        select: {
+          title: true,
+          company: { select: { ownerId: true } },
+        },
+      })
+
+      if (jobRow?.company?.ownerId && jobRow.company.ownerId !== data.userId) {
+        const applicantCount = await tx.jobApplication.count({
+          where: {
+            jobId: data.jobId,
+            status: { not: JobApplicationStatus.CANCELLED },
+          },
+        })
+        const employerLink = `/employer?applicantsJobId=${data.jobId}`
+        const title = 'Ứng viên mới ứng tuyển'
+        const message = `(${applicantCount}) ${jobRow.title}`
+
+        const existing = await tx.notification.findFirst({
+          where: {
+            userId: jobRow.company.ownerId,
+            link: employerLink,
+          },
+        })
+
+        if (existing) {
+          await tx.notification.update({
+            where: { id: existing.id },
+            data: {
+              title,
+              message,
+              isRead: false,
+            },
+          })
+        } else {
+          await tx.notification.create({
+            data: {
+              userId: jobRow.company.ownerId,
+              title,
+              message,
+              link: employerLink,
+            },
+          })
+        }
+      }
+
+      return application
     })
   }
 
@@ -836,7 +900,7 @@ export class JobRepository {
   }
 
   async createJobReport(userId: number, dto: any) {
-    return this.prisma.jobReport.create({
+    const report = await this.prisma.jobReport.create({
       data: {
         jobId: dto.jobId,
         reporterId: userId,
@@ -844,7 +908,30 @@ export class JobRepository {
         description: dto.description,
         status: 'PENDING',
       },
+      include: {
+        job: { select: { title: true } },
+      },
     })
+
+    const managers = await this.prisma.user.findMany({
+      where: { role: EnumUserRole.MANAGER },
+      select: { id: true },
+    })
+
+    await Promise.all(
+      managers.map((m) =>
+        this.prisma.notification.create({
+          data: {
+            userId: m.id,
+            title: 'Có báo cáo tin tuyển dụng mới',
+            message: `(${report.id}) ${report.job.title}`,
+            link: `/manager?tab=job_reports`,
+          },
+        }),
+      ),
+    )
+
+    return report
   }
   async changeJobReportStatus(reportId: number, status: ReportStatus) {
     const report = await this.prisma.jobReport.update({
