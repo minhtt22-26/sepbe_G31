@@ -664,6 +664,7 @@ model InterviewInvitationCampaign {
 
   company     Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
   invitations InterviewInvitation[]
+  slots       InterviewInvitationSlot[]
 
   @@index([companyId])
   @@index([status])
@@ -674,20 +675,42 @@ model InterviewInvitation {
   id               Int                       @id @default(autoincrement())
   campaignId       Int
   workerId         Int
+  selectedSlotId   Int?
   status           InterviewInvitationStatus @default(PENDING)
   responseMessage  String?                   // Lý do từ chối (nếu worker từ chối)
   respondedAt      DateTime?
   createdAt        DateTime                  @default(now())
   updatedAt        DateTime                  @updatedAt
 
-  campaign InterviewInvitationCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  worker   User                         @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  campaign     InterviewInvitationCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  worker       User                       @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  selectedSlot InterviewInvitationSlot?   @relation("InvitationSelectedSlot", fields: [selectedSlotId], references: [id], onDelete: SetNull)
 
   @@unique([campaignId, workerId])
   @@index([campaignId])
   @@index([workerId])
+  @@index([selectedSlotId])
   @@index([status])
   @@index([createdAt])
+}
+
+model InterviewInvitationSlot {
+  id         Int      @id @default(autoincrement())
+  campaignId Int
+  startAt    DateTime
+  endAt      DateTime
+  capacity   Int
+  bookedCount Int     @default(0)
+  location   String?
+  note       String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  campaign    InterviewInvitationCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  invitations InterviewInvitation[]       @relation("InvitationSelectedSlot")
+
+  @@index([campaignId])
+  @@index([startAt])
 }
 
 model MatchingConfig {

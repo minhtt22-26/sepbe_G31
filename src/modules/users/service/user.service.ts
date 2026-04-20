@@ -53,12 +53,25 @@ export class UserService {
     private readonly aiMatchingService: AIMatchingService,
   ) { }
 
+  private async validateSingleManagerConstraint(role: EnumUserRole) {
+    if (role !== EnumUserRole.MANAGER) return
+
+    const managerCount = await this.userRepository.countNonDeletedManagers()
+    if (managerCount > 0) {
+      throw new BadRequestException({
+        message: 'Hệ thống chỉ cho phép duy nhất 1 tài khoản manager',
+      })
+    }
+  }
+
   async signUp({
     userName,
     email,
     password: passwordString,
     ...others
   }: UserSignUpRequestDto) {
+    await this.validateSingleManagerConstraint(others.role)
+
     const isExistEmail = email
       ? await this.userRepository.findUserWithByEmail(email)
       : null
@@ -416,6 +429,8 @@ export class UserService {
 
     // Nếu user không tồn tại, tạo mới
     if (!user) {
+      await this.validateSingleManagerConstraint(body.role)
+
       user = await this.userRepository.createBySocial(
         email,
         body.fullName,

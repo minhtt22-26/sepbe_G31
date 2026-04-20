@@ -1,4 +1,12 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator'
+import {
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+} from 'class-validator'
 import { ApiProperty } from '@nestjs/swagger'
 import { InterviewInvitationStatus } from 'src/generated/prisma/enums'
 
@@ -21,4 +29,14 @@ export class RespondInvitationRequestDto {
   @IsOptional()
   @MaxLength(500)
   responseMessage?: string
+
+  @ApiProperty({
+    description: 'ID ca phỏng vấn được chọn (bắt buộc nếu status = ACCEPTED)',
+    required: false,
+    example: 12,
+  })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  selectedSlotId?: number
 }

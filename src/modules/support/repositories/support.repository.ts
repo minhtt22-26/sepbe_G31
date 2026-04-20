@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import {
+  EnumUserRole,
+  EnumUserStatus,
   Prisma,
   SupportTicketChannel,
   SupportTicketPriority,
@@ -27,6 +29,20 @@ export class SupportRepository {
     return this.prisma.supportTicket.update({
       where: { id },
       data,
+    })
+  }
+
+  async findActiveManagers() {
+    return this.prisma.user.findMany({
+      where: {
+        role: EnumUserRole.MANAGER,
+        status: EnumUserStatus.ACTIVE,
+      },
+      select: {
+        id: true,
+        fullName: true,
+      },
+      orderBy: { id: 'asc' },
     })
   }
 

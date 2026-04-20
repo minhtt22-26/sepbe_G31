@@ -60,6 +60,17 @@ export class UserRepository {
     })
   }
 
+  async countNonDeletedManagers(): Promise<number> {
+    return this.prisma.user.count({
+      where: {
+        role: EnumUserRole.MANAGER,
+        status: {
+          not: EnumUserStatus.DELETED,
+        },
+      },
+    })
+  }
+
   async login(userId: number, loginWith: EnumUserLoginWith): Promise<void> {
     const dateNow = this.helperService.dateCreate()
     await this.prisma.user.update({
