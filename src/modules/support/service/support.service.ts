@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { SupportTicketStatus } from 'src/generated/prisma/enums'
 import { CreateSupportTicketDto } from '../dtos/create-support-ticket.dto'
 import { SupportTicketListDto } from '../dtos/support-ticket-list.dto'
@@ -8,6 +8,26 @@ import { SupportRepository } from '../repositories/support.repository'
 @Injectable()
 export class SupportService {
   constructor(private readonly supportRepository: SupportRepository) {}
+
+  private async getSingleActiveManager() {
+    const managers = await this.supportRepository.findActiveManagers()
+
+    if (managers.length === 0) {
+      throw new BadRequestException({
+        message:
+          'Không thể xử lý ticket vì chưa có manager đang hoạt động trong hệ thống',
+      })
+    }
+
+    if (managers.length > 1) {
+      throw new BadRequestException({
+        message:
+          'Không thể xử lý ticket vì hệ thống đang có nhiều hơn 1 manager đang hoạt động',
+      })
+    }
+
+    return managers[0]
+  }
 
   private async generateTicketCode() {
     for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -22,6 +42,7 @@ export class SupportService {
   }
 
   async createTicket(dto: CreateSupportTicketDto) {
+    const manager = await this.getSingleActiveManager()
     const ticketCode = await this.generateTicketCode()
     return this.supportRepository.create({
       ticketCode,
@@ -31,10 +52,13 @@ export class SupportService {
       description: dto.description,
       channel: dto.channel,
       priority: dto.priority,
+      assigneeName: manager.fullName,
     })
   }
 
   async listTickets(query: SupportTicketListDto) {
+    await this.getSingleActiveManager()
+
     const page = query.page ?? 1
     const limit = query.limit ?? 10
 
@@ -58,6 +82,7 @@ export class SupportService {
   }
 
   async updateTicket(id: number, dto: UpdateSupportTicketDto) {
+    const manager = await this.getSingleActiveManager()
     const existing = await this.supportRepository.findById(id)
     if (!existing) {
       throw new NotFoundException(`Support ticket ${id} not found`)
@@ -69,9 +94,7 @@ export class SupportService {
 
     return this.supportRepository.update(id, {
       ...(dto.status ? { status: dto.status } : {}),
-      ...(dto.assigneeName !== undefined
-        ? { assigneeName: dto.assigneeName || null }
-        : {}),
+      assigneeName: manager.fullName,
       ...(dto.internalNote !== undefined
         ? { internalNote: dto.internalNote || null }
         : {}),

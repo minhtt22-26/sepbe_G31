@@ -9,7 +9,11 @@ import { InterviewInvitationRepository } from '../repositories/interview-invitat
 import { CreateCampaignRequestDto } from '../dtos/request/create-campaign.request.dto'
 import { RespondInvitationRequestDto } from '../dtos/request/respond-invitation.request.dto'
 import { GetCampaignsRequestDto } from '../dtos/request/get-campaigns.request.dto'
-import { InterviewInvitationStatus, CampaignStatus } from 'src/generated/prisma/enums'
+import {
+  CampaignStatus,
+  EnumUserRole,
+  InterviewInvitationStatus,
+} from 'src/generated/prisma/enums'
 import { NotificationsService } from 'src/modules/notifications/notifications.service'
 import { ChatService } from 'src/modules/chat/service/chat.service'
 
@@ -22,11 +26,66 @@ export class InterviewInvitationService {
     private readonly chatService: ChatService,
   ) {}
 
+  private formatSlotSummary(slot: {
+    startAt: Date
+    endAt: Date
+    bookedCount: number
+    capacity: number
+    location?: string | null
+  }) {
+    const startText = new Date(slot.startAt).toLocaleString('vi-VN')
+    const endText = new Date(slot.endAt).toLocaleString('vi-VN')
+    const locationText = slot.location ? ` | ${slot.location}` : ''
+
+    return `${startText} - ${endText} (${slot.bookedCount}/${slot.capacity})${locationText}`
+  }
+
+  private validateCampaignSlots(slots: CreateCampaignRequestDto['slots']) {
+    if (!slots?.length) {
+      throw new BadRequestException('Phải tạo ít nhất 1 ca phỏng vấn')
+    }
+
+    const normalizedKeys = new Set<string>()
+    const now = Date.now()
+
+    for (const slot of slots) {
+      const startAt = new Date(slot.startAt)
+      const endAt = new Date(slot.endAt)
+
+      if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
+        throw new BadRequestException('Thời gian ca phỏng vấn không hợp lệ')
+      }
+
+      if (endAt <= startAt) {
+        throw new BadRequestException('Giờ kết thúc phải sau giờ bắt đầu của ca phỏng vấn')
+      }
+
+      if (startAt.getTime() < now) {
+        throw new BadRequestException('Không được tạo ca phỏng vấn ở thời gian đã qua')
+      }
+
+      const key = `${startAt.toISOString()}_${endAt.toISOString()}`
+      if (normalizedKeys.has(key)) {
+        throw new BadRequestException('Không được tạo 2 ca phỏng vấn trùng giờ')
+      }
+      normalizedKeys.add(key)
+    }
+  }
+
   /**
    * Tạo chiến dịch mời phỏng vấn
    */
   async createCampaign(dto: CreateCampaignRequestDto, companyId: number) {
-    const { title, description, message, jobId, workerIds, expiresAt, scheduledAt } = dto
+    const {
+      title,
+      description,
+      message,
+      jobId,
+      workerIds,
+      slots,
+      expiresAt,
+      scheduledAt,
+    } = dto
 
     // Validate worker IDs
     if (!workerIds || workerIds.length === 0) {
@@ -38,46 +97,104 @@ export class InterviewInvitationService {
       throw new BadRequestException('Danh sách worker chứa ID trùng lặp')
     }
 
-    // Validate workers exist
+    this.validateCampaignSlots(slots)
+
+    // Validate workers exist and are WORKER role
     const workers = await this.prisma.user.findMany({
-      where: { id: { in: workerIds } },
+      where: {
+        id: { in: workerIds },
+        role: EnumUserRole.WORKER,
+      },
     })
 
     if (workers.length !== workerIds.length) {
       throw new BadRequestException('Một số worker không tồn tại')
     }
 
-    // Create campaign
-    const campaign = await this.repository.createCampaign({
-      companyId,
-      jobId: jobId || null,
-      title,
-      description: description || null,
-      message,
-      totalCount: workerIds.length,
-      pendingCount: workerIds.length,
-      status: scheduledAt ? CampaignStatus.SCHEDULED : CampaignStatus.DRAFT,
-      expiresAt: expiresAt ? new Date(expiresAt) : null,
-      scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
-    })
-
-    // Create individual invitations
-    const invitations = workerIds.map((workerId) => ({
-      campaignId: campaign.id,
-      workerId,
-      status: InterviewInvitationStatus.PENDING,
-    }))
-
-    try {
-      await this.prisma.interviewInvitation.createMany({
-        data: invitations,
-        skipDuplicates: true,
+    if (jobId) {
+      const job = await this.prisma.job.findFirst({
+        where: {
+          id: jobId,
+          companyId,
+        },
+        select: { id: true },
       })
-    } catch {
-      throw new BadRequestException('Không thể tạo lời mời. Có thể một số worker đã được mời trước đó')
+
+      if (!job) {
+        throw new BadRequestException('Không tìm thấy công việc hợp lệ cho chiến dịch này')
+      }
+
+      const existingInvitations = await this.prisma.interviewInvitation.findMany({
+        where: {
+          workerId: { in: workerIds },
+          campaign: {
+            companyId,
+            jobId,
+          },
+        },
+        select: {
+          workerId: true,
+        },
+      })
+
+      const invitedWorkerIdSet = new Set(existingInvitations.map((i) => i.workerId))
+      if (invitedWorkerIdSet.size > 0) {
+        throw new BadRequestException(
+          'Một số ứng viên đã được mời phỏng vấn cho job này, không thể mời lại',
+        )
+      }
+
     }
 
-    return this.repository.getCampaignById(campaign.id)
+    const createdCampaign = await this.prisma.$transaction(async (tx) => {
+      const campaign = await tx.interviewInvitationCampaign.create({
+        data: {
+          companyId,
+          jobId: jobId || null,
+          title,
+          description: description || null,
+          message,
+          totalCount: workerIds.length,
+          pendingCount: workerIds.length,
+          status: scheduledAt ? CampaignStatus.SCHEDULED : CampaignStatus.DRAFT,
+          expiresAt: expiresAt ? new Date(expiresAt) : null,
+          scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+        },
+      })
+
+      await tx.interviewInvitationSlot.createMany({
+        data: slots.map((slot) => ({
+          campaignId: campaign.id,
+          startAt: new Date(slot.startAt),
+          endAt: new Date(slot.endAt),
+          capacity: slot.capacity,
+          location: slot.location?.trim() || null,
+          note: slot.note?.trim() || null,
+        })),
+      })
+
+      await tx.interviewInvitation.createMany({
+        data: workerIds.map((workerId) => ({
+          campaignId: campaign.id,
+          workerId,
+          status: InterviewInvitationStatus.PENDING,
+        })),
+        skipDuplicates: true,
+      })
+
+      return tx.interviewInvitationCampaign.findUnique({
+        where: { id: campaign.id },
+        include: {
+          company: true,
+          invitations: true,
+          slots: {
+            orderBy: { startAt: 'asc' },
+          },
+        },
+      })
+    })
+
+    return createdCampaign
   }
 
   /**
@@ -125,6 +242,13 @@ export class InterviewInvitationService {
    */
   private async sendNotificationsToWorkers(campaign: any) {
     const invitations = campaign.invitations || []
+    const slots = (campaign.slots || [])
+      .map((slot) => `- ${this.formatSlotSummary(slot)}`)
+      .join('\n')
+
+    const messageWithSlots = slots
+      ? `${campaign.message}\n\nCác ca phỏng vấn:\n${slots}\n\nVui lòng mở lời mời để chọn ca phù hợp.`
+      : campaign.message
 
     for (const invitation of invitations) {
       try {
@@ -133,7 +257,7 @@ export class InterviewInvitationService {
           data: {
             userId: invitation.workerId,
             title: `Mời phỏng vấn: ${campaign.title}`,
-            message: campaign.message,
+            message: messageWithSlots,
             link: `/interview-invitations/${invitation.id}`,
           },
         })
@@ -176,6 +300,15 @@ export class InterviewInvitationService {
         sentAt: c.sentAt,
         completedAt: c.completedAt,
         expiresAt: c.expiresAt,
+        slots: (c.slots || []).map((slot) => ({
+          id: slot.id,
+          startAt: slot.startAt,
+          endAt: slot.endAt,
+          capacity: slot.capacity,
+          bookedCount: slot.bookedCount,
+          location: slot.location,
+          note: slot.note,
+        })),
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
       })),
@@ -221,6 +354,16 @@ export class InterviewInvitationService {
           title: i.campaign.title,
           message: i.campaign.message,
           expiresAt: i.campaign.expiresAt,
+          slots: (i.campaign.slots || []).map((slot) => ({
+            id: slot.id,
+            startAt: slot.startAt,
+            endAt: slot.endAt,
+            capacity: slot.capacity,
+            bookedCount: slot.bookedCount,
+            remainingSeats: Math.max(0, slot.capacity - slot.bookedCount),
+            location: slot.location,
+            note: slot.note,
+          })),
         },
         company: i.campaign.company
           ? {
@@ -230,6 +373,14 @@ export class InterviewInvitationService {
             }
           : null,
         status: i.status,
+        selectedSlot: i.selectedSlot
+          ? {
+              id: i.selectedSlot.id,
+              startAt: i.selectedSlot.startAt,
+              endAt: i.selectedSlot.endAt,
+              location: i.selectedSlot.location,
+            }
+          : null,
         responseMessage: i.responseMessage,
         respondedAt: i.respondedAt,
         createdAt: i.createdAt,
@@ -272,12 +423,72 @@ export class InterviewInvitationService {
       throw new BadRequestException('Phải cung cấp lý do khi từ chối lời mời')
     }
 
-    // Update invitation status
-    const updatedInvitation = await this.repository.updateInvitationStatus(
-      invitationId,
-      dto.status,
-      dto.responseMessage,
-    )
+    if (dto.status === InterviewInvitationStatus.ACCEPTED && !dto.selectedSlotId) {
+      throw new BadRequestException('Bạn cần chọn ca phỏng vấn trước khi chấp nhận')
+    }
+
+    let updatedInvitation: any
+
+    if (dto.status === InterviewInvitationStatus.ACCEPTED) {
+      updatedInvitation = await this.prisma.$transaction(async (tx) => {
+        const slot = await tx.interviewInvitationSlot.findUnique({
+          where: { id: dto.selectedSlotId },
+        })
+
+        if (!slot || slot.campaignId !== invitation.campaignId) {
+          throw new BadRequestException('Ca phỏng vấn đã chọn không hợp lệ')
+        }
+
+        if (slot.bookedCount >= slot.capacity) {
+          throw new BadRequestException('Ca phỏng vấn này đã đủ số lượng ứng viên')
+        }
+
+        const reserved = await tx.interviewInvitationSlot.updateMany({
+          where: {
+            id: slot.id,
+            bookedCount: slot.bookedCount,
+          },
+          data: {
+            bookedCount: {
+              increment: 1,
+            },
+          },
+        })
+
+        if (reserved.count === 0) {
+          throw new BadRequestException(
+            'Ca phỏng vấn vừa được đặt đầy. Vui lòng chọn ca khác',
+          )
+        }
+
+        return tx.interviewInvitation.update({
+          where: { id: invitationId },
+          data: {
+            status: dto.status,
+            responseMessage: dto.responseMessage,
+            selectedSlotId: dto.selectedSlotId,
+            respondedAt: new Date(),
+          },
+          include: {
+            campaign: {
+              include: {
+                slots: {
+                  orderBy: { startAt: 'asc' },
+                },
+              },
+            },
+            worker: true,
+            selectedSlot: true,
+          },
+        })
+      })
+    } else {
+      updatedInvitation = await this.repository.updateInvitationStatus(
+        invitationId,
+        dto.status,
+        dto.responseMessage,
+      )
+    }
 
     // Update campaign stats
     await this.updateCampaignStats(invitation.campaign.id)
@@ -290,11 +501,17 @@ export class InterviewInvitationService {
 
     // Send notification to company owner
     if (company) {
+      const acceptedSlotText =
+        dto.status === InterviewInvitationStatus.ACCEPTED &&
+        updatedInvitation.selectedSlot
+          ? ` | Ca đã chọn: ${this.formatSlotSummary(updatedInvitation.selectedSlot)}`
+          : ''
+
       await this.prisma.notification.create({
         data: {
           userId: company.ownerId,
           title: `Worker ${invitation.worker.fullName} đã phản hồi lời mời`,
-          message: `${invitation.worker.fullName} đã ${dto.status === InterviewInvitationStatus.ACCEPTED ? 'chấp nhận' : 'từ chối'} lời mời phỏng vấn cho ${invitation.campaign.title}`,
+          message: `${invitation.worker.fullName} đã ${dto.status === InterviewInvitationStatus.ACCEPTED ? 'chấp nhận' : 'từ chối'} lời mời phỏng vấn cho ${invitation.campaign.title}${acceptedSlotText}`,
           link: `/campaigns/${invitation.campaign.id}`,
         },
       })
@@ -386,5 +603,96 @@ export class InterviewInvitationService {
     }
 
     return this.repository.getCampaignStats(campaignId)
+  }
+
+  async getJobInviteConstraints(jobId: number, companyId: number) {
+    const job = await this.prisma.job.findFirst({
+      where: {
+        id: jobId,
+        companyId,
+      },
+      select: { id: true },
+    })
+
+    if (!job) {
+      throw new NotFoundException('Không tìm thấy job của công ty')
+    }
+
+    const campaigns = await this.prisma.interviewInvitationCampaign.findMany({
+      where: {
+        companyId,
+        jobId,
+      },
+      include: {
+        slots: {
+          orderBy: { startAt: 'asc' },
+        },
+        invitations: {
+          select: {
+            workerId: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    })
+
+    const latestCampaignId = campaigns.length
+      ? campaigns[campaigns.length - 1].id
+      : null
+
+    const invitedWorkerIdSet = new Set<number>()
+    const allSlots: Array<{
+      id: number
+      startAt: Date
+      endAt: Date
+      capacity: number
+      location: string | null
+      note: string | null
+    }> = []
+
+    for (const campaign of campaigns) {
+      for (const invitation of campaign.invitations || []) {
+        invitedWorkerIdSet.add(invitation.workerId)
+      }
+      for (const slot of campaign.slots || []) {
+        allSlots.push({
+          id: slot.id,
+          startAt: slot.startAt,
+          endAt: slot.endAt,
+          capacity: slot.capacity,
+          location: slot.location,
+          note: slot.note,
+        })
+      }
+    }
+
+    const hasExistingSchedule = allSlots.length > 0
+    const sortedSlots = [...allSlots].sort(
+      (a, b) => a.startAt.getTime() - b.startAt.getTime(),
+    )
+    const windowStart = hasExistingSchedule ? sortedSlots[0].startAt : null
+    const windowEnd = hasExistingSchedule
+      ? sortedSlots.reduce(
+          (max, slot) => (slot.endAt > max ? slot.endAt : max),
+          sortedSlots[0].endAt,
+        )
+      : null
+
+    return {
+      jobId,
+      latestCampaignId,
+      hasExistingSchedule,
+      windowStart,
+      windowEnd,
+      invitedWorkerIds: Array.from(invitedWorkerIdSet),
+      scheduleSlots: sortedSlots.map((slot) => ({
+        id: slot.id,
+        startAt: slot.startAt,
+        endAt: slot.endAt,
+        capacity: slot.capacity,
+        location: slot.location,
+        note: slot.note,
+      })),
+    }
   }
 }

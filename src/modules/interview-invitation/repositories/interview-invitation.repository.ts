@@ -17,8 +17,25 @@ export class InterviewInvitationRepository implements IInterviewInvitationReposi
     return this.prisma.interviewInvitationCampaign.findUnique({
       where: { id: campaignId },
       include: {
-        invitations: true,
+        invitations: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            worker: {
+              select: {
+                id: true,
+                fullName: true,
+                email: true,
+                phone: true,
+                avatar: true,
+              },
+            },
+            selectedSlot: true,
+          },
+        },
         company: true,
+        slots: {
+          orderBy: { startAt: 'asc' },
+        },
       },
     })
   }
@@ -40,6 +57,11 @@ export class InterviewInvitationRepository implements IInterviewInvitationReposi
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { createdAt: 'desc' },
+        include: {
+          slots: {
+            orderBy: { startAt: 'asc' },
+          },
+        },
       }),
       this.prisma.interviewInvitationCampaign.count({ where }),
     ])
@@ -58,8 +80,15 @@ export class InterviewInvitationRepository implements IInterviewInvitationReposi
     return this.prisma.interviewInvitation.findUnique({
       where: { id: invitationId },
       include: {
-        campaign: true,
+        campaign: {
+          include: {
+            slots: {
+              orderBy: { startAt: 'asc' },
+            },
+          },
+        },
         worker: true,
+        selectedSlot: true,
       },
     })
   }
@@ -74,8 +103,12 @@ export class InterviewInvitationRepository implements IInterviewInvitationReposi
           campaign: {
             include: {
               company: true,
+              slots: {
+                orderBy: { startAt: 'asc' },
+              },
             },
           },
+          selectedSlot: true,
         },
         skip: (page - 1) * limit,
         take: limit,
@@ -91,17 +124,26 @@ export class InterviewInvitationRepository implements IInterviewInvitationReposi
     invitationId: number,
     status: InterviewInvitationStatus,
     message?: string,
+    selectedSlotId?: number,
   ) {
     return this.prisma.interviewInvitation.update({
       where: { id: invitationId },
       data: {
         status,
         responseMessage: message,
+        selectedSlotId: selectedSlotId ?? null,
         respondedAt: new Date(),
       },
       include: {
-        campaign: true,
+        campaign: {
+          include: {
+            slots: {
+              orderBy: { startAt: 'asc' },
+            },
+          },
+        },
         worker: true,
+        selectedSlot: true,
       },
     })
   }

@@ -1,5 +1,18 @@
-import { IsString, IsNotEmpty, IsOptional, IsInt, IsArray, IsDateString, MaxLength, MinLength } from 'class-validator'
+import {
+  ArrayMinSize,
+  IsArray,
+  IsDateString,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+  ValidateNested,
+} from 'class-validator'
 import { ApiProperty } from '@nestjs/swagger'
+import { Type } from 'class-transformer'
+import { CreateCampaignSlotRequestDto } from './create-campaign-slot.request.dto'
 
 export class CreateCampaignRequestDto {
   @ApiProperty({ description: 'Tên chiến dịch mời phỏng vấn', example: 'Mời phỏng vấn công nhân lắp ráp' })
@@ -35,6 +48,16 @@ export class CreateCampaignRequestDto {
   @IsInt({ each: true })
   @IsNotEmpty()
   workerIds: number[]
+
+  @ApiProperty({
+    description: 'Danh sách ca phỏng vấn để worker lựa chọn',
+    type: [CreateCampaignSlotRequestDto],
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => CreateCampaignSlotRequestDto)
+  slots: CreateCampaignSlotRequestDto[]
 
   @ApiProperty({ 
     description: 'Thời gian hết hạn phản hồi (ISO format)', 

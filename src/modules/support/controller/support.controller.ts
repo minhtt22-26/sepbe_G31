@@ -28,7 +28,7 @@ export class SupportController {
   }
 
   @Get()
-  @AuthRoleProtected(EnumUserRole.ADMIN, EnumUserRole.MANAGER)
+  @AuthRoleProtected(EnumUserRole.MANAGER)
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'List support tickets for staff' })
   async listTickets(@Query() query: SupportTicketListDto) {
@@ -36,7 +36,7 @@ export class SupportController {
   }
 
   @Patch(':id')
-  @AuthRoleProtected(EnumUserRole.ADMIN, EnumUserRole.MANAGER)
+  @AuthRoleProtected(EnumUserRole.MANAGER)
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Update support ticket status/assignment' })
   async updateTicket(

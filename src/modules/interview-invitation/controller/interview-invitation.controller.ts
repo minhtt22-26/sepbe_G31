@@ -137,6 +137,23 @@ export class InterviewInvitationController {
   }
 
   /**
+   * Employer: Lấy ràng buộc mời phỏng vấn theo job
+   */
+  @Get('jobs/:jobId/invite-constraints')
+  @AuthJwtAccessProtected()
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Lấy ràng buộc mời phỏng vấn theo job' })
+  @ApiResponse({ status: 200, description: 'Ràng buộc mời phỏng vấn theo job' })
+  async getJobInviteConstraints(
+    @AuthJwtPayload() user: any,
+    @Param('jobId', ParseIntPipe) jobId: number,
+  ) {
+    const company = await this.companyService.findByOwnerId(user.userId)
+    return this.interviewInvitationService.getJobInviteConstraints(jobId, company.id)
+  }
+
+  /**
    * Worker: Lấy danh sách lời mời phỏng vấn
    */
   @Get('my-invitations')

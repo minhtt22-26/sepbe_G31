@@ -16,7 +16,12 @@ export interface IInterviewInvitationRepository {
     page: number,
     limit: number,
   ): Promise<{ invitations: unknown[]; total: number }>
-  updateInvitationStatus(invitationId: number, status: InterviewInvitationStatus, message?: string): Promise<any>
+  updateInvitationStatus(
+    invitationId: number,
+    status: InterviewInvitationStatus,
+    message?: string,
+    selectedSlotId?: number,
+  ): Promise<any>
   getCampaignStats(campaignId: number): Promise<unknown>
   getScheduledCampaigns(): Promise<unknown[]>
   updateCampaignStatus(campaignId: number, status: CampaignStatus): Promise<unknown>
