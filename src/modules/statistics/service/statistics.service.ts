@@ -33,4 +33,12 @@ export class StatisticsService {
     }
     return this.statisticsRepository.getPaymentStats(ownerId, query)
   }
+
+  async getJobStatus(ownerId: number) {
+    const company = await this.companyService.findByOwnerId(ownerId)
+    if (!company) {
+      throw new NotFoundException('Bạn chưa sở hữu công ty nào')
+    }
+    return this.statisticsRepository.getJobStatus(company.id)
+  }
 }

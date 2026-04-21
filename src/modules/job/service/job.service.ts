@@ -59,7 +59,7 @@ export class JobService {
     @Inject(forwardRef(() => AIMatchingService))
     private readonly aiMatchingService: AIMatchingService,
     private readonly moderationService: JobModerationService,
-  ) { }
+  ) {}
 
   async searchJobs(q: any) {
     await this.jobRepository.deactivateExpiredBoosts()
@@ -255,7 +255,7 @@ export class JobService {
         ? normalizedPayload.transferType.toLowerCase()
         : typeof normalizedPayload.transfer_type === 'string'
           ? normalizedPayload.transfer_type.toLowerCase()
-        : ''
+          : ''
     if (transferType !== 'in') {
       this.logger.log(
         `SePay webhook ignored: transferType=${transferType || '(empty)'}`,
@@ -263,7 +263,8 @@ export class JobService {
       return { success: true, message: 'Bỏ qua giao dịch không phải tiền vào' }
     }
 
-    const orderId = this.sepayService.extractOrderIdFromPayload(normalizedPayload)
+    const orderId =
+      this.sepayService.extractOrderIdFromPayload(normalizedPayload)
     if (!orderId) {
       this.logger.warn('SePay webhook ignored: cannot extract BOOST order id')
       return {
@@ -288,21 +289,25 @@ export class JobService {
     }
 
     if (order.status === PaymentStatus.COMPLETED) {
-      this.logger.log(`SePay webhook ignored: order already completed (orderId=${order.id})`)
+      this.logger.log(
+        `SePay webhook ignored: order already completed (orderId=${order.id})`,
+      )
       return { success: true, message: 'Order đã xử lý trước đó' }
     }
 
     if (!order.targetId) {
-      this.logger.warn(`SePay webhook ignored: order has no targetId (orderId=${order.id})`)
+      this.logger.warn(
+        `SePay webhook ignored: order has no targetId (orderId=${order.id})`,
+      )
       return { success: true, message: 'Order không có target job' }
     }
 
     const transferAmount = Number(
       normalizedPayload.transferAmount ??
-      normalizedPayload.transfer_amount ??
-      normalizedPayload.amount ??
-      normalizedPayload.amount_in ??
-      0,
+        normalizedPayload.transfer_amount ??
+        normalizedPayload.amount ??
+        normalizedPayload.amount_in ??
+        0,
     )
     if (!Number.isFinite(transferAmount) || transferAmount < order.amount) {
       this.logger.warn(
@@ -334,7 +339,7 @@ export class JobService {
         ? normalizedPayload.transactionCode
         : typeof normalizedPayload.transaction_code === 'string'
           ? normalizedPayload.transaction_code
-        : null
+          : null
     const webhookId =
       typeof normalizedPayload.id === 'number' ||
       typeof normalizedPayload.id === 'string'
@@ -530,28 +535,30 @@ export class JobService {
 
     // AI CONTENT MODERATION (chỉ phát hiện SPAM)
     try {
-      this.logger.log(`Starting AI moderation for job: ${dto.title}`);
-      const moderationResult = await this.moderationService.moderateJob({ ...jobData, fields: dto.fields });
+      this.logger.log(`Starting AI moderation for job: ${dto.title}`)
+      const moderationResult = await this.moderationService.moderateJob({
+        ...jobData,
+        fields: dto.fields,
+      })
 
       if (moderationResult.status === ModerationStatus.SPAM) {
         this.logger.warn(
           `AI REJECTED job as SPAM. Reason: ${moderationResult.reason}`,
-        );
+        )
         throw new BadRequestException(
           `Tin tuyển dụng bị từ chối do có dấu hiệu SPAM (AI detect): ${moderationResult.reason}. Vui lòng kiểm tra và viết lại nội dung nghiêm túc.`,
-        );
+        )
       }
     } catch (moderationError) {
       if (moderationError instanceof BadRequestException) {
         throw moderationError
       }
-      // AI lỗi kỹ thuật → không chặn user, cho đăng bình thường
-      this.logger.error('Moderation failed, bypassing AI check:', moderationError)
+      // AI lỗi kỹ thuật → không  user, cho đăng bình thường
+      this.logger.error(
+        'Moderation failed, bypassing AI check:',
+        moderationError,
+      )
     }
-
-    // ==============================
-    // 3️⃣ Call Repository
-    // ==============================
 
     try {
       const created = await this.jobRepository.createJobWithForm({
@@ -559,13 +566,7 @@ export class JobService {
         fields: dto.fields,
       })
 
-      //this.embeddingQueueService.queueJobEmbedding(created.id)
-      // Gọi trực tiếp embedding (không qua queue)
       await this.aiMatchingService.buildJobEmbedding(created.id)
-
-      // ==============================
-      // 4️⃣ Return Response
-      // ==============================
 
       return {
         success: true,
@@ -593,27 +594,23 @@ export class JobService {
 
     const update = await this.jobRepository.updateJobFull(jobId, dto)
 
-    /* Queue-based (tạm comment):
-    // this.embeddingQueueService.queueJobEmbedding(jobId)
-    */
-
-    // Gọi trực tiếp embedding (không qua queue)
     await this.aiMatchingService.buildJobEmbedding(jobId)
 
     return update
   }
 
-  async getDetail(jobId: number) {
+  async getDetail(jobId: number, ipAddress?: string) {
     const job = await this.jobRepository.findJobById(jobId)
 
     if (!job) {
       throw new Error('Job not found')
     }
 
-    // return {
-    //   success: true,
-    //   data: job
-    // };
+    if (ipAddress) {
+      this.jobRepository.recordView(jobId, ipAddress).catch((err) => {
+        this.logger.warn(`Failed to record view for job ${jobId}: ${err}`)
+      })
+    }
 
     return job
   }
@@ -708,9 +705,9 @@ export class JobService {
             const selected =
               field.fieldType === 'checkbox'
                 ? value
-                  .split(',')
-                  .map((item) => item.trim())
-                  .filter(Boolean)
+                    .split(',')
+                    .map((item) => item.trim())
+                    .filter(Boolean)
                 : [value]
 
             const hasInvalid = selected.some(
@@ -893,11 +890,11 @@ export class JobService {
       meta: fetchAll
         ? undefined
         : {
-          page,
-          limit,
-          total,
-          totalPage: Math.ceil(total / limit),
-        },
+            page,
+            limit,
+            total,
+            totalPage: Math.ceil(total / limit),
+          },
     }
   }
   async getWarningJobs(page = 1, limit = 10) {

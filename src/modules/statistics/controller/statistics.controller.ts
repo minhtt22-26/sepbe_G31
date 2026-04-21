@@ -36,4 +36,10 @@ export class StatisticsController {
   ) {
     return this.statisticService.getPaymentStats(userId, query)
   }
+
+  @Get('employer/job-status')
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
+  async getJobStatus(@AuthJwtPayload('userId') userId: number) {
+    return this.statisticService.getJobStatus(userId)
+  }
 }
