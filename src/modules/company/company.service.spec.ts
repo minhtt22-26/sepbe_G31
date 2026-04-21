@@ -155,7 +155,7 @@ describe('CompanyService', () => {
 
     const result = await service.review(
       1,
-      { status: CompanyStatus.APPROVED } as any,
+      { status: CompanyStatus.APPROVED },
     );
 
     expect(result).toBe(expected);
@@ -247,7 +247,7 @@ describe('CompanyService', () => {
 
     const result = await service.update(
       1,
-      { name: 'Updated' } as any,
+      { name: 'Updated' },
       {
         logo: [{ path: 'logo.png' }],
         businessLicense: [{ path: 'license.pdf' }],

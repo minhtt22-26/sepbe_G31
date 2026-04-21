@@ -14,6 +14,7 @@ import {
   EnumUserRole,
   InterviewInvitationStatus,
 } from 'src/generated/prisma/enums'
+import { Cron, CronExpression } from '@nestjs/schedule'
 import { NotificationsService } from 'src/modules/notifications/notifications.service'
 import { ChatService } from 'src/modules/chat/service/chat.service'
 
@@ -69,6 +70,207 @@ export class InterviewInvitationService {
         throw new BadRequestException('Không được tạo 2 ca phỏng vấn trùng giờ')
       }
       normalizedKeys.add(key)
+    }
+  }
+
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async handleEmployerInterviewReminders() {
+    try {
+      await Promise.all([
+        this.sendEmployerSlotReminders(24),
+        this.sendEmployerSlotReminders(1),
+      ])
+    } catch (error) {
+      console.error('Error sending employer interview reminders:', error)
+    }
+  }
+
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async handleWorkerInterviewReminders() {
+    try {
+      await Promise.all([
+        this.sendWorkerInvitationReminders(24),
+        this.sendWorkerInvitationReminders(1),
+      ])
+    } catch (error) {
+      console.error('Error sending worker interview reminders:', error)
+    }
+  }
+
+  private async sendEmployerSlotReminders(hoursBefore: 24 | 1) {
+    const now = new Date()
+    const target = new Date(now.getTime() + hoursBefore * 60 * 60 * 1000)
+    const rangeStart = new Date(target.getTime() - 5 * 60 * 1000)
+    const rangeEnd = new Date(target.getTime() + 5 * 60 * 1000)
+
+    const acceptedInvitations = await this.prisma.interviewInvitation.findMany({
+      where: {
+        status: InterviewInvitationStatus.ACCEPTED,
+        selectedSlotId: {
+          not: null,
+        },
+        selectedSlot: {
+          startAt: {
+            gte: rangeStart,
+            lte: rangeEnd,
+          },
+        },
+        campaign: {
+          status: {
+            in: [CampaignStatus.IN_PROGRESS, CampaignStatus.COMPLETED],
+          },
+        },
+      },
+      include: {
+        selectedSlot: true,
+        worker: {
+          select: {
+            id: true,
+            fullName: true,
+          },
+        },
+        campaign: {
+          include: {
+            company: {
+              select: {
+                ownerId: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    const grouped = new Map<
+      string,
+      {
+        campaignId: number
+        title: string
+        ownerId: number
+        startAt: Date
+        endAt: Date
+        location: string | null
+        acceptedCount: number
+      }
+    >()
+
+    for (const invitation of acceptedInvitations) {
+      if (!invitation.selectedSlot || !invitation.campaign?.company?.ownerId) continue
+
+      const key = `${invitation.campaignId}:${invitation.selectedSlot.id}`
+      const current = grouped.get(key)
+
+      if (!current) {
+        grouped.set(key, {
+          campaignId: invitation.campaignId,
+          title: invitation.campaign.title,
+          ownerId: invitation.campaign.company.ownerId,
+          startAt: invitation.selectedSlot.startAt,
+          endAt: invitation.selectedSlot.endAt,
+          location: invitation.selectedSlot.location,
+          acceptedCount: 1,
+        })
+        continue
+      }
+
+      current.acceptedCount += 1
+    }
+
+    for (const [slotKey, item] of grouped.entries()) {
+      const reminderTag = `${hoursBefore}h`
+      const link = `/employer?campaignId=${item.campaignId}&slotReminder=${slotKey}&before=${reminderTag}`
+
+      const existed = await this.prisma.notification.findFirst({
+        where: {
+          userId: item.ownerId,
+          link,
+        },
+        select: {
+          id: true,
+        },
+      })
+
+      if (existed) continue
+
+      const startText = new Date(item.startAt).toLocaleString('vi-VN')
+      const endText = new Date(item.endAt).toLocaleString('vi-VN')
+      const locationText = item.location || 'Chưa cập nhật địa điểm'
+
+      await this.prisma.notification.create({
+        data: {
+          userId: item.ownerId,
+          title: `Nhắc lịch phỏng vấn trước ${hoursBefore} giờ`,
+          message: `Ca phỏng vấn của chiến dịch "${item.title}" sẽ diễn ra lúc ${startText} - ${endText} tại ${locationText}. Hiện có ${item.acceptedCount} ứng viên đã xác nhận.`,
+          link,
+        },
+      })
+    }
+  }
+
+  private async sendWorkerInvitationReminders(hoursBefore: 24 | 1) {
+    const now = new Date()
+    const target = new Date(now.getTime() + hoursBefore * 60 * 60 * 1000)
+    const rangeStart = new Date(target.getTime() - 5 * 60 * 1000)
+    const rangeEnd = new Date(target.getTime() + 5 * 60 * 1000)
+
+    const acceptedInvitations = await this.prisma.interviewInvitation.findMany({
+      where: {
+        status: InterviewInvitationStatus.ACCEPTED,
+        selectedSlotId: {
+          not: null,
+        },
+        selectedSlot: {
+          startAt: {
+            gte: rangeStart,
+            lte: rangeEnd,
+          },
+        },
+        campaign: {
+          status: {
+            in: [CampaignStatus.IN_PROGRESS, CampaignStatus.COMPLETED],
+          },
+        },
+      },
+      include: {
+        selectedSlot: true,
+        campaign: {
+          select: {
+            title: true,
+          },
+        },
+      },
+    })
+
+    for (const invitation of acceptedInvitations) {
+      if (!invitation.selectedSlot) continue
+
+      const reminderTag = `${hoursBefore}h`
+      const link = `/interview-invitations/${invitation.id}?before=${reminderTag}&slotId=${invitation.selectedSlot.id}`
+
+      const existed = await this.prisma.notification.findFirst({
+        where: {
+          userId: invitation.workerId,
+          link,
+        },
+        select: {
+          id: true,
+        },
+      })
+
+      if (existed) continue
+
+      const startText = new Date(invitation.selectedSlot.startAt).toLocaleString('vi-VN')
+      const endText = new Date(invitation.selectedSlot.endAt).toLocaleString('vi-VN')
+      const locationText = invitation.selectedSlot.location || 'Chưa cập nhật địa điểm'
+
+      await this.prisma.notification.create({
+        data: {
+          userId: invitation.workerId,
+          title: `Nhắc lịch phỏng vấn trước ${hoursBefore} giờ`,
+          message: `Buổi phỏng vấn "${invitation.campaign.title}" của bạn sẽ diễn ra lúc ${startText} - ${endText} tại ${locationText}. Vui lòng chuẩn bị trước giờ hẹn.`,
+          link,
+        },
+      })
     }
   }
 
@@ -130,6 +332,12 @@ export class InterviewInvitationService {
           campaign: {
             companyId,
             jobId,
+          },
+          status: {
+            in: [
+              InterviewInvitationStatus.PENDING,
+              InterviewInvitationStatus.ACCEPTED,
+            ],
           },
         },
         select: {
@@ -406,8 +614,18 @@ export class InterviewInvitationService {
       throw new ForbiddenException('Bạn không có quyền phản hồi lời mời này')
     }
 
-    if (invitation.status !== InterviewInvitationStatus.PENDING) {
-      throw new BadRequestException('Lời mời này đã được phản hồi rồi')
+    if (
+      invitation.status !== InterviewInvitationStatus.PENDING &&
+      invitation.status !== InterviewInvitationStatus.ACCEPTED
+    ) {
+      throw new BadRequestException('Lời mời này không còn cho phép phản hồi')
+    }
+
+    if (
+      invitation.status === InterviewInvitationStatus.ACCEPTED &&
+      dto.status !== InterviewInvitationStatus.ACCEPTED
+    ) {
+      throw new BadRequestException('Lời mời đã chấp nhận chỉ có thể đổi ca phỏng vấn')
     }
 
     // Check if expired
@@ -431,42 +649,87 @@ export class InterviewInvitationService {
 
     if (dto.status === InterviewInvitationStatus.ACCEPTED) {
       updatedInvitation = await this.prisma.$transaction(async (tx) => {
+        const latestInvitation = await tx.interviewInvitation.findUnique({
+          where: { id: invitationId },
+          select: {
+            campaignId: true,
+            status: true,
+            selectedSlotId: true,
+          },
+        })
+
+        if (!latestInvitation) {
+          throw new NotFoundException('Lời mời không tồn tại')
+        }
+
+        if (
+          latestInvitation.status !== InterviewInvitationStatus.PENDING &&
+          latestInvitation.status !== InterviewInvitationStatus.ACCEPTED
+        ) {
+          throw new BadRequestException('Lời mời này không còn cho phép đổi ca')
+        }
+
+        const targetSlotId = Number(dto.selectedSlotId)
+        if (!targetSlotId) {
+          throw new BadRequestException('Bạn cần chọn ca phỏng vấn hợp lệ')
+        }
+
         const slot = await tx.interviewInvitationSlot.findUnique({
           where: { id: dto.selectedSlotId },
         })
 
-        if (!slot || slot.campaignId !== invitation.campaignId) {
+        if (!slot || slot.campaignId !== latestInvitation.campaignId) {
           throw new BadRequestException('Ca phỏng vấn đã chọn không hợp lệ')
         }
 
-        if (slot.bookedCount >= slot.capacity) {
-          throw new BadRequestException('Ca phỏng vấn này đã đủ số lượng ứng viên')
-        }
+        const isSameSlot = latestInvitation.selectedSlotId === targetSlotId
 
-        const reserved = await tx.interviewInvitationSlot.updateMany({
-          where: {
-            id: slot.id,
-            bookedCount: slot.bookedCount,
-          },
-          data: {
-            bookedCount: {
-              increment: 1,
+        if (!isSameSlot) {
+          if (slot.bookedCount >= slot.capacity) {
+            throw new BadRequestException('Ca phỏng vấn này đã đủ số lượng ứng viên')
+          }
+
+          const reserved = await tx.interviewInvitationSlot.updateMany({
+            where: {
+              id: slot.id,
+              bookedCount: slot.bookedCount,
             },
-          },
-        })
+            data: {
+              bookedCount: {
+                increment: 1,
+              },
+            },
+          })
 
-        if (reserved.count === 0) {
-          throw new BadRequestException(
-            'Ca phỏng vấn vừa được đặt đầy. Vui lòng chọn ca khác',
-          )
+          if (reserved.count === 0) {
+            throw new BadRequestException(
+              'Ca phỏng vấn vừa được đặt đầy. Vui lòng chọn ca khác',
+            )
+          }
+
+          if (latestInvitation.selectedSlotId) {
+            await tx.interviewInvitationSlot.updateMany({
+              where: {
+                id: latestInvitation.selectedSlotId,
+                bookedCount: {
+                  gte: 1,
+                },
+              },
+              data: {
+                bookedCount: {
+                  decrement: 1,
+                },
+              },
+            })
+          }
         }
 
         return tx.interviewInvitation.update({
           where: { id: invitationId },
           data: {
-            status: dto.status,
+            status: InterviewInvitationStatus.ACCEPTED,
             responseMessage: dto.responseMessage,
-            selectedSlotId: dto.selectedSlotId,
+            selectedSlotId: targetSlotId,
             respondedAt: new Date(),
           },
           include: {
@@ -567,23 +830,90 @@ export class InterviewInvitationService {
       throw new ForbiddenException('Bạn không có quyền hủy chiến dịch này')
     }
 
-    if (campaign.status === CampaignStatus.COMPLETED) {
-      throw new BadRequestException('Không thể hủy chiến dịch đã hoàn thành')
+    if (campaign.status === CampaignStatus.CANCELLED) {
+      throw new BadRequestException('Chiến dịch đã được hủy trước đó')
     }
 
-    // Update campaign status
-    await this.repository.updateCampaignStatus(campaignId, CampaignStatus.CANCELLED)
+    const affectedInvitations = (campaign.invitations || []).filter(
+      (invitation) =>
+        invitation.status === InterviewInvitationStatus.PENDING ||
+        invitation.status === InterviewInvitationStatus.ACCEPTED,
+    )
 
-    // Update all pending invitations to CANCELLED
-    await this.prisma.interviewInvitation.updateMany({
-      where: {
-        campaignId,
-        status: InterviewInvitationStatus.PENDING,
-      },
-      data: {
-        status: InterviewInvitationStatus.CANCELLED,
-      },
+    const slotReleaseMap = new Map<number, number>()
+    for (const invitation of affectedInvitations) {
+      if (
+        invitation.status === InterviewInvitationStatus.ACCEPTED &&
+        invitation.selectedSlotId
+      ) {
+        const current = slotReleaseMap.get(invitation.selectedSlotId) || 0
+        slotReleaseMap.set(invitation.selectedSlotId, current + 1)
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      // Update campaign status first so worker UI reflects cancellation immediately.
+      await tx.interviewInvitationCampaign.update({
+        where: { id: campaignId },
+        data: {
+          status: CampaignStatus.CANCELLED,
+        },
+      })
+
+      if (affectedInvitations.length > 0) {
+        await tx.interviewInvitation.updateMany({
+          where: {
+            campaignId,
+            status: {
+              in: [
+                InterviewInvitationStatus.PENDING,
+                InterviewInvitationStatus.ACCEPTED,
+              ],
+            },
+          },
+          data: {
+            status: InterviewInvitationStatus.CANCELLED,
+            selectedSlotId: null,
+            respondedAt: new Date(),
+          },
+        })
+      }
+
+      for (const [slotId, releaseCount] of slotReleaseMap) {
+        await tx.interviewInvitationSlot.updateMany({
+          where: {
+            id: slotId,
+            bookedCount: { gte: releaseCount },
+          },
+          data: {
+            bookedCount: {
+              decrement: releaseCount,
+            },
+          },
+        })
+      }
     })
+
+    await this.updateCampaignStats(campaignId)
+
+    for (const invitation of affectedInvitations) {
+      try {
+        await this.prisma.notification.create({
+          data: {
+            userId: invitation.workerId,
+            title: `Lịch phỏng vấn đã bị hủy: ${campaign.title}`,
+            message:
+              'Nhà tuyển dụng đã hủy lịch phỏng vấn cho chiến dịch này. Bạn không cần tham gia buổi phỏng vấn đã chọn trước đó.',
+            link: `/interview-invitations/${invitation.id}`,
+          },
+        })
+      } catch (error) {
+        console.error(
+          `Error sending cancellation notification to worker ${invitation.workerId}:`,
+          error,
+        )
+      }
+    }
 
     return this.repository.getCampaignById(campaignId)
   }
@@ -630,6 +960,7 @@ export class InterviewInvitationService {
         invitations: {
           select: {
             workerId: true,
+            status: true,
           },
         },
       },
@@ -652,7 +983,12 @@ export class InterviewInvitationService {
 
     for (const campaign of campaigns) {
       for (const invitation of campaign.invitations || []) {
-        invitedWorkerIdSet.add(invitation.workerId)
+        if (
+          invitation.status === InterviewInvitationStatus.PENDING ||
+          invitation.status === InterviewInvitationStatus.ACCEPTED
+        ) {
+          invitedWorkerIdSet.add(invitation.workerId)
+        }
       }
       for (const slot of campaign.slots || []) {
         allSlots.push({

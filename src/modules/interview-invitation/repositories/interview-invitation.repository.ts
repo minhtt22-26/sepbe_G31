@@ -21,12 +21,12 @@ export class InterviewInvitationRepository implements IInterviewInvitationReposi
           orderBy: { createdAt: 'desc' },
           include: {
             worker: {
-              select: {
-                id: true,
-                fullName: true,
-                email: true,
-                phone: true,
-                avatar: true,
+              include: {
+                workerProfile: {
+                  include: {
+                    occupation: true,
+                  },
+                },
               },
             },
             selectedSlot: true,
