@@ -82,7 +82,7 @@ export class CloudinaryService {
             });
           }
 
-          resolve(result as CloudinaryUploadResult);
+          resolve(result);
         },
       ).end(file.buffer);
     });

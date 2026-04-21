@@ -157,7 +157,7 @@ describe('UserController', () => {
 
   describe('Profile & Info', () => {
     it('createWorkerProfile: should call service', async () => {
-      await controller.createWorkerProfile(1, {} as any)
+      await controller.createWorkerProfile(1, {})
       expect(userService.createWorkerProfile).toHaveBeenCalledWith(1, {})
     })
 
@@ -167,7 +167,7 @@ describe('UserController', () => {
     })
 
     it('updateInfoUser: should call service', async () => {
-      await controller.updateInfoUser(1, {} as any)
+      await controller.updateInfoUser(1, {})
       expect(userService.updateInfoUser).toHaveBeenCalledWith(1, {}, undefined)
     })
   })
