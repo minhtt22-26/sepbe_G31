@@ -23,10 +23,6 @@ import { ApplyJobRequest } from '../dtos/request/apply-job.request'
 import { GetJobsByEmployerDto } from '../dtos/request/get-jobs-employer.dto'
 import { JOB_CONSTANTS } from '../constant/job.constant'
 import { AIMatchingService } from 'src/modules/ai-matching/service/ai-matching.service'
-import {
-  JobModerationService,
-  ModerationStatus,
-} from './job-moderation.service'
 // import { EmbeddingQueueService } from 'src/infrastructure/queue/embedding/service/embedding-queue.service'
 import { JobReportDto } from '../dtos/job.report.request.dto'
 import { BoostCheckoutRequestDto } from '../dtos/request/boost-checkout.request'
@@ -36,6 +32,7 @@ import { SepayService } from './sepay.service'
 @Injectable()
 export class JobService {
   private readonly logger = new Logger(JobService.name)
+  private readonly JOB_POSTING_FEE = 50000
   private readonly BOOST_SHORT_DAYS = 7
   private readonly BOOST_LONG_DAYS = 30
   private readonly BOOST_PRICE_BY_DAYS: Record<number, number> = {
@@ -58,7 +55,6 @@ export class JobService {
     // private readonly embeddingQueueService: EmbeddingQueueService,
     @Inject(forwardRef(() => AIMatchingService))
     private readonly aiMatchingService: AIMatchingService,
-    private readonly moderationService: JobModerationService,
   ) {}
 
   async searchJobs(q: any) {
@@ -223,6 +219,51 @@ export class JobService {
     }
   }
 
+  async createJobPostingCheckout(jobId: number, companyId: number) {
+    const job = await this.jobRepository.findJobById(jobId)
+    if (!job || job.companyId !== companyId) {
+      throw new NotFoundException('Job not found or unauthorized')
+    }
+
+    if (job.status === JobStatus.PUBLISHED) {
+      throw new BadRequestException('Job has already been published')
+    }
+
+    const existingOrder = await this.jobRepository.findPendingJobPostingOrder(
+      jobId,
+    )
+
+    const order =
+      existingOrder ??
+      (await this.jobRepository.createJobPostingPaymentOrder({
+        userId: job.company.ownerId,
+        jobId,
+        amount: this.JOB_POSTING_FEE,
+        paymentMethod: PaymentMethod.SEPAY,
+      }))
+
+    const checkout = this.sepayService.buildCheckout(order.id, order.amount)
+
+    return {
+      success: true,
+      data: {
+        paymentOrderId: order.id,
+        status: order.status,
+        amount: order.amount,
+        currency: order.currency,
+        paymentMethod: order.paymentMethod,
+        paymentCode: checkout.paymentCode,
+        paymentUrl: checkout.paymentUrl,
+        transferNote: checkout.transferNote,
+        bankCode: checkout.bankCode,
+        accountNumber: checkout.accountNumber,
+        accountName: checkout.accountName,
+      },
+      message:
+        'Đã tạo đơn thanh toán cho tin tuyển dụng. Hãy chuyển khoản đúng nội dung để SePay tự xác nhận.',
+    }
+  }
+
   async handleSepayWebhook(
     authorizationHeader?: string,
     payload?: Record<string, unknown>,
@@ -256,7 +297,7 @@ export class JobService {
         : typeof normalizedPayload.transfer_type === 'string'
           ? normalizedPayload.transfer_type.toLowerCase()
           : ''
-    if (transferType !== 'in') {
+    if (transferType && !transferType.startsWith('in')) {
       this.logger.log(
         `SePay webhook ignored: transferType=${transferType || '(empty)'}`,
       )
@@ -274,11 +315,15 @@ export class JobService {
     }
 
     const order = await this.jobRepository.findPaymentOrderById(orderId)
-    if (!order || order.orderType !== OrderType.BOOST_JOB) {
+    if (
+      !order ||
+      (order.orderType !== OrderType.BOOST_JOB &&
+        order.orderType !== OrderType.FEATURE_LISTING)
+    ) {
       this.logger.warn(
-        `SePay webhook ignored: order not found or not BOOST_JOB (orderId=${orderId})`,
+        `SePay webhook ignored: order not found or unsupported order type (orderId=${orderId})`,
       )
-      return { success: true, message: 'Không tìm thấy boost order tương ứng' }
+      return { success: true, message: 'Không tìm thấy order thanh toán tương ứng' }
     }
 
     if (order.paymentMethod !== PaymentMethod.SEPAY) {
@@ -315,7 +360,10 @@ export class JobService {
       )
       return {
         success: true,
-        message: 'Số tiền chưa đủ để kích hoạt boost',
+        message:
+          order.orderType === OrderType.BOOST_JOB
+            ? 'Số tiền chưa đủ để kích hoạt boost'
+            : 'Số tiền chưa đủ để xuất bản tin tuyển dụng',
         data: {
           paymentOrderId: order.id,
           requiredAmount: order.amount,
@@ -349,12 +397,23 @@ export class JobService {
     const transactionCode =
       referenceCode || rawTransactionCode || webhookId || String(order.id)
 
-    const result = await this.jobRepository.activateBoostAfterPayment({
-      orderId: order.id,
-      jobId: order.targetId,
-      durationDays,
-      transactionCode,
-    })
+    const result =
+      order.orderType === OrderType.BOOST_JOB
+        ? await this.jobRepository.activateBoostAfterPayment({
+            orderId: order.id,
+            jobId: order.targetId,
+            durationDays,
+            transactionCode,
+          })
+        : await this.jobRepository.activateJobPostingAfterPayment({
+            orderId: order.id,
+            jobId: order.targetId,
+            transactionCode,
+          })
+
+    if (order.orderType === OrderType.FEATURE_LISTING) {
+      await this.aiMatchingService.buildJobEmbedding(result.job.id)
+    }
 
     this.logger.log(
       `SePay webhook processed successfully: orderId=${result.order.id}, jobId=${result.job.id}`,
@@ -362,7 +421,10 @@ export class JobService {
 
     return {
       success: true,
-      message: 'Đã xác nhận thanh toán SePay và kích hoạt boost',
+      message:
+        order.orderType === OrderType.BOOST_JOB
+          ? 'Đã xác nhận thanh toán SePay và kích hoạt boost'
+          : 'Đã xác nhận thanh toán SePay và xuất bản tin tuyển dụng',
       data: {
         paymentOrderId: result.order.id,
         jobId: result.job.id,
@@ -530,34 +592,7 @@ export class JobService {
       expiredAt: dto.expiredAt ? new Date(dto.expiredAt) : undefined, // hoặc set mặc định 30 ngày nếu muốn
 
       companyId,
-      status: JobStatus.PUBLISHED, // Default to PUBLISHED
-    }
-
-    // AI CONTENT MODERATION (chỉ phát hiện SPAM)
-    try {
-      this.logger.log(`Starting AI moderation for job: ${dto.title}`)
-      const moderationResult = await this.moderationService.moderateJob({
-        ...jobData,
-        fields: dto.fields,
-      })
-
-      if (moderationResult.status === ModerationStatus.SPAM) {
-        this.logger.warn(
-          `AI REJECTED job as SPAM. Reason: ${moderationResult.reason}`,
-        )
-        throw new BadRequestException(
-          `Tin tuyển dụng bị từ chối do có dấu hiệu SPAM (AI detect): ${moderationResult.reason}. Vui lòng kiểm tra và viết lại nội dung nghiêm túc.`,
-        )
-      }
-    } catch (moderationError) {
-      if (moderationError instanceof BadRequestException) {
-        throw moderationError
-      }
-      // AI lỗi kỹ thuật → không  user, cho đăng bình thường
-      this.logger.error(
-        'Moderation failed, bypassing AI check:',
-        moderationError,
-      )
+      status: JobStatus.WARNING,
     }
 
     try {
@@ -566,12 +601,33 @@ export class JobService {
         fields: dto.fields,
       })
 
-      await this.aiMatchingService.buildJobEmbedding(created.id)
+      const order = await this.jobRepository.createJobPostingPaymentOrder({
+        userId: created.company?.ownerId ?? companyId,
+        jobId: created.id,
+        amount: this.JOB_POSTING_FEE,
+        paymentMethod: PaymentMethod.SEPAY,
+      })
+
+      const checkout = this.sepayService.buildCheckout(order.id, order.amount)
 
       return {
         success: true,
-        data: created,
-        message: 'Đăng tin tuyển dụng thành công',
+        data: {
+          job: created,
+          payment: {
+            paymentOrderId: order.id,
+            amount: order.amount,
+            currency: order.currency,
+            paymentMethod: order.paymentMethod,
+            paymentCode: checkout.paymentCode,
+            paymentUrl: checkout.paymentUrl,
+            transferNote: checkout.transferNote,
+            bankCode: checkout.bankCode,
+            accountNumber: checkout.accountNumber,
+            accountName: checkout.accountName,
+          },
+        },
+        message: 'Đã tạo tin. Vui lòng thanh toán để hiển thị công khai',
       }
     } catch (error) {
       const errorMessage =
@@ -607,7 +663,7 @@ export class JobService {
     }
 
     if (ipAddress) {
-      this.jobRepository.recordView(jobId, ipAddress).catch((err) => {
+      Promise.resolve(this.jobRepository.recordView(jobId, ipAddress)).catch((err) => {
         this.logger.warn(`Failed to record view for job ${jobId}: ${err}`)
       })
     }

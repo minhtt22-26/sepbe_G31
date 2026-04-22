@@ -46,12 +46,49 @@ export class JobRepository {
     return this.prisma.job.create({
       data: jobDataCreate,
       include: {
+        company: {
+          select: {
+            id: true,
+            ownerId: true,
+            name: true,
+          },
+        },
         applyForms: {
           include: {
             fields: true,
           },
         },
       },
+    })
+  }
+
+  async createJobPostingPaymentOrder(params: {
+    userId: number
+    jobId: number
+    amount: number
+    paymentMethod: PaymentMethod
+  }) {
+    return this.prisma.paymentOrder.create({
+      data: {
+        userId: params.userId,
+        orderType: OrderType.FEATURE_LISTING,
+        targetId: params.jobId,
+        amount: params.amount,
+        paymentMethod: params.paymentMethod,
+        status: PaymentStatus.PENDING,
+      },
+    })
+  }
+
+  async findPendingJobPostingOrder(jobId: number) {
+    return this.prisma.paymentOrder.findFirst({
+      where: {
+        targetId: jobId,
+        orderType: OrderType.FEATURE_LISTING,
+        status: PaymentStatus.PENDING,
+        paymentMethod: PaymentMethod.SEPAY,
+      },
+      orderBy: { createdAt: 'desc' },
     })
   }
 
@@ -257,6 +294,45 @@ export class JobRepository {
             userId: job.company.ownerId,
             title: 'Thanh toán đẩy tin thành công',
             message: `(${params.durationDays} ngày) ${job.title}`,
+            link: `/employer`,
+          },
+        })
+      }
+
+      return { order, job }
+    })
+  }
+
+  async activateJobPostingAfterPayment(params: {
+    orderId: number
+    jobId: number
+    transactionCode?: string
+  }) {
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.paymentOrder.update({
+        where: { id: params.orderId },
+        data: {
+          status: PaymentStatus.COMPLETED,
+          transactionCode: params.transactionCode,
+        },
+      })
+
+      const job = await tx.job.update({
+        where: { id: params.jobId },
+        data: {
+          status: JobStatus.PUBLISHED,
+        },
+        include: {
+          company: { select: { ownerId: true } },
+        },
+      })
+
+      if (job.company?.ownerId) {
+        await tx.notification.create({
+          data: {
+            userId: job.company.ownerId,
+            title: 'Thanh toán tin tuyển dụng thành công',
+            message: job.title,
             link: `/employer`,
           },
         })
