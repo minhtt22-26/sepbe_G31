@@ -228,16 +228,64 @@ export class JobRepository {
     jobId: number
     amount: number
     paymentMethod: PaymentMethod
+    packageId?: number
+    packageDays?: number
   }) {
     return this.prisma.paymentOrder.create({
       data: {
         userId: params.userId,
         orderType: OrderType.BOOST_JOB,
         targetId: params.jobId,
+        packageId: params.packageId,
+        packageDays: params.packageDays,
         amount: params.amount,
         paymentMethod: params.paymentMethod,
         status: PaymentStatus.PENDING,
       },
+    })
+  }
+
+  async getActiveBoostPackages() {
+    return this.prisma.paymentPackage.findMany({
+      where: {
+        orderType: OrderType.BOOST_JOB,
+        isActive: true,
+      },
+      orderBy: [{ durationDays: 'asc' }, { price: 'asc' }, { createdAt: 'asc' }],
+    })
+  }
+
+  async getBoostPackageByDays(days: number) {
+    return this.prisma.paymentPackage.findFirst({
+      where: {
+        orderType: OrderType.BOOST_JOB,
+        durationDays: days,
+        isActive: true,
+      },
+      orderBy: [{ isDefault: 'desc' }, { updatedAt: 'desc' }],
+    })
+  }
+
+  async getDefaultFeatureListingPackage() {
+    const defaultPackage = await this.prisma.paymentPackage.findFirst({
+      where: {
+        orderType: OrderType.FEATURE_LISTING,
+        isActive: true,
+        isDefault: true,
+      },
+      orderBy: { updatedAt: 'desc' },
+    })
+
+    if (defaultPackage) {
+      return defaultPackage
+    }
+
+    return this.prisma.paymentPackage.findFirst({
+      where: {
+        orderType: OrderType.FEATURE_LISTING,
+        isActive: true,
+      },
+      orderBy: { updatedAt: 'desc' },
     })
   }
 

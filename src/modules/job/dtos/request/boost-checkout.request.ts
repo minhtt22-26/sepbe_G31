@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
-import { IsEnum, IsIn, IsInt, IsOptional, Min } from 'class-validator'
+import { IsEnum, IsInt, IsOptional, Min } from 'class-validator'
 import { PaymentMethod } from 'src/generated/prisma/enums'
 
 export class BoostCheckoutRequestDto {
@@ -12,7 +12,7 @@ export class BoostCheckoutRequestDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @IsIn([7, 30])
+  @Min(1)
   packageDays?: number
 
   @ApiPropertyOptional({

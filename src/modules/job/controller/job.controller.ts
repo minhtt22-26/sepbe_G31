@@ -73,6 +73,15 @@ export class JobController {
     return this.jobService.getBoostedJobs(Number(page) || 1, Number(limit) || 10)
   }
 
+  @Get('boost/packages')
+  @AuthJwtAccessProtected()
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get active boost packages' })
+  async getBoostPackages() {
+    return this.jobService.getBoostPackages()
+  }
+
   @Post('boost/sepay/webhook')
   @ApiBody({
     schema: {

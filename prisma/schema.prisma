@@ -565,6 +565,8 @@ model JobApplicationAnswer {
 model PaymentOrder {
   id              Int           @id @default(autoincrement())
   userId          Int
+  packageId       Int?
+  packageDays     Int?
   orderType       OrderType
   targetId        Int? // ID of job being boosted, etc.
   amount          Int
@@ -575,12 +577,34 @@ model PaymentOrder {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  user User @relation(fields: [userId], references: [id])
+  user           User            @relation(fields: [userId], references: [id])
+  paymentPackage PaymentPackage? @relation(fields: [packageId], references: [id])
 
   @@index([userId])
+  @@index([packageId])
+  @@index([packageDays])
   @@index([status])
   @@index([orderType])
   @@index([createdAt])
+}
+
+model PaymentPackage {
+  id           Int           @id @default(autoincrement())
+  name         String
+  description  String?
+  orderType    OrderType
+  durationDays Int?
+  price        Int
+  currency     String        @default("VND")
+  isActive     Boolean       @default(true)
+  isDefault    Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  paymentOrders PaymentOrder[]
+
+  @@index([orderType, isActive])
+  @@index([orderType, durationDays])
 }
 
 model TermsConditions {

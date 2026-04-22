@@ -1,10 +1,117 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
-import { EnumUserRole } from 'src/generated/prisma/enums';
+import { EnumUserRole, OrderType } from 'src/generated/prisma/enums';
+import { CreatePaymentPackageDto } from './dtos/create-payment-package.dto';
+import { UpdatePaymentPackageDto } from './dtos/update-payment-package.dto';
 
 @Injectable()
 export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private validateDurationByOrderType(orderType: OrderType, durationDays?: number | null) {
+    if (orderType === OrderType.BOOST_JOB && !durationDays) {
+      throw new BadRequestException('Goi BOOST_JOB bat buoc co durationDays');
+    }
+  }
+
+  async getPaymentPackages(params: {
+    orderType?: OrderType;
+    includeInactive?: boolean;
+  }) {
+    const packages = await this.prisma.paymentPackage.findMany({
+      where: {
+        ...(params.orderType ? { orderType: params.orderType } : {}),
+        ...(params.includeInactive ? {} : { isActive: true }),
+      },
+      orderBy: [
+        { orderType: 'asc' },
+        { durationDays: 'asc' },
+        { price: 'asc' },
+        { createdAt: 'asc' },
+      ],
+    });
+
+    return { items: packages };
+  }
+
+  async createPaymentPackage(dto: CreatePaymentPackageDto) {
+    this.validateDurationByOrderType(dto.orderType, dto.durationDays);
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      if (dto.isDefault) {
+        await tx.paymentPackage.updateMany({
+          where: { orderType: dto.orderType },
+          data: { isDefault: false },
+        });
+      }
+
+      return tx.paymentPackage.create({
+        data: {
+          name: dto.name.trim(),
+          description: dto.description?.trim() || null,
+          orderType: dto.orderType,
+          durationDays:
+            dto.orderType === OrderType.BOOST_JOB
+              ? (dto.durationDays ?? null)
+              : null,
+          price: dto.price,
+          isActive: dto.isActive ?? true,
+          isDefault: dto.isDefault ?? false,
+        },
+      });
+    });
+
+    return {
+      message: 'Tao goi thanh toan thanh cong',
+      data: created,
+    };
+  }
+
+  async updatePaymentPackage(id: number, dto: UpdatePaymentPackageDto) {
+    const existing = await this.prisma.paymentPackage.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Khong tim thay goi thanh toan');
+    }
+
+    const nextOrderType = dto.orderType ?? existing.orderType;
+    const nextDurationDays =
+      dto.durationDays === undefined
+        ? existing.durationDays
+        : dto.durationDays;
+
+    this.validateDurationByOrderType(nextOrderType, nextDurationDays);
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (dto.isDefault) {
+        await tx.paymentPackage.updateMany({
+          where: { orderType: nextOrderType },
+          data: { isDefault: false },
+        });
+      }
+
+      return tx.paymentPackage.update({
+        where: { id },
+        data: {
+          name: dto.name?.trim(),
+          description: dto.description?.trim(),
+          orderType: nextOrderType,
+          durationDays:
+            nextOrderType === OrderType.BOOST_JOB ? nextDurationDays : null,
+          price: dto.price,
+          isActive: dto.isActive,
+          isDefault: dto.isDefault,
+        },
+      });
+    });
+
+    return {
+      message: 'Cap nhat goi thanh toan thanh cong',
+      data: updated,
+    };
+  }
 
   async getStatistics(year?: number) {
     const targetYear = year || new Date().getFullYear();

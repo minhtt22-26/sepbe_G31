@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { IsDateString, IsEnum } from 'class-validator'
+import { IsDateString, IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator'
+import { Type } from 'class-transformer'
 
 export enum PaymentGroupByEnum {
   DAY = 'day',
@@ -24,4 +25,19 @@ export class PaymentStatsRequestDto {
   })
   @IsEnum(PaymentGroupByEnum)
   groupBy: PaymentGroupByEnum
+
+  @ApiProperty({ description: 'Trang du lieu lich su giao dich', example: 1, required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1
+
+  @ApiProperty({ description: 'So ban ghi moi trang', example: 10, required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number = 10
 }

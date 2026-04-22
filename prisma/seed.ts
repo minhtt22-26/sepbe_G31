@@ -11,6 +11,7 @@ import {
   ReportReason,
   ReportStatus,
   MatchingConfigKey,
+  OrderType,
 } from '../src/generated/prisma/client'
 
 import { PrismaPg } from '@prisma/adapter-pg'
@@ -1054,6 +1055,51 @@ async function main() {
   })
 
   console.log('✅ Đã tạo cấu hình matching')
+
+  // =====================
+  // PAYMENT PACKAGES
+  // =====================
+  console.log('💳 Tạo gói thanh toán mặc định...')
+
+  await prisma.paymentPackage.deleteMany({
+    where: {
+      orderType: { in: [OrderType.BOOST_JOB, OrderType.FEATURE_LISTING] },
+    },
+  })
+
+  await prisma.paymentPackage.createMany({
+    data: [
+      {
+        name: 'Gói nổi bật 7 ngày',
+        description: 'Hiển thị tin tuyển dụng nổi bật trong 7 ngày.',
+        orderType: OrderType.BOOST_JOB,
+        durationDays: 7,
+        price: 50000,
+        isActive: true,
+        isDefault: true,
+      },
+      {
+        name: 'Gói nổi bật 30 ngày',
+        description: 'Hiển thị tin tuyển dụng nổi bật trong 30 ngày.',
+        orderType: OrderType.BOOST_JOB,
+        durationDays: 30,
+        price: 100000,
+        isActive: true,
+        isDefault: false,
+      },
+      {
+        name: 'Gói đăng tin chuẩn',
+        description: 'Thanh toán để xuất bản tin tuyển dụng.',
+        orderType: OrderType.FEATURE_LISTING,
+        durationDays: null,
+        price: 50000,
+        isActive: true,
+        isDefault: true,
+      },
+    ],
+  })
+
+  console.log('✅ Đã tạo gói thanh toán mặc định')
   console.log('🎉 Seed hoàn tất!')
 }
 
