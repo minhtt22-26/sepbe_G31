@@ -1,8 +1,19 @@
-import { Controller, Get, Query } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { AdminService } from './admin.service'
 import { AuthRoleProtected } from '../auth/decorators/auth.jwt.decorator'
-import { EnumUserRole } from 'src/generated/prisma/enums'
+import { EnumUserRole, OrderType } from 'src/generated/prisma/enums'
+import { CreatePaymentPackageDto } from './dtos/create-payment-package.dto'
+import { UpdatePaymentPackageDto } from './dtos/update-payment-package.dto'
 
 @ApiTags('Admin')
 @Controller('admin')
@@ -17,5 +28,38 @@ export class AdminController {
     return this.adminService.getStatistics(
       year ? parseInt(year, 10) : undefined,
     )
+  }
+
+  @Get('payment-packages')
+  @AuthRoleProtected(EnumUserRole.ADMIN, EnumUserRole.MANAGER)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get payment packages' })
+  async getPaymentPackages(
+    @Query('orderType') orderType?: OrderType,
+    @Query('includeInactive') includeInactive?: string,
+  ) {
+    return this.adminService.getPaymentPackages({
+      orderType,
+      includeInactive: includeInactive === 'true',
+    })
+  }
+
+  @Post('payment-packages')
+  @AuthRoleProtected(EnumUserRole.ADMIN, EnumUserRole.MANAGER)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Create a payment package' })
+  async createPaymentPackage(@Body() body: CreatePaymentPackageDto) {
+    return this.adminService.createPaymentPackage(body)
+  }
+
+  @Patch('payment-packages/:id')
+  @AuthRoleProtected(EnumUserRole.ADMIN, EnumUserRole.MANAGER)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Update payment package (price, status, metadata)' })
+  async updatePaymentPackage(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdatePaymentPackageDto,
+  ) {
+    return this.adminService.updatePaymentPackage(id, body)
   }
 }

@@ -36,8 +36,8 @@ export class JobService {
   private readonly BOOST_SHORT_DAYS = 7
   private readonly BOOST_LONG_DAYS = 30
   private readonly BOOST_PRICE_BY_DAYS: Record<number, number> = {
-    7: 10000,
-    30: 20000,
+    7: 50000,
+    30: 100000,
   }
 
   private shuffleBoostedJobs<T>(items: T[]): T[] {
@@ -157,6 +157,44 @@ export class JobService {
     }
   }
 
+  async getBoostPackages() {
+    const packages = await this.jobRepository.getActiveBoostPackages()
+
+    if (!packages.length) {
+      return {
+        success: true,
+        items: [
+          {
+            id: 0,
+            name: 'Goi noi bat 7 ngay',
+            description: 'Phu hop test nhanh nhu cau tuyen gap trong tuan.',
+            durationDays: this.BOOST_SHORT_DAYS,
+            price: this.BOOST_PRICE_BY_DAYS[this.BOOST_SHORT_DAYS],
+          },
+          {
+            id: 0,
+            name: 'Goi noi bat 30 ngay',
+            description: 'Hien thi dai han va tiet kiem hon.',
+            durationDays: this.BOOST_LONG_DAYS,
+            price: this.BOOST_PRICE_BY_DAYS[this.BOOST_LONG_DAYS],
+          },
+        ],
+      }
+    }
+
+    return {
+      success: true,
+      items: packages.map((pkg) => ({
+        id: pkg.id,
+        name: pkg.name,
+        description: pkg.description,
+        durationDays: pkg.durationDays,
+        price: pkg.price,
+        isDefault: pkg.isDefault,
+      })),
+    }
+  }
+
   async createBoostCheckout(
     jobId: number,
     companyId: number,
@@ -172,10 +210,13 @@ export class JobService {
     }
 
     const packageDays = body.packageDays ?? this.BOOST_SHORT_DAYS
-    const defaultAmount = this.BOOST_PRICE_BY_DAYS[packageDays]
+    const boostPackage = await this.jobRepository.getBoostPackageByDays(packageDays)
+    const defaultAmount = boostPackage
+      ? boostPackage.price
+      : this.BOOST_PRICE_BY_DAYS[packageDays]
 
     if (!defaultAmount) {
-      throw new BadRequestException('Package boost không hợp lệ')
+      throw new BadRequestException('Package boost khong hop le')
     }
 
     if (body.paymentMethod && body.paymentMethod !== PaymentMethod.SEPAY) {
@@ -194,6 +235,8 @@ export class JobService {
       jobId,
       amount,
       paymentMethod: body.paymentMethod ?? PaymentMethod.SEPAY,
+      packageId: boostPackage?.id,
+      packageDays,
     })
 
     const checkout = this.sepayService.buildBoostCheckout(order.id, amount)
@@ -233,12 +276,15 @@ export class JobService {
       jobId,
     )
 
+    const postingPackage = await this.jobRepository.getDefaultFeatureListingPackage()
+    const postingAmount = postingPackage?.price ?? this.JOB_POSTING_FEE
+
     const order =
       existingOrder ??
       (await this.jobRepository.createJobPostingPaymentOrder({
         userId: job.company.ownerId,
         jobId,
-        amount: this.JOB_POSTING_FEE,
+        amount: postingAmount,
         paymentMethod: PaymentMethod.SEPAY,
       }))
 
@@ -373,9 +419,10 @@ export class JobService {
     }
 
     const durationDays =
-      order.amount >= this.BOOST_PRICE_BY_DAYS[this.BOOST_LONG_DAYS]
+      order.packageDays ??
+      (order.amount >= this.BOOST_PRICE_BY_DAYS[this.BOOST_LONG_DAYS]
         ? this.BOOST_LONG_DAYS
-        : this.BOOST_SHORT_DAYS
+        : this.BOOST_SHORT_DAYS)
     const referenceCode =
       typeof normalizedPayload.referenceCode === 'string'
         ? normalizedPayload.referenceCode
@@ -470,9 +517,10 @@ export class JobService {
     }
 
     const durationDays =
-      order.amount >= this.BOOST_PRICE_BY_DAYS[this.BOOST_LONG_DAYS]
+      order.packageDays ??
+      (order.amount >= this.BOOST_PRICE_BY_DAYS[this.BOOST_LONG_DAYS]
         ? this.BOOST_LONG_DAYS
-        : this.BOOST_SHORT_DAYS
+        : this.BOOST_SHORT_DAYS)
 
     const result = await this.jobRepository.activateBoostAfterPayment({
       orderId: order.id,
