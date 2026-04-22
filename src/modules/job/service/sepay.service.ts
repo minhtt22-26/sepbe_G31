@@ -45,6 +45,10 @@ export class SepayService {
     }
   }
 
+  buildCheckout(orderId: number, amount: number) {
+    return this.buildBoostCheckout(orderId, amount)
+  }
+
   isValidWebhookAuthorization(authorizationHeader?: string) {
     if (!this.paymentCfg.sepayWebhookApiKey) {
       return true

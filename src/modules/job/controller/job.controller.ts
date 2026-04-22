@@ -189,7 +189,7 @@ export class JobController {
     @Param('id', ParseIntPipe) id: number,
     @Ip() ip: string,
   ) {
-    return this.jobService.getDetail(id, ip)
+    return ip ? this.jobService.getDetail(id, ip) : this.jobService.getDetail(id)
   }
 
   @Get(':id/apply-form')
@@ -285,6 +285,20 @@ export class JobController {
     const ownerId = user.userId
     const company = await this.companyService.findByOwnerId(ownerId)
     return this.jobService.createBoostCheckout(id, company.id, body)
+  }
+
+  @Post(':id/posting/checkout')
+  @AuthJwtAccessProtected()
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Create job posting payment order' })
+  async createPostingCheckout(
+    @AuthJwtPayload() user: any,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    const ownerId = user.userId
+    const company = await this.companyService.findByOwnerId(ownerId)
+    return this.jobService.createJobPostingCheckout(id, company.id)
   }
 
   @Post(':id/boost/confirm')
