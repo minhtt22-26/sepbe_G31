@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Ip,
   Param,
   Post,
   Patch,
@@ -184,8 +185,11 @@ export class JobController {
   // GET JOB DETAIL
   @Get(':id')
   @ApiOperation({ summary: 'Get job detail by id' })
-  async getDetail(@Param('id', ParseIntPipe) id: number) {
-    return this.jobService.getDetail(id)
+  async getDetail(
+    @Param('id', ParseIntPipe) id: number,
+    @Ip() ip: string,
+  ) {
+    return this.jobService.getDetail(id, ip)
   }
 
   @Get(':id/apply-form')

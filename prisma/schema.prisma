@@ -430,6 +430,7 @@ model Job {
   ageMin            Int?
   ageMax            Int?
   expiredAt         DateTime?
+  viewCount      Int       @default(0)
 
   // Boost information
   isBoosted      Boolean   @default(false)
@@ -455,6 +456,7 @@ model Job {
   savedBy      SavedJob[]
   applyForms   JobApplyForm[]
   reports      JobReport[]
+  views JobView[]
 
   @@index([companyId])
   @@index([occupationId])
@@ -502,6 +504,7 @@ model JobApplication {
   jobId     Int
   userId    Int
   status    JobApplicationStatus @default(APPLIED)
+  createdAt DateTime             @default(now())
   updatedAt DateTime             @updatedAt
 
   job     Job                    @relation(fields: [jobId], references: [id], onDelete: Cascade)
@@ -719,5 +722,15 @@ model MatchingConfig {
   label     String
   value     Float
   updatedAt DateTime @updatedAt
+}
+model JobView {
+  id        Int      @id @default(autoincrement())
+  jobId     Int
+  ipAddress String
+  createdAt DateTime @default(now())
+
+  job Job @relation(fields: [jobId], references: [id])
+
+  @@index([jobId, ipAddress, createdAt])
 }
 

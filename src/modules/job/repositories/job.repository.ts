@@ -12,7 +12,7 @@ import { PrismaService } from 'src/prisma.service'
 
 @Injectable()
 export class JobRepository {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
   async createJobWithForm(data: any) {
     const occupation = await this.prisma.occupation.findUnique({
       where: { id: data.jobData.occupationId },
@@ -436,6 +436,31 @@ export class JobRepository {
     })
   }
 
+  async recordView(jobId: number, ipAddress: string): Promise<void> {
+    const yesterday = new Date()
+    yesterday.setHours(yesterday.getHours() - 24)
+
+    const existingView = await this.prisma.jobView.findFirst({
+      where: {
+        jobId,
+        ipAddress,
+        createdAt: { gte: yesterday },
+      },
+    })
+
+    if (!existingView) {
+      await this.prisma.$transaction([
+        this.prisma.jobView.create({
+          data: { jobId, ipAddress },
+        }),
+        this.prisma.job.update({
+          where: { id: jobId },
+          data: { viewCount: { increment: 1 } },
+        }),
+      ])
+    }
+  }
+
   async findJobWithApplyForm(jobId: number) {
     return this.prisma.job.findUnique({
       where: { id: jobId },
@@ -723,22 +748,22 @@ export class JobRepository {
       },
     })
 
-    let title = '';
-    let message = '';
+    let title = ''
+    let message = ''
 
     switch (status as any) {
       case 'VIEWED':
-        title = 'Hồ sơ đã được xem';
-        message = `Nhà tuyển dụng đã xem hồ sơ của bạn cho vị trí "${app.job.title}".`;
-        break;
+        title = 'Hồ sơ đã được xem'
+        message = `Nhà tuyển dụng đã xem hồ sơ của bạn cho vị trí "${app.job.title}".`
+        break
       case 'SUITABLE':
-        title = 'Hồ sơ phù hợp';
-        message = `Hồ sơ của bạn cho vị trí "${app.job.title}" được đánh giá là phù hợp!`;
-        break;
+        title = 'Hồ sơ phù hợp'
+        message = `Hồ sơ của bạn cho vị trí "${app.job.title}" được đánh giá là phù hợp!`
+        break
       case 'UNSUITABLE':
-        title = 'Hồ sơ chưa phù hợp';
-        message = `Rất tiếc, hồ sơ của bạn cho vị trí "${app.job.title}" chưa phù hợp ở thời điểm hiện tại.`;
-        break;
+        title = 'Hồ sơ chưa phù hợp'
+        message = `Rất tiếc, hồ sơ của bạn cho vị trí "${app.job.title}" chưa phù hợp ở thời điểm hiện tại.`
+        break
     }
 
     if (title && app.userId) {
@@ -749,10 +774,10 @@ export class JobRepository {
           message,
           link: `/job/${app.jobId}`,
         },
-      });
+      })
     }
 
-    return app;
+    return app
   }
 
   async findApplicationById(applicationId: number) {
@@ -942,14 +967,14 @@ export class JobRepository {
       },
     })
 
-    let title = '';
-    let message = '';
+    let title = ''
+    let message = ''
     if (status === ReportStatus.RESOLVED) {
-      title = 'Báo cáo đã được giải quyết';
-      message = `Báo cáo của bạn về công việc "${report.job.title}" đã được giải quyết. Cảm ơn bạn đã đóng góp.`;
+      title = 'Báo cáo đã được giải quyết'
+      message = `Báo cáo của bạn về công việc "${report.job.title}" đã được giải quyết. Cảm ơn bạn đã đóng góp.`
     } else if (status === ReportStatus.REJECTED) {
-      title = 'Báo cáo không được chấp nhận';
-      message = `Báo cáo của bạn về công việc "${report.job.title}" không được chấp nhận do không phát hiện vi phạm.`;
+      title = 'Báo cáo không được chấp nhận'
+      message = `Báo cáo của bạn về công việc "${report.job.title}" không được chấp nhận do không phát hiện vi phạm.`
     }
 
     if (title) {
@@ -960,10 +985,10 @@ export class JobRepository {
           message,
           link: `/job/${report.jobId}`,
         },
-      });
+      })
     }
 
-    return report;
+    return report
   }
 
   async markExpiredJobs() {
@@ -1017,18 +1042,18 @@ export class JobRepository {
       include: { company: true },
     })
 
-    let title = '';
-    let message = '';
+    let title = ''
+    let message = ''
 
     if (status === JobStatus.PUBLISHED) {
-      title = 'Tin tuyển dụng đã được duyệt';
-      message = `Tin tuyển dụng "${job.title}" của bạn đã được quản trị viên phê duyệt.`;
-    } else if (status === JobStatus.DELETED || status as any === 'REJECTED') {
-      title = 'Tin tuyển dụng bị từ chối/gỡ bỏ';
-      message = `Tin tuyển dụng "${job.title}" của bạn đã bị từ chối hoặc gỡ bỏ do vi phạm quy định.`;
+      title = 'Tin tuyển dụng đã được duyệt'
+      message = `Tin tuyển dụng "${job.title}" của bạn đã được quản trị viên phê duyệt.`
+    } else if (status === JobStatus.DELETED || (status as any) === 'REJECTED') {
+      title = 'Tin tuyển dụng bị từ chối/gỡ bỏ'
+      message = `Tin tuyển dụng "${job.title}" của bạn đã bị từ chối hoặc gỡ bỏ do vi phạm quy định.`
     } else if (status === JobStatus.WARNING) {
-      title = 'Tin tuyển dụng bị tạm ngưng';
-      message = `Tin tuyển dụng "${job.title}" đang chờ kiểm duyệt thủ công do có dấu hiệu nghi ngờ.`;
+      title = 'Tin tuyển dụng bị tạm ngưng'
+      message = `Tin tuyển dụng "${job.title}" đang chờ kiểm duyệt thủ công do có dấu hiệu nghi ngờ.`
     }
 
     if (title && job.company) {
@@ -1039,9 +1064,9 @@ export class JobRepository {
           message,
           link: `/employer`,
         },
-      });
+      })
     }
 
-    return job;
+    return job
   }
 }

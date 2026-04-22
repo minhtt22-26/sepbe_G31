@@ -19,6 +19,7 @@ const jobRepositoryMock = {
   findApplicationsByUser: jest.fn(),
   findJobById: jest.fn(),
   getRelatedJobs: jest.fn(),
+  recordView: jest.fn(),
 }
 
 const sepayServiceMock = {
@@ -254,10 +255,12 @@ describe('JobService', () => {
     const jobId = 1
     const mockJob = { id: jobId, title: 'Test Job' }
 
+    const ipAddress = '127.0.0.1'
+
     it('Normal: should return job detail when job exists', async () => {
       jobRepositoryMock.findJobById.mockResolvedValue(mockJob)
 
-      const result = await service.getDetail(jobId)
+      const result = await service.getDetail(jobId, ipAddress)
 
       expect(result).toEqual(mockJob)
       expect(jobRepositoryMock.findJobById).toHaveBeenCalledWith(jobId)
@@ -266,14 +269,14 @@ describe('JobService', () => {
     it('Abnormal: should throw Error when job is not found', async () => {
       jobRepositoryMock.findJobById.mockResolvedValue(null)
 
-      await expect(service.getDetail(jobId)).rejects.toThrow('Job not found')
+      await expect(service.getDetail(jobId, ipAddress)).rejects.toThrow('Job not found')
     })
 
     it('Boundary: should propagate database error', async () => {
       const dbError = new Error('Database connection failed')
       jobRepositoryMock.findJobById.mockRejectedValue(dbError)
 
-      await expect(service.getDetail(jobId)).rejects.toThrow(dbError)
+      await expect(service.getDetail(jobId, ipAddress)).rejects.toThrow(dbError)
     })
   })
 
