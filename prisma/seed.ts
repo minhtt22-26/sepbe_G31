@@ -1127,6 +1127,16 @@ async function main() {
   })
 
   await prisma.systemSetting.upsert({
+    where: { key: 'BOOST_JOB_DURATION_DAYS' },
+    update: { value: '7', description: 'Số ngày hiệu lực cho mỗi lần boost job' },
+    create: {
+      key: 'BOOST_JOB_DURATION_DAYS',
+      value: '7',
+      description: 'Số ngày hiệu lực cho mỗi lần boost job',
+    },
+  })
+
+  await prisma.systemSetting.upsert({
     where: { key: 'AI_INVITE_POINT_COST_PER_WORKER' },
     update: {
       value: '1000',

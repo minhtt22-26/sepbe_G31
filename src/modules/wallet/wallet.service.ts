@@ -140,6 +140,7 @@ export class WalletService {
     const keys = [
       'JOB_POST_POINT_COST',
       'BOOST_JOB_POINT_COST',
+      'BOOST_JOB_DURATION_DAYS',
       'AI_INVITE_POINT_COST_PER_WORKER',
     ]
     const settings = await this.prisma.systemSetting.findMany({
@@ -149,6 +150,7 @@ export class WalletService {
     return {
       JOB_POST_POINT_COST: map.get('JOB_POST_POINT_COST') ?? 50000,
       BOOST_JOB_POINT_COST: map.get('BOOST_JOB_POINT_COST') ?? 50000,
+      BOOST_JOB_DURATION_DAYS: map.get('BOOST_JOB_DURATION_DAYS') ?? 7,
       AI_INVITE_POINT_COST_PER_WORKER:
         map.get('AI_INVITE_POINT_COST_PER_WORKER') ?? 1000,
     }
