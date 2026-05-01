@@ -10,6 +10,7 @@ export class AdminService {
   private readonly POINT_SETTING_KEYS = [
     'JOB_POST_POINT_COST',
     'BOOST_JOB_POINT_COST',
+    'BOOST_JOB_DURATION_DAYS',
     'AI_INVITE_POINT_COST_PER_WORKER',
   ] as const
 
@@ -67,6 +68,9 @@ export class AdminService {
     for (const [key, value] of entries) {
       if (!Number.isFinite(value) || value < 0) {
         throw new BadRequestException(`Giá trị ${key} không hợp lệ`)
+      }
+      if (key === 'BOOST_JOB_DURATION_DAYS' && value < 1) {
+        throw new BadRequestException('Thời gian boost phải lớn hơn hoặc bằng 1 ngày')
       }
     }
 

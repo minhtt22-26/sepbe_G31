@@ -30,12 +30,8 @@ import { WalletService } from 'src/modules/wallet/wallet.service'
 export class JobService {
   private readonly logger = new Logger(JobService.name)
   private readonly JOB_POSTING_FEE = 50000
-  private readonly BOOST_SHORT_DAYS = 7
-  private readonly BOOST_LONG_DAYS = 30
-  private readonly BOOST_PRICE_BY_DAYS: Record<number, number> = {
-    7: 50000,
-    30: 100000,
-  }
+  private readonly BOOST_DEFAULT_DAYS = 7
+  private readonly BOOST_DEFAULT_POINT_COST = 50000
 
   private shuffleBoostedJobs<T>(items: T[]): T[] {
     const shuffled = [...items]
@@ -155,48 +151,37 @@ export class JobService {
   }
 
   async getBoostPackages() {
-    const packages = await this.jobRepository.getActiveBoostPackages()
-
-    if (!packages.length) {
-      return {
-        success: true,
-        items: [
-          {
-            id: 0,
-            name: 'Goi noi bat 7 ngay',
-            description: 'Phu hop test nhanh nhu cau tuyen gap trong tuan.',
-            durationDays: this.BOOST_SHORT_DAYS,
-            price: this.BOOST_PRICE_BY_DAYS[this.BOOST_SHORT_DAYS],
-          },
-          {
-            id: 0,
-            name: 'Goi noi bat 30 ngay',
-            description: 'Hien thi dai han va tiet kiem hon.',
-            durationDays: this.BOOST_LONG_DAYS,
-            price: this.BOOST_PRICE_BY_DAYS[this.BOOST_LONG_DAYS],
-          },
-        ],
-      }
-    }
+    const configuredDays = await this.walletService.getPointCost(
+      'BOOST_JOB_DURATION_DAYS',
+      this.BOOST_DEFAULT_DAYS,
+    )
+    const configuredPointCost = await this.walletService.getPointCost(
+      'BOOST_JOB_POINT_COST',
+      this.BOOST_DEFAULT_POINT_COST,
+    )
+    const durationDays = Math.max(1, configuredDays)
 
     return {
       success: true,
-      items: packages.map((pkg) => ({
-        id: pkg.id,
-        name: pkg.name,
-        description: pkg.description,
-        durationDays: pkg.durationDays,
-        price: pkg.price,
-        isDefault: pkg.isDefault,
-      })),
+      items: [
+        {
+          id: 0,
+          name: `Goi boost ${durationDays} ngay`,
+          description: `Ap dung theo cau hinh point he thong (${durationDays} ngay).`,
+          durationDays,
+          price: configuredPointCost,
+          isDefault: true,
+        },
+      ],
     }
   }
 
   async createBoostCheckout(
     jobId: number,
     companyId: number,
-    body: BoostCheckoutRequestDto,
+    _body: BoostCheckoutRequestDto,
   ) {
+    void _body
     const job = await this.jobRepository.findJobById(jobId)
     if (!job || job.companyId !== companyId) {
       throw new NotFoundException('Job not found or unauthorized')
@@ -206,13 +191,14 @@ export class JobService {
       throw new BadRequestException('Only published jobs can be boosted')
     }
 
-    const packageDays = body.packageDays ?? this.BOOST_SHORT_DAYS
-    if (!this.BOOST_PRICE_BY_DAYS[packageDays]) {
-      throw new BadRequestException('Package boost khong hop le')
-    }
+    const configuredDays = await this.walletService.getPointCost(
+      'BOOST_JOB_DURATION_DAYS',
+      this.BOOST_DEFAULT_DAYS,
+    )
+    const packageDays = Math.max(1, configuredDays)
     const pointCost = await this.walletService.getPointCost(
       'BOOST_JOB_POINT_COST',
-      this.BOOST_PRICE_BY_DAYS[packageDays],
+      this.BOOST_DEFAULT_POINT_COST,
     )
     await this.walletService.deductPoints({
       companyId,

@@ -80,6 +80,7 @@ export class AdminController {
     body: {
       JOB_POST_POINT_COST: number
       BOOST_JOB_POINT_COST: number
+      BOOST_JOB_DURATION_DAYS: number
       AI_INVITE_POINT_COST_PER_WORKER: number
     },
   ) {
