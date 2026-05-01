@@ -4,6 +4,8 @@ import {
   Controller,
   Get,
   Headers,
+  Param,
+  ParseIntPipe,
   Post,
   Query,
 } from '@nestjs/common'
@@ -83,6 +85,24 @@ export class WalletController {
     const data = await this.walletService.createTopupCheckout(
       company.id,
       amount,
+      user.userId,
+    )
+    return { success: true, data }
+  }
+
+  @Get('topup/orders/:orderId/status')
+  @AuthJwtAccessProtected()
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Kiểm tra trạng thái đơn nạp point' })
+  async getTopupOrderStatus(
+    @AuthJwtPayload() user: any,
+    @Param('orderId', ParseIntPipe) orderId: number,
+  ) {
+    const company = await this.companyService.findByOwnerId(user.userId)
+    const data = await this.walletService.getTopupOrderStatus(
+      orderId,
+      company.id,
       user.userId,
     )
     return { success: true, data }

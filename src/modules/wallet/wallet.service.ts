@@ -184,6 +184,43 @@ export class WalletService {
     }
   }
 
+  async getTopupOrderStatus(orderId: number, companyId: number, userId: number) {
+    const order = await this.prisma.paymentOrder.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        userId: true,
+        targetId: true,
+        orderType: true,
+        status: true,
+        amount: true,
+        pointAmount: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    })
+
+    if (!order || order.orderType !== OrderType.TOPUP_WALLET) {
+      throw new BadRequestException('Không tìm thấy đơn nạp point')
+    }
+
+    if (order.userId !== userId || order.targetId !== companyId) {
+      throw new UnauthorizedException('Bạn không có quyền xem đơn nạp này')
+    }
+
+    const wallet = await this.ensureCompanyWallet(companyId)
+
+    return {
+      orderId: order.id,
+      status: order.status,
+      amount: order.amount,
+      pointAmount: order.pointAmount ?? order.amount,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+      walletBalancePoint: wallet.balancePoint,
+    }
+  }
+
   async processTopupWebhook(
     authorizationHeader?: string,
     payload?: Record<string, unknown>,
