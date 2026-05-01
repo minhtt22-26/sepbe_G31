@@ -4,6 +4,7 @@ import { AuthModule } from '../auth/auth.module'
 import { CompanyModule } from '../company/company.module'
 import { NotificationsModule } from '../notifications/notifications.module'
 import { ChatModule } from '../chat/chat.module'
+import { WalletModule } from '../wallet/wallet.module'
 import { InterviewInvitationService } from './service/interview-invitation.service'
 import { InterviewInvitationRepository } from './repositories/interview-invitation.repository'
 import { InterviewInvitationController } from './controller/interview-invitation.controller'
@@ -15,6 +16,7 @@ import { InterviewInvitationController } from './controller/interview-invitation
     CompanyModule,
     NotificationsModule,
     ChatModule,
+    WalletModule,
   ],
   controllers: [InterviewInvitationController],
   providers: [InterviewInvitationService, InterviewInvitationRepository],

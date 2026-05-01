@@ -10,6 +10,7 @@ import { PrismaService } from 'src/prisma.service'
 import { CompanyRegisterDto } from './dtos/request/company.register'
 import {
   CompanyStatus,
+  CompanyProfileUpdateRequestStatus,
   EnumUserRole,
   ReportStatus,
   ReviewStatus,
@@ -118,6 +119,43 @@ export class CompanyService {
     return company
   }
 
+  async findPendingUpdates() {
+    return this.prisma.company.findMany({
+      where: { status: CompanyStatus.UPDATING },
+      include: {
+        owner: {
+          select: {
+            fullName: true,
+            phone: true,
+            email: true,
+            avatar: true,
+          },
+        },
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    })
+  }
+
+  async findPendingUpdateRequest(companyId: number) {
+    const company = await this.findOne(companyId)
+    const updateRequest = await this.prisma.companyProfileUpdateRequest.findFirst({
+      where: {
+        companyId,
+        status: CompanyProfileUpdateRequestStatus.PENDING,
+      },
+      orderBy: { submittedAt: 'desc' },
+    })
+
+    return {
+      companyId: company.id,
+      current: company,
+      proposed: (updateRequest?.payload as Record<string, unknown>) ?? null,
+      request: updateRequest,
+    }
+  }
+
   async findByOwnerId(ownerId: number) {
     const company = await this.prisma.company.findFirst({
       where: { ownerId: ownerId },
@@ -142,7 +180,7 @@ export class CompanyService {
     }
     return company
   }
-  async review(id: number, body: CompanyReviewDto) {
+  async review(id: number, body: CompanyReviewDto, managerId?: number) {
     const company = await this.prisma.company.findUnique({
       where: { id },
     })
@@ -162,6 +200,10 @@ export class CompanyService {
       throw new BadRequestException('Rejection reason is required')
     }
 
+    if (company.status === CompanyStatus.UPDATING) {
+      return this.reviewPendingUpdate(id, body, managerId)
+    }
+
     const updatedCompany = await this.prisma.company.update({
       where: { id },
       data: {
@@ -170,6 +212,8 @@ export class CompanyService {
           body.status === CompanyStatus.REJECTED ? body.rejectionReason : null,
       },
     })
+
+    await this.invalidateApprovedCompaniesCache()
 
     const title =
       body.status === CompanyStatus.APPROVED
@@ -188,6 +232,95 @@ export class CompanyService {
         link: `/company/${company.id}`,
       },
     })
+
+    return updatedCompany
+  }
+
+  private async reviewPendingUpdate(
+    companyId: number,
+    body: CompanyReviewDto,
+    managerId?: number,
+  ) {
+    const pendingRequest = await this.prisma.companyProfileUpdateRequest.findFirst({
+      where: {
+        companyId,
+        status: CompanyProfileUpdateRequestStatus.PENDING,
+      },
+      orderBy: { submittedAt: 'desc' },
+    })
+    if (!pendingRequest) {
+      throw new BadRequestException('No pending update request found')
+    }
+
+    const reviewStatus =
+      body.status === CompanyStatus.APPROVED
+        ? CompanyProfileUpdateRequestStatus.APPROVED
+        : CompanyProfileUpdateRequestStatus.REJECTED
+
+    const payload = pendingRequest.payload as Record<string, unknown>
+    const applyData: Prisma.CompanyUpdateInput = {
+      status: CompanyStatus.APPROVED,
+      rejectionReason: null,
+    }
+
+    if (reviewStatus === CompanyProfileUpdateRequestStatus.APPROVED) {
+      applyData.name = typeof payload.name === 'string' ? payload.name : undefined
+      applyData.taxCode =
+        typeof payload.taxCode === 'string' ? payload.taxCode : payload.taxCode == null ? null : undefined
+      applyData.address =
+        typeof payload.address === 'string' ? payload.address : payload.address == null ? null : undefined
+      applyData.description =
+        typeof payload.description === 'string'
+          ? payload.description
+          : payload.description == null
+            ? null
+            : undefined
+      applyData.website =
+        typeof payload.website === 'string' ? payload.website : payload.website == null ? null : undefined
+      applyData.logoUrl =
+        typeof payload.logoUrl === 'string' ? payload.logoUrl : payload.logoUrl == null ? null : undefined
+      applyData.businessLicenseUrl =
+        typeof payload.businessLicenseUrl === 'string'
+          ? payload.businessLicenseUrl
+          : payload.businessLicenseUrl == null
+            ? null
+            : undefined
+    }
+
+    const [updatedCompany] = await this.prisma.$transaction([
+      this.prisma.company.update({
+        where: { id: companyId },
+        data: applyData,
+      }),
+      this.prisma.companyProfileUpdateRequest.update({
+        where: { id: pendingRequest.id },
+        data: {
+          status: reviewStatus,
+          rejectionReason:
+            reviewStatus === CompanyProfileUpdateRequestStatus.REJECTED
+              ? body.rejectionReason || 'Thông tin cập nhật bị từ chối'
+              : null,
+          reviewedAt: new Date(),
+          reviewedById: managerId ?? null,
+        },
+      }),
+    ])
+
+    const isApproved = reviewStatus === CompanyProfileUpdateRequestStatus.APPROVED
+    await this.prisma.notification.create({
+      data: {
+        userId: updatedCompany.ownerId,
+        title: isApproved
+          ? 'Cập nhật công ty đã được duyệt'
+          : 'Cập nhật công ty bị từ chối',
+        message: isApproved
+          ? 'Thông tin công ty mới đã được cập nhật.'
+          : body.rejectionReason || 'Yêu cầu cập nhật thông tin công ty đã bị từ chối.',
+        link: `/company/${companyId}`,
+      },
+    })
+
+    await this.invalidateApprovedCompaniesCache()
 
     return updatedCompany
   }
@@ -312,8 +445,76 @@ export class CompanyService {
     }
 
     const { ...updateData } = body as any
+    const proposedPayload = {
+      ...updateData,
+      logoUrl,
+      businessLicenseUrl,
+    }
+    const normalizedPayload = Object.fromEntries(
+      Object.entries(proposedPayload).filter(([, value]) => value !== undefined),
+    )
 
-    return this.prisma.company.update({
+    if (company.status === CompanyStatus.APPROVED || company.status === CompanyStatus.UPDATING) {
+      const savedCompany = await this.prisma.$transaction(async (tx) => {
+        const companyUpdated = await tx.company.update({
+          where: { id },
+          data: {
+            status: CompanyStatus.UPDATING,
+            rejectionReason: null,
+          },
+        })
+
+        const existingRequest = await tx.companyProfileUpdateRequest.findFirst({
+          where: {
+            companyId: id,
+            status: CompanyProfileUpdateRequestStatus.PENDING,
+          },
+          orderBy: { submittedAt: 'desc' },
+        })
+
+        if (existingRequest) {
+          await tx.companyProfileUpdateRequest.update({
+            where: { id: existingRequest.id },
+            data: {
+              payload: normalizedPayload as Prisma.InputJsonValue,
+              submittedAt: new Date(),
+              rejectionReason: null,
+              reviewedAt: null,
+              reviewedById: null,
+            },
+          })
+        } else {
+          await tx.companyProfileUpdateRequest.create({
+            data: {
+              companyId: id,
+              payload: normalizedPayload as Prisma.InputJsonValue,
+              status: CompanyProfileUpdateRequestStatus.PENDING,
+            },
+          })
+        }
+
+        return companyUpdated
+      })
+
+      const manager = await this.prisma.user.findFirst({
+        where: { role: EnumUserRole.MANAGER },
+        select: { id: true },
+      })
+      if (manager) {
+        await this.prisma.notification.create({
+          data: {
+            userId: manager.id,
+            title: 'Công ty chờ duyệt cập nhật',
+            message: `Công ty "${company.name}" vừa gửi cập nhật thông tin.`,
+            link: `/manager?companyId=${id}`,
+          },
+        })
+      }
+
+      return savedCompany
+    }
+
+    const updatedCompany = await this.prisma.company.update({
       where: { id },
       data: {
         ...updateData,
@@ -321,6 +522,28 @@ export class CompanyService {
         businessLicenseUrl: businessLicenseUrl,
       },
     })
+
+    await this.invalidateApprovedCompaniesCache()
+
+    return updatedCompany
+  }
+
+  async ensureCompanyApprovedForEmployerActions(ownerId: number) {
+    const company = await this.findByOwnerId(ownerId)
+    if (company.status !== CompanyStatus.APPROVED) {
+      throw new ForbiddenException(
+        'Company must be approved to create or update jobs',
+      )
+    }
+    return company
+  }
+
+  private async invalidateApprovedCompaniesCache() {
+    try {
+      await this.redis.del('companies:approved')
+    } catch (err) {
+      console.error('[CACHE] Delete key failed:', err?.message)
+    }
   }
 
   async searchCompanies(dto: CompanySearchDto) {

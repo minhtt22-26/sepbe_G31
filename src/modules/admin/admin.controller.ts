@@ -62,4 +62,27 @@ export class AdminController {
   ) {
     return this.adminService.updatePaymentPackage(id, body)
   }
+
+  @Get('point-pricing')
+  @AuthRoleProtected(EnumUserRole.ADMIN, EnumUserRole.MANAGER)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get point pricing settings for employer actions' })
+  async getPointPricingSettings() {
+    return this.adminService.getPointPricingSettings()
+  }
+
+  @Patch('point-pricing')
+  @AuthRoleProtected(EnumUserRole.ADMIN, EnumUserRole.MANAGER)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Update point pricing settings for employer actions' })
+  async updatePointPricingSettings(
+    @Body()
+    body: {
+      JOB_POST_POINT_COST: number
+      BOOST_JOB_POINT_COST: number
+      AI_INVITE_POINT_COST_PER_WORKER: number
+    },
+  ) {
+    return this.adminService.updatePointPricingSettings(body)
+  }
 }

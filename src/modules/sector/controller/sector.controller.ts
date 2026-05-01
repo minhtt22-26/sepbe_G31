@@ -7,11 +7,13 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
 import { SectorService } from '../service/sector.service'
 import { CreateSectorRequest } from '../dtos/request/create-sector.request'
 import { UpdateSectorRequest } from '../dtos/request/update-sector.request'
+import { SectorListQueryDto } from '../dtos/request/sector-list.query'
 import { AuthRoleProtected } from 'src/modules/auth/decorators/auth.jwt.decorator'
 import { EnumUserRole } from 'src/generated/prisma/enums'
 
@@ -28,8 +30,14 @@ export class SectorController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all sectors' })
-  findAll() {
+  @ApiOperation({
+    summary:
+      'Get all sectors (không query) hoặc phân trang (?page=1&limit=10)',
+  })
+  findAll(@Query() query: SectorListQueryDto) {
+    if (query.page != null) {
+      return this.sectorService.findPage(query.page, query.limit)
+    }
     return this.sectorService.findAll()
   }
 

@@ -31,6 +31,25 @@ export class SectorService {
         return this.sectorRepository.findAll()
     }
 
+    async findPage(page: number, limit?: number) {
+        const rawLimit = limit ?? 10
+        const take = Math.min(Math.max(1, rawLimit), 100)
+        const safePage = Math.max(1, page)
+        const skip = (safePage - 1) * take
+        const { items, totalItems } = await this.sectorRepository.findManyPaged(
+            skip,
+            take,
+        )
+        const totalPages = Math.max(1, Math.ceil(totalItems / take))
+        return {
+            data: items,
+            page: safePage,
+            size: take,
+            totalItems,
+            totalPages,
+        }
+    }
+
     async findOne(id: number) {
         const sector = await this.sectorRepository.findById(id)
 

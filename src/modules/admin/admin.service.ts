@@ -7,6 +7,11 @@ import { UpdatePaymentPackageDto } from './dtos/update-payment-package.dto';
 @Injectable()
 export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
+  private readonly POINT_SETTING_KEYS = [
+    'JOB_POST_POINT_COST',
+    'BOOST_JOB_POINT_COST',
+    'AI_INVITE_POINT_COST_PER_WORKER',
+  ] as const
 
   private validateDurationByOrderType(orderType: OrderType, durationDays?: number | null) {
     if (orderType === OrderType.BOOST_JOB && !durationDays) {
@@ -32,6 +37,53 @@ export class AdminService {
     });
 
     return { items: packages };
+  }
+
+  async getPointPricingSettings() {
+    const settings = await this.prisma.systemSetting.findMany({
+      where: {
+        key: { in: [...this.POINT_SETTING_KEYS] },
+      },
+      orderBy: { key: 'asc' },
+    })
+
+    const map = new Map(settings.map((item) => [item.key, item]))
+    return {
+      items: this.POINT_SETTING_KEYS.map((key) => {
+        const item = map.get(key)
+        return {
+          key,
+          value: Number(item?.value ?? 0),
+          description: item?.description || null,
+        }
+      }),
+    }
+  }
+
+  async updatePointPricingSettings(payload: Record<string, number>) {
+    const entries: Array<
+      [(typeof this.POINT_SETTING_KEYS)[number], number]
+    > = this.POINT_SETTING_KEYS.map((key) => [key, Number(payload[key] ?? 0)])
+    for (const [key, value] of entries) {
+      if (!Number.isFinite(value) || value < 0) {
+        throw new BadRequestException(`Giá trị ${key} không hợp lệ`)
+      }
+    }
+
+    await this.prisma.$transaction(
+      entries.map(([key, value]) =>
+        this.prisma.systemSetting.upsert({
+          where: { key },
+          update: { value: String(Math.floor(value)) },
+          create: {
+            key,
+            value: String(Math.floor(value)),
+          },
+        }),
+      ),
+    )
+
+    return this.getPointPricingSettings()
   }
 
   async createPaymentPackage(dto: CreatePaymentPackageDto) {

@@ -129,6 +129,24 @@ export class CompanyController {
     return this.companyService.searchCompanies(dto)
   }
 
+  @Get('pending-updates')
+  @AuthRoleProtected(EnumUserRole.MANAGER)
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'List companies waiting for profile update approval' })
+  findPendingUpdates() {
+    return this.companyService.findPendingUpdates()
+  }
+
+  @Get(':id/update-request')
+  @AuthRoleProtected(EnumUserRole.MANAGER)
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get old/new company data for update review' })
+  findPendingUpdateRequest(@Param('id') id: string) {
+    return this.companyService.findPendingUpdateRequest(+id)
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get company detail' })
   @ApiParam({ name: 'id', type: Number, description: 'Company ID' })
@@ -152,8 +170,12 @@ export class CompanyController {
   @ApiResponse({ status: 404, description: 'Company not found' })
   @AuthJwtAccessProtected()
   @ApiBearerAuth('access-token')
-  updateStatus(@Param('id') id: string, @Body() body: CompanyReviewDto) {
-    return this.companyService.review(+id, body)
+  updateStatus(
+    @Param('id') id: string,
+    @Body() body: CompanyReviewDto,
+    @AuthJwtPayload() user: any,
+  ) {
+    return this.companyService.review(+id, body, user.userId)
   }
 
   // Alias kept for frontend compatibility
@@ -162,8 +184,12 @@ export class CompanyController {
   @ApiOperation({ summary: 'Approve or reject company (alias)' })
   @AuthJwtAccessProtected()
   @ApiBearerAuth('access-token')
-  reviewAlias(@Param('id') id: string, @Body() body: CompanyReviewDto) {
-    return this.companyService.review(+id, body)
+  reviewAlias(
+    @Param('id') id: string,
+    @Body() body: CompanyReviewDto,
+    @AuthJwtPayload() user: any,
+  ) {
+    return this.companyService.review(+id, body, user.userId)
   }
 
   // ================= COMPANY REVIEWS =================

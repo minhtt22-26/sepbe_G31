@@ -141,15 +141,23 @@ export class ChatService {
     conversationId: number,
     query: ChatGetMessageRequestDto,
   ): Promise<ChatMessageResponseDto[]> {
-    const { limit = 20, cursor } = query
+    const { limit = 20, cursor, search } = query
+    const trimmedSearch = typeof search === 'string' ? search.trim() : ''
 
     await this.assertConversationAccess(conversationId, userId)
 
-    const messages = await this.chatRepository.getMessages(
-      conversationId,
-      limit,
-      cursor,
-    )
+    const messages =
+      trimmedSearch.length > 0
+        ? await this.chatRepository.searchMessages(
+            conversationId,
+            trimmedSearch,
+            limit,
+          )
+        : await this.chatRepository.getMessages(
+            conversationId,
+            limit,
+            cursor,
+          )
 
     return messages.map((m) => ({
       id: m.id,

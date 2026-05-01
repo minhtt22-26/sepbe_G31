@@ -1100,6 +1100,62 @@ async function main() {
   })
 
   console.log('✅ Đã tạo gói thanh toán mặc định')
+
+  // =====================
+  // POINT SYSTEM SETTINGS
+  // =====================
+  console.log('🪙 Tạo cấu hình point mặc định...')
+
+  await prisma.systemSetting.upsert({
+    where: { key: 'JOB_POST_POINT_COST' },
+    update: { value: '50000', description: 'Số point cần trả cho mỗi lần đăng job' },
+    create: {
+      key: 'JOB_POST_POINT_COST',
+      value: '50000',
+      description: 'Số point cần trả cho mỗi lần đăng job',
+    },
+  })
+
+  await prisma.systemSetting.upsert({
+    where: { key: 'BOOST_JOB_POINT_COST' },
+    update: { value: '50000', description: 'Số point cần trả cho mỗi lần boost job' },
+    create: {
+      key: 'BOOST_JOB_POINT_COST',
+      value: '50000',
+      description: 'Số point cần trả cho mỗi lần boost job',
+    },
+  })
+
+  await prisma.systemSetting.upsert({
+    where: { key: 'AI_INVITE_POINT_COST_PER_WORKER' },
+    update: {
+      value: '1000',
+      description: 'Số point cho mỗi worker khi gửi lời mời từ đề xuất AI',
+    },
+    create: {
+      key: 'AI_INVITE_POINT_COST_PER_WORKER',
+      value: '1000',
+      description: 'Số point cho mỗi worker khi gửi lời mời từ đề xuất AI',
+    },
+  })
+
+  console.log('✅ Đã tạo cấu hình point')
+
+  // =====================
+  // COMPANY WALLETS
+  // =====================
+  console.log('👛 Khởi tạo ví point cho công ty...')
+  for (const company of companies) {
+    await prisma.companyWallet.upsert({
+      where: { companyId: company.id },
+      update: {},
+      create: {
+        companyId: company.id,
+      },
+    })
+  }
+  console.log('✅ Đã khởi tạo ví point cho công ty')
+
   console.log('🎉 Seed hoàn tất!')
 }
 
