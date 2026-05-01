@@ -111,6 +111,26 @@ export class ChatRepository {
     })
   }
 
+  async searchMessages(
+    conversationId: number,
+    search: string,
+    limit: number,
+  ): Promise<ChatMessage[]> {
+    const q = search.trim()
+    if (!q) return []
+    return await this.prisma.chatMessage.findMany({
+      where: {
+        conversationId,
+        content: {
+          contains: q,
+          mode: 'insensitive',
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    })
+  }
+
   async markMessagesAsRead(
     userId: number,
     conversationId: number,

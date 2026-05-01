@@ -24,7 +24,14 @@ enum CompanyStatus {
   PENDING // Chờ duyệt
   APPROVED // Đã duyệt
   REJECTED // Bị từ chối
+  UPDATING // Chờ duyệt cập nhật thông tin (bản đang hiển thị = dữ liệu live)
   DELETED
+}
+
+enum CompanyProfileUpdateRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum EnumUserGender {
@@ -126,6 +133,15 @@ enum OrderType {
   BOOST_JOB
   PREMIUM_SUBSCRIPTION
   FEATURE_LISTING
+  TOPUP_WALLET
+}
+
+enum WalletTransactionType {
+  TOPUP
+  POST_JOB
+  BOOST_JOB
+  AI_INVITE
+  ADJUSTMENT
 }
 
 enum MessageStatus {
@@ -332,8 +348,27 @@ model Company {
   jobs               Job[]
   reviews            CompanyReview[]
   interviewCampaigns InterviewInvitationCampaign[]
+  profileUpdateRequests CompanyProfileUpdateRequest[]
+  wallet             CompanyWallet?
+  firstJobPostUsedAt DateTime?
 
   @@index([ownerId])
+  @@index([status])
+}
+
+model CompanyProfileUpdateRequest {
+  id              Int                               @id @default(autoincrement())
+  companyId       Int
+  status          CompanyProfileUpdateRequestStatus @default(PENDING)
+  payload         Json // proposed profile fields after employer submit
+  rejectionReason String?
+  submittedAt     DateTime                         @default(now())
+  reviewedAt      DateTime?
+  reviewedById    Int?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
   @@index([status])
 }
 
@@ -569,6 +604,7 @@ model PaymentOrder {
   packageDays     Int?
   orderType       OrderType
   targetId        Int? // ID of job being boosted, etc.
+  pointAmount     Int?
   amount          Int
   currency        String        @default("VND")
   status          PaymentStatus @default(PENDING)
@@ -746,6 +782,45 @@ model MatchingConfig {
   label     String
   value     Float
   updatedAt DateTime @updatedAt
+}
+
+model SystemSetting {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  value       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CompanyWallet {
+  id              Int                 @id @default(autoincrement())
+  companyId       Int                 @unique
+  balancePoint    Int                 @default(0)
+  totalTopupPoint Int                 @default(0)
+  totalSpentPoint Int                 @default(0)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  company       Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  transactions  WalletTransaction[]
+}
+
+model WalletTransaction {
+  id            Int                   @id @default(autoincrement())
+  walletId       Int
+  type          WalletTransactionType
+  pointDelta    Int
+  balanceAfter  Int
+  referenceType String?
+  referenceId   Int?
+  metadata      Json?
+  createdAt     DateTime              @default(now())
+
+  wallet CompanyWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId, createdAt])
+  @@index([type, createdAt])
 }
 model JobView {
   id        Int      @id @default(autoincrement())

@@ -80,6 +80,110 @@ export class JobRepository {
     })
   }
 
+  async isFirstJobPostFree(companyId: number) {
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { firstJobPostUsedAt: true },
+    })
+    if (!company) {
+      throw new BadRequestException('Company not found')
+    }
+    return !company.firstJobPostUsedAt
+  }
+
+  async publishFirstJobForFree(jobId: number, companyId: number) {
+    return this.prisma.$transaction(async (tx) => {
+      const now = new Date()
+      const company = await tx.company.update({
+        where: { id: companyId },
+        data: {
+          firstJobPostUsedAt: now,
+        },
+        select: {
+          ownerId: true,
+        },
+      })
+      const job = await tx.job.update({
+        where: { id: jobId },
+        data: {
+          status: JobStatus.PUBLISHED,
+        },
+      })
+      await tx.notification.create({
+        data: {
+          userId: company.ownerId,
+          title: 'Đăng tin miễn phí thành công',
+          message: `Tin "${job.title}" đã được xuất bản miễn phí lần đầu.`,
+          link: '/employer',
+        },
+      })
+      return job
+    })
+  }
+
+  async publishJobByPoint(jobId: number) {
+    return this.prisma.$transaction(async (tx) => {
+      const job = await tx.job.update({
+        where: { id: jobId },
+        data: {
+          status: JobStatus.PUBLISHED,
+        },
+        include: {
+          company: { select: { ownerId: true } },
+        },
+      })
+
+      if (job.company?.ownerId) {
+        await tx.notification.create({
+          data: {
+            userId: job.company.ownerId,
+            title: 'Đăng tin thành công',
+            message: `${job.title} (đã trừ point)`,
+            link: '/employer',
+          },
+        })
+      }
+      return job
+    })
+  }
+
+  async activateBoostByPoint(params: { jobId: number; durationDays: number }) {
+    const now = new Date()
+    return this.prisma.$transaction(async (tx) => {
+      const existingJob = await tx.job.findUnique({
+        where: { id: params.jobId },
+        select: { boostExpiredAt: true, title: true, company: { select: { ownerId: true } } },
+      })
+      const baseDate =
+        existingJob?.boostExpiredAt && existingJob.boostExpiredAt > now
+          ? existingJob.boostExpiredAt
+          : now
+      const boostExpiredAt = new Date(baseDate)
+      boostExpiredAt.setDate(boostExpiredAt.getDate() + params.durationDays)
+
+      const job = await tx.job.update({
+        where: { id: params.jobId },
+        data: {
+          isBoosted: true,
+          boostExpiredAt,
+        },
+      })
+
+      if (existingJob?.company?.ownerId) {
+        await tx.notification.create({
+          data: {
+            userId: existingJob.company.ownerId,
+            title: 'Boost job thành công',
+            message: `(${params.durationDays} ngày) ${existingJob.title}`,
+            link: '/employer',
+          },
+        })
+      }
+
+      return job
+    })
+  }
+
   async findPendingJobPostingOrder(jobId: number) {
     return this.prisma.paymentOrder.findFirst({
       where: {

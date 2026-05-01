@@ -279,7 +279,8 @@ export class UserRepository {
 
   async getUserList(filters: UserListRequestDto) {
     const { page, role, status, fromDate, toDate } = filters
-    const limit = 20
+    const rawLimit = filters.limit ?? 10
+    const limit = Math.min(Math.max(1, rawLimit), 100)
     const skip = (page - 1) * limit
 
     const andConditions: Prisma.UserWhereInput[] = [

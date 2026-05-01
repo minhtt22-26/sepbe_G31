@@ -9,6 +9,7 @@ jest.mock('src/prisma.service', () => ({
 const sectorServiceMock = {
     create: jest.fn(),
     findAll: jest.fn(),
+    findPage: jest.fn(),
     findOne: jest.fn(),
     update: jest.fn(),
     remove: jest.fn(),
@@ -46,14 +47,32 @@ describe('SectorController', () => {
         expect(sectorServiceMock.create).toHaveBeenCalledWith(body)
     })
 
-    it('findAll should call service.findAll', async () => {
+    it('findAll should call service.findAll when no page query', async () => {
         const expected = [{ id: 1, name: 'Sản xuất' }]
         sectorServiceMock.findAll.mockResolvedValue(expected)
 
-        const result = await controller.findAll()
+        const result = await controller.findAll({})
 
         expect(result).toBe(expected)
         expect(sectorServiceMock.findAll).toHaveBeenCalledTimes(1)
+        expect(sectorServiceMock.findPage).not.toHaveBeenCalled()
+    })
+
+    it('findAll should call service.findPage when page query set', async () => {
+        const expected = {
+            data: [{ id: 1, name: 'Sản xuất' }],
+            page: 1,
+            size: 10,
+            totalItems: 1,
+            totalPages: 1,
+        }
+        sectorServiceMock.findPage.mockResolvedValue(expected)
+
+        const result = await controller.findAll({ page: 1, limit: 10 })
+
+        expect(result).toBe(expected)
+        expect(sectorServiceMock.findPage).toHaveBeenCalledWith(1, 10)
+        expect(sectorServiceMock.findAll).not.toHaveBeenCalled()
     })
 
     it('findOne should call service.findOne', async () => {

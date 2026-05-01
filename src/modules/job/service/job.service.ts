@@ -5,7 +5,6 @@ import {
   NotFoundException,
   Inject,
   forwardRef,
-  UnauthorizedException,
 } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { JobRepository } from '../repositories/job.repository'
@@ -14,10 +13,8 @@ import { UpdateJobRequest } from '../dtos/request/update-job.request'
 import {
   JobApplicationStatus,
   JobStatus,
-  OrderType,
-  PaymentMethod,
-  PaymentStatus,
   ReportStatus,
+  WalletTransactionType,
 } from 'src/generated/prisma/enums'
 import { ApplyJobRequest } from '../dtos/request/apply-job.request'
 import { GetJobsByEmployerDto } from '../dtos/request/get-jobs-employer.dto'
@@ -27,7 +24,7 @@ import { AIMatchingService } from 'src/modules/ai-matching/service/ai-matching.s
 import { JobReportDto } from '../dtos/job.report.request.dto'
 import { BoostCheckoutRequestDto } from '../dtos/request/boost-checkout.request'
 import { ConfirmBoostPaymentRequestDto } from '../dtos/request/confirm-boost-payment.request'
-import { SepayService } from './sepay.service'
+import { WalletService } from 'src/modules/wallet/wallet.service'
 
 @Injectable()
 export class JobService {
@@ -51,7 +48,7 @@ export class JobService {
 
   constructor(
     private readonly jobRepository: JobRepository,
-    private readonly sepayService: SepayService,
+    private readonly walletService: WalletService,
     // private readonly embeddingQueueService: EmbeddingQueueService,
     @Inject(forwardRef(() => AIMatchingService))
     private readonly aiMatchingService: AIMatchingService,
@@ -210,55 +207,37 @@ export class JobService {
     }
 
     const packageDays = body.packageDays ?? this.BOOST_SHORT_DAYS
-    const boostPackage = await this.jobRepository.getBoostPackageByDays(packageDays)
-    const defaultAmount = boostPackage
-      ? boostPackage.price
-      : this.BOOST_PRICE_BY_DAYS[packageDays]
-
-    if (!defaultAmount) {
+    if (!this.BOOST_PRICE_BY_DAYS[packageDays]) {
       throw new BadRequestException('Package boost khong hop le')
     }
-
-    if (body.paymentMethod && body.paymentMethod !== PaymentMethod.SEPAY) {
-      throw new BadRequestException(
-        'Hiện tại chỉ hỗ trợ thanh toán boost qua SEPAY',
-      )
-    }
-
-    const amount = body.amount ?? defaultAmount
-    if (amount <= 0) {
-      throw new BadRequestException('Số tiền thanh toán không hợp lệ')
-    }
-
-    const order = await this.jobRepository.createBoostPaymentOrder({
-      userId: job.company.ownerId,
-      jobId,
-      amount,
-      paymentMethod: body.paymentMethod ?? PaymentMethod.SEPAY,
-      packageId: boostPackage?.id,
-      packageDays,
+    const pointCost = await this.walletService.getPointCost(
+      'BOOST_JOB_POINT_COST',
+      this.BOOST_PRICE_BY_DAYS[packageDays],
+    )
+    await this.walletService.deductPoints({
+      companyId,
+      cost: pointCost,
+      type: WalletTransactionType.BOOST_JOB,
+      referenceType: 'JOB',
+      referenceId: jobId,
+      metadata: {
+        packageDays,
+      },
     })
-
-    const checkout = this.sepayService.buildBoostCheckout(order.id, amount)
+    const result = await this.jobRepository.activateBoostByPoint({
+      jobId,
+      durationDays: packageDays,
+    })
 
     return {
       success: true,
       data: {
-        paymentOrderId: order.id,
-        status: order.status,
-        amount: order.amount,
-        currency: order.currency,
-        paymentMethod: order.paymentMethod,
+        jobId: result.id,
         packageDays,
-        paymentCode: checkout.paymentCode,
-        paymentUrl: checkout.paymentUrl,
-        transferNote: checkout.transferNote,
-        bankCode: checkout.bankCode,
-        accountNumber: checkout.accountNumber,
-        accountName: checkout.accountName,
+        pointCost,
+        boostExpiredAt: result.boostExpiredAt,
       },
-      message:
-        'Đã tạo đơn boost. Hãy thanh toán bằng QR/chuyển khoản đúng nội dung để SePay tự xác nhận.',
+      message: 'Đã trừ point và kích hoạt boost cho tin tuyển dụng.',
     }
   }
 
@@ -272,41 +251,27 @@ export class JobService {
       throw new BadRequestException('Job has already been published')
     }
 
-    const existingOrder = await this.jobRepository.findPendingJobPostingOrder(
-      jobId,
+    const pointCost = await this.walletService.getPointCost(
+      'JOB_POST_POINT_COST',
+      this.JOB_POSTING_FEE,
     )
-
-    const postingPackage = await this.jobRepository.getDefaultFeatureListingPackage()
-    const postingAmount = postingPackage?.price ?? this.JOB_POSTING_FEE
-
-    const order =
-      existingOrder ??
-      (await this.jobRepository.createJobPostingPaymentOrder({
-        userId: job.company.ownerId,
-        jobId,
-        amount: postingAmount,
-        paymentMethod: PaymentMethod.SEPAY,
-      }))
-
-    const checkout = this.sepayService.buildCheckout(order.id, order.amount)
+    await this.walletService.deductPoints({
+      companyId,
+      cost: pointCost,
+      type: WalletTransactionType.POST_JOB,
+      referenceType: 'JOB',
+      referenceId: jobId,
+    })
+    const published = await this.jobRepository.publishJobByPoint(jobId)
+    await this.aiMatchingService.buildJobEmbedding(jobId)
 
     return {
       success: true,
       data: {
-        paymentOrderId: order.id,
-        status: order.status,
-        amount: order.amount,
-        currency: order.currency,
-        paymentMethod: order.paymentMethod,
-        paymentCode: checkout.paymentCode,
-        paymentUrl: checkout.paymentUrl,
-        transferNote: checkout.transferNote,
-        bankCode: checkout.bankCode,
-        accountNumber: checkout.accountNumber,
-        accountName: checkout.accountName,
+        jobId: published.id,
+        pointCost,
       },
-      message:
-        'Đã tạo đơn thanh toán cho tin tuyển dụng. Hãy chuyển khoản đúng nội dung để SePay tự xác nhận.',
+      message: 'Đã trừ point và xuất bản tin tuyển dụng.',
     }
   }
 
@@ -314,170 +279,15 @@ export class JobService {
     authorizationHeader?: string,
     payload?: Record<string, unknown>,
   ) {
-    this.logger.log('SePay webhook received')
-
-    if (!this.sepayService.isValidWebhookAuthorization(authorizationHeader)) {
-      this.logger.warn('SePay webhook rejected: invalid authorization header')
-      throw new UnauthorizedException(
-        'SePay webhook authorization không hợp lệ',
-      )
-    }
-
-    if (!payload || typeof payload !== 'object') {
-      this.logger.warn('SePay webhook rejected: invalid payload')
-      throw new BadRequestException('Payload webhook không hợp lệ')
-    }
-
-    const normalizedPayload =
-      payload.data && typeof payload.data === 'object'
-        ? (payload.data as Record<string, unknown>)
-        : payload
-
-    this.logger.debug(
-      `SePay webhook payload keys: ${Object.keys(normalizedPayload).join(',')}`,
+    this.logger.warn(
+      `Đã ngưng webhook SePay cho job/boost. Dùng point-only. authorization=${Boolean(
+        authorizationHeader,
+      )}, payload=${Boolean(payload)}`,
     )
-
-    const transferType =
-      typeof normalizedPayload.transferType === 'string'
-        ? normalizedPayload.transferType.toLowerCase()
-        : typeof normalizedPayload.transfer_type === 'string'
-          ? normalizedPayload.transfer_type.toLowerCase()
-          : ''
-    if (transferType && !transferType.startsWith('in')) {
-      this.logger.log(
-        `SePay webhook ignored: transferType=${transferType || '(empty)'}`,
-      )
-      return { success: true, message: 'Bỏ qua giao dịch không phải tiền vào' }
-    }
-
-    const orderId =
-      this.sepayService.extractOrderIdFromPayload(normalizedPayload)
-    if (!orderId) {
-      this.logger.warn('SePay webhook ignored: cannot extract BOOST order id')
-      return {
-        success: true,
-        message: 'Bỏ qua giao dịch không chứa mã boost hợp lệ',
-      }
-    }
-
-    const order = await this.jobRepository.findPaymentOrderById(orderId)
-    if (
-      !order ||
-      (order.orderType !== OrderType.BOOST_JOB &&
-        order.orderType !== OrderType.FEATURE_LISTING)
-    ) {
-      this.logger.warn(
-        `SePay webhook ignored: order not found or unsupported order type (orderId=${orderId})`,
-      )
-      return { success: true, message: 'Không tìm thấy order thanh toán tương ứng' }
-    }
-
-    if (order.paymentMethod !== PaymentMethod.SEPAY) {
-      this.logger.warn(
-        `SePay webhook ignored: payment method mismatch (orderId=${order.id}, method=${order.paymentMethod})`,
-      )
-      return { success: true, message: 'Order không dùng phương thức SEPAY' }
-    }
-
-    if (order.status === PaymentStatus.COMPLETED) {
-      this.logger.log(
-        `SePay webhook ignored: order already completed (orderId=${order.id})`,
-      )
-      return { success: true, message: 'Order đã xử lý trước đó' }
-    }
-
-    if (!order.targetId) {
-      this.logger.warn(
-        `SePay webhook ignored: order has no targetId (orderId=${order.id})`,
-      )
-      return { success: true, message: 'Order không có target job' }
-    }
-
-    const transferAmount = Number(
-      normalizedPayload.transferAmount ??
-        normalizedPayload.transfer_amount ??
-        normalizedPayload.amount ??
-        normalizedPayload.amount_in ??
-        0,
-    )
-    if (!Number.isFinite(transferAmount) || transferAmount < order.amount) {
-      this.logger.warn(
-        `SePay webhook ignored: insufficient amount (orderId=${order.id}, required=${order.amount}, transfer=${transferAmount})`,
-      )
-      return {
-        success: true,
-        message:
-          order.orderType === OrderType.BOOST_JOB
-            ? 'Số tiền chưa đủ để kích hoạt boost'
-            : 'Số tiền chưa đủ để xuất bản tin tuyển dụng',
-        data: {
-          paymentOrderId: order.id,
-          requiredAmount: order.amount,
-          transferAmount,
-        },
-      }
-    }
-
-    const durationDays =
-      order.packageDays ??
-      (order.amount >= this.BOOST_PRICE_BY_DAYS[this.BOOST_LONG_DAYS]
-        ? this.BOOST_LONG_DAYS
-        : this.BOOST_SHORT_DAYS)
-    const referenceCode =
-      typeof normalizedPayload.referenceCode === 'string'
-        ? normalizedPayload.referenceCode
-        : typeof normalizedPayload.reference_code === 'string'
-          ? normalizedPayload.reference_code
-          : null
-    const rawTransactionCode =
-      typeof normalizedPayload.transactionCode === 'string'
-        ? normalizedPayload.transactionCode
-        : typeof normalizedPayload.transaction_code === 'string'
-          ? normalizedPayload.transaction_code
-          : null
-    const webhookId =
-      typeof normalizedPayload.id === 'number' ||
-      typeof normalizedPayload.id === 'string'
-        ? String(normalizedPayload.id)
-        : null
-
-    const transactionCode =
-      referenceCode || rawTransactionCode || webhookId || String(order.id)
-
-    const result =
-      order.orderType === OrderType.BOOST_JOB
-        ? await this.jobRepository.activateBoostAfterPayment({
-            orderId: order.id,
-            jobId: order.targetId,
-            durationDays,
-            transactionCode,
-          })
-        : await this.jobRepository.activateJobPostingAfterPayment({
-            orderId: order.id,
-            jobId: order.targetId,
-            transactionCode,
-          })
-
-    if (order.orderType === OrderType.FEATURE_LISTING) {
-      await this.aiMatchingService.buildJobEmbedding(result.job.id)
-    }
-
-    this.logger.log(
-      `SePay webhook processed successfully: orderId=${result.order.id}, jobId=${result.job.id}`,
-    )
-
     return {
       success: true,
       message:
-        order.orderType === OrderType.BOOST_JOB
-          ? 'Đã xác nhận thanh toán SePay và kích hoạt boost'
-          : 'Đã xác nhận thanh toán SePay và xuất bản tin tuyển dụng',
-      data: {
-        paymentOrderId: result.order.id,
-        jobId: result.job.id,
-        isBoosted: result.job.isBoosted,
-        boostExpiredAt: result.job.boostExpiredAt,
-      },
+        'Luồng webhook SePay cho job/boost đã ngưng. Hệ thống hiện thanh toán bằng point.',
     }
   }
 
@@ -486,58 +296,16 @@ export class JobService {
     companyId: number,
     body: ConfirmBoostPaymentRequestDto,
   ) {
+    void body
     const job = await this.jobRepository.findJobById(jobId)
     if (!job || job.companyId !== companyId) {
       throw new NotFoundException('Job not found or unauthorized')
     }
 
-    const order = await this.jobRepository.findPaymentOrderById(
-      body.paymentOrderId,
-    )
-
-    if (!order || order.targetId !== jobId) {
-      throw new NotFoundException('Payment order không tồn tại cho job này')
-    }
-
-    if (order.status === PaymentStatus.COMPLETED) {
-      return {
-        success: true,
-        message: 'Đơn thanh toán đã được xác nhận trước đó',
-        data: {
-          jobId,
-          isBoosted: job.isBoosted,
-          boostExpiredAt: job.boostExpiredAt,
-          paymentOrderId: order.id,
-        },
-      }
-    }
-
-    if (order.status !== PaymentStatus.PENDING) {
-      throw new BadRequestException('Chỉ đơn PENDING mới có thể xác nhận')
-    }
-
-    const durationDays =
-      order.packageDays ??
-      (order.amount >= this.BOOST_PRICE_BY_DAYS[this.BOOST_LONG_DAYS]
-        ? this.BOOST_LONG_DAYS
-        : this.BOOST_SHORT_DAYS)
-
-    const result = await this.jobRepository.activateBoostAfterPayment({
-      orderId: order.id,
-      jobId,
-      durationDays,
-      transactionCode: body.transactionCode,
-    })
-
     return {
-      success: true,
-      message: 'Thanh toán thành công và đã kích hoạt boost cho job',
-      data: {
-        paymentOrderId: result.order.id,
-        jobId: result.job.id,
-        isBoosted: result.job.isBoosted,
-        boostExpiredAt: result.job.boostExpiredAt,
-      },
+      success: false,
+      message:
+        'Endpoint xác nhận payment boost đã ngưng trong chế độ point-only. Hãy dùng thao tác boost bằng point.',
     }
   }
 
@@ -648,34 +416,51 @@ export class JobService {
         jobData,
         fields: dto.fields,
       })
+      const freePostingAvailable = await this.jobRepository.isFirstJobPostFree(
+        companyId,
+      )
 
-      const order = await this.jobRepository.createJobPostingPaymentOrder({
-        userId: created.company?.ownerId ?? companyId,
-        jobId: created.id,
-        amount: this.JOB_POSTING_FEE,
-        paymentMethod: PaymentMethod.SEPAY,
+      if (freePostingAvailable) {
+        await this.jobRepository.publishFirstJobForFree(created.id, companyId)
+        await this.aiMatchingService.buildJobEmbedding(created.id)
+        return {
+          success: true,
+          data: {
+            job: {
+              ...created,
+              status: JobStatus.PUBLISHED,
+            },
+            payment: {
+              pointCost: 0,
+            },
+          },
+          message: 'Đã đăng tin miễn phí cho lần đầu tiên của doanh nghiệp.',
+        }
+      }
+
+      const pointCost = await this.walletService.getPointCost(
+        'JOB_POST_POINT_COST',
+        this.JOB_POSTING_FEE,
+      )
+      await this.walletService.deductPoints({
+        companyId,
+        cost: pointCost,
+        type: WalletTransactionType.POST_JOB,
+        referenceType: 'JOB',
+        referenceId: created.id,
       })
-
-      const checkout = this.sepayService.buildCheckout(order.id, order.amount)
+      await this.jobRepository.publishJobByPoint(created.id)
+      await this.aiMatchingService.buildJobEmbedding(created.id)
 
       return {
         success: true,
         data: {
           job: created,
           payment: {
-            paymentOrderId: order.id,
-            amount: order.amount,
-            currency: order.currency,
-            paymentMethod: order.paymentMethod,
-            paymentCode: checkout.paymentCode,
-            paymentUrl: checkout.paymentUrl,
-            transferNote: checkout.transferNote,
-            bankCode: checkout.bankCode,
-            accountNumber: checkout.accountNumber,
-            accountName: checkout.accountName,
+            pointCost,
           },
         },
-        message: 'Đã tạo tin. Vui lòng thanh toán để hiển thị công khai',
+        message: 'Đã tạo và xuất bản tin bằng point thành công.',
       }
     } catch (error) {
       const errorMessage =

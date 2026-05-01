@@ -15,6 +15,7 @@ import {
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common'
@@ -476,6 +477,23 @@ describe('UserService', () => {
         expect(result).toEqual({ tokens: { accessToken: 'a' } })
       })
 
+      it('Normal: should login existing active social user without role in body', async () => {
+        const existingUser = { id: 1, status: EnumUserStatus.ACTIVE } as any
+        mockUserRepository.findUserWithByEmail.mockResolvedValue(existingUser)
+        mockAuthService.createTokens.mockReturnValue({
+          tokens: { accessToken: 'a' },
+        })
+
+        const result = await service.loginWithSocial(
+          email,
+          EnumUserLoginWith.SOCIAL_GOOGLE,
+          {},
+        )
+
+        expect(result).toEqual({ tokens: { accessToken: 'a' } })
+        expect(userRepository.createBySocial).not.toHaveBeenCalled()
+      })
+
       it('Normal: should create and login new social user', async () => {
         mockUserRepository.findUserWithByEmail.mockResolvedValue(null)
         const newUser = { id: 2, status: EnumUserStatus.ACTIVE } as any
@@ -488,10 +506,54 @@ describe('UserService', () => {
           email,
           EnumUserLoginWith.SOCIAL_GOOGLE,
           body,
-          // requestLog,
+          { googleFullName: 'Tên từ Google' },
         )
 
-        expect(userRepository.createBySocial).toHaveBeenCalled()
+        expect(userRepository.createBySocial).toHaveBeenCalledWith(
+          email,
+          'Tên từ Google',
+          EnumUserLoginWith.SOCIAL_GOOGLE,
+          expect.any(Date),
+          body.role,
+        )
+      })
+
+      it('Prefers verified Google display name over body.fullName when creating user', async () => {
+        mockUserRepository.findUserWithByEmail.mockResolvedValue(null)
+        const newUser = { id: 2, status: EnumUserStatus.ACTIVE } as any
+        mockUserRepository.createBySocial.mockResolvedValue(newUser)
+        mockAuthService.createTokens.mockReturnValue({
+          tokens: { accessToken: 'a' },
+        })
+
+        await service.loginWithSocial(
+          email,
+          EnumUserLoginWith.SOCIAL_GOOGLE,
+          { ...body, fullName: 'Body Name' },
+          { googleFullName: 'Verified Google' },
+        )
+
+        expect(userRepository.createBySocial).toHaveBeenCalledWith(
+          email,
+          'Verified Google',
+          EnumUserLoginWith.SOCIAL_GOOGLE,
+          expect.any(Date),
+          body.role,
+        )
+      })
+
+      it('Abnormal: should throw HttpException when new Google user has no role', async () => {
+        mockUserRepository.findUserWithByEmail.mockResolvedValue(null)
+
+        await expect(
+          service.loginWithSocial(
+            email,
+            EnumUserLoginWith.SOCIAL_GOOGLE,
+            {},
+          ),
+        ).rejects.toThrow(HttpException)
+
+        expect(userRepository.createBySocial).not.toHaveBeenCalled()
       })
 
       it('Abnormal: should throw ForbiddenException when user is inactive', async () => {

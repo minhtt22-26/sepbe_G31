@@ -184,11 +184,19 @@ describe('UserController', () => {
 
     it('loginWithGoogle: should call service', async () => {
       mockUserService.loginWithSocial.mockResolvedValue({ tokens: {} })
-      await controller.loginWithGoogle('e', {} as any)
+      await controller.loginWithGoogle(
+        {
+          email: 'e',
+          emailVerified: true,
+          fullName: 'Google User Name',
+        },
+        {},
+      )
       expect(userService.loginWithSocial).toHaveBeenCalledWith(
         'e',
         EnumUserLoginWith.SOCIAL_GOOGLE,
         {},
+        { googleFullName: 'Google User Name' },
       )
     })
 

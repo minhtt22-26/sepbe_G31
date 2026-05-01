@@ -266,10 +266,18 @@ export class AuthService {
 
     try {
       const payload = await this.authUtil.verifyGoogle(requestHeaders[1])
+      const email =
+        typeof payload.email === 'string' ? payload.email.trim() : undefined
+      if (!email) {
+        throw new UnauthorizedException({
+          message: 'Google không cung cấp email trong token',
+        })
+      }
 
       request.user = {
-        email: payload.email,
-        emailVerified: payload.email_verified,
+        email,
+        emailVerified: !!payload.email_verified,
+        fullName: this.authUtil.pickGoogleDisplayName(payload),
       } as IAuthSocialPayload
 
       return true

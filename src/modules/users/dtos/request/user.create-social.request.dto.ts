@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString } from "class-validator";
+import { IsEnum, IsOptional, IsString } from "class-validator";
 import { EnumUserRole } from "src/generated/prisma/enums";
 
 export class UserCreateSocialRequestDto {
@@ -6,7 +6,8 @@ export class UserCreateSocialRequestDto {
     @IsString()
     fullName?: string;
 
-    @IsString()
-    @IsNotEmpty()
-    role: EnumUserRole
+    /** Bắt buộc khi tạo tài khoản Google lần đầu; bỏ qua nếu user đã tồn tại */
+    @IsOptional()
+    @IsEnum(EnumUserRole)
+    role?: EnumUserRole;
 }
