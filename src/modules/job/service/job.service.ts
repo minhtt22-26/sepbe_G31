@@ -30,8 +30,6 @@ import { WalletService } from 'src/modules/wallet/wallet.service'
 export class JobService {
   private readonly logger = new Logger(JobService.name)
   private readonly JOB_POSTING_FEE = 50000
-  private readonly BOOST_DEFAULT_DAYS = 7
-  private readonly BOOST_DEFAULT_POINT_COST = 50000
 
   private shuffleBoostedJobs<T>(items: T[]): T[] {
     const shuffled = [...items]
@@ -151,37 +149,19 @@ export class JobService {
   }
 
   async getBoostPackages() {
-    const configuredDays = await this.walletService.getPointCost(
-      'BOOST_JOB_DURATION_DAYS',
-      this.BOOST_DEFAULT_DAYS,
-    )
-    const configuredPointCost = await this.walletService.getPointCost(
-      'BOOST_JOB_POINT_COST',
-      this.BOOST_DEFAULT_POINT_COST,
-    )
-    const durationDays = Math.max(1, configuredDays)
+    const items = await this.walletService.getBoostPackagesForEmployer()
 
     return {
       success: true,
-      items: [
-        {
-          id: 0,
-          name: `Goi boost ${durationDays} ngay`,
-          description: `Ap dung theo cau hinh point he thong (${durationDays} ngay).`,
-          durationDays,
-          price: configuredPointCost,
-          isDefault: true,
-        },
-      ],
+      items,
     }
   }
 
   async createBoostCheckout(
     jobId: number,
     companyId: number,
-    _body: BoostCheckoutRequestDto,
+    body: BoostCheckoutRequestDto,
   ) {
-    void _body
     const job = await this.jobRepository.findJobById(jobId)
     if (!job || job.companyId !== companyId) {
       throw new NotFoundException('Job not found or unauthorized')
@@ -191,15 +171,12 @@ export class JobService {
       throw new BadRequestException('Only published jobs can be boosted')
     }
 
-    const configuredDays = await this.walletService.getPointCost(
-      'BOOST_JOB_DURATION_DAYS',
-      this.BOOST_DEFAULT_DAYS,
+    const selectedPackage = await this.walletService.resolveBoostPackage(
+      body?.packageDays,
     )
-    const packageDays = Math.max(1, configuredDays)
-    const pointCost = await this.walletService.getPointCost(
-      'BOOST_JOB_POINT_COST',
-      this.BOOST_DEFAULT_POINT_COST,
-    )
+    const packageDays = Math.max(1, Number(selectedPackage.durationDays || 1))
+    const pointCost = Math.max(0, Number(selectedPackage.price || 0))
+
     await this.walletService.deductPoints({
       companyId,
       cost: pointCost,
@@ -207,6 +184,8 @@ export class JobService {
       referenceType: 'JOB',
       referenceId: jobId,
       metadata: {
+        packageId: selectedPackage.id,
+        packageName: selectedPackage.name,
         packageDays,
       },
     })
@@ -219,6 +198,8 @@ export class JobService {
       success: true,
       data: {
         jobId: result.id,
+        packageId: selectedPackage.id,
+        packageName: selectedPackage.name,
         packageDays,
         pointCost,
         boostExpiredAt: result.boostExpiredAt,

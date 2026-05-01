@@ -20,6 +20,31 @@ export class AdminService {
     }
   }
 
+  private async validateUniqueBoostDuration(
+    orderType: OrderType,
+    durationDays?: number | null,
+    ignoreId?: number,
+  ) {
+    if (orderType !== OrderType.BOOST_JOB || !durationDays) {
+      return
+    }
+
+    const duplicated = await this.prisma.paymentPackage.findFirst({
+      where: {
+        orderType: OrderType.BOOST_JOB,
+        durationDays,
+        ...(ignoreId ? { id: { not: ignoreId } } : {}),
+      },
+      select: { id: true },
+    })
+
+    if (duplicated) {
+      throw new BadRequestException(
+        `Da ton tai goi boost ${durationDays} ngay. Vui long chon so ngay khac.`,
+      )
+    }
+  }
+
   async getPaymentPackages(params: {
     orderType?: OrderType;
     includeInactive?: boolean;
@@ -92,6 +117,7 @@ export class AdminService {
 
   async createPaymentPackage(dto: CreatePaymentPackageDto) {
     this.validateDurationByOrderType(dto.orderType, dto.durationDays);
+    await this.validateUniqueBoostDuration(dto.orderType, dto.durationDays);
 
     const created = await this.prisma.$transaction(async (tx) => {
       if (dto.isDefault) {
@@ -139,6 +165,11 @@ export class AdminService {
         : dto.durationDays;
 
     this.validateDurationByOrderType(nextOrderType, nextDurationDays);
+    await this.validateUniqueBoostDuration(
+      nextOrderType,
+      nextDurationDays,
+      id,
+    )
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (dto.isDefault) {

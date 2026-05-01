@@ -156,6 +156,90 @@ export class WalletService {
     }
   }
 
+  async getActiveBoostPackages() {
+    return this.prisma.paymentPackage.findMany({
+      where: {
+        orderType: OrderType.BOOST_JOB,
+        isActive: true,
+        durationDays: { not: null },
+      },
+      orderBy: [
+        { isDefault: 'desc' },
+        { durationDays: 'asc' },
+        { price: 'asc' },
+        { createdAt: 'asc' },
+      ],
+    })
+  }
+
+  async getBoostPackagesForEmployer() {
+    const packages = await this.getActiveBoostPackages()
+    const mappedPackages = packages.map((item) => ({
+      id: item.id,
+      name: item.name,
+      description: item.description,
+      durationDays: Number(item.durationDays || 1),
+      price: Number(item.price || 0),
+      isDefault: Boolean(item.isDefault),
+    }))
+
+    const fallbackDays = await this.getPointCost('BOOST_JOB_DURATION_DAYS', 7)
+    const fallbackPrice = await this.getPointCost('BOOST_JOB_POINT_COST', 50000)
+    const normalizedFallbackDays = Math.max(1, fallbackDays)
+    const normalizedFallbackPrice = Math.max(0, fallbackPrice)
+
+    const hasFallbackDuration = mappedPackages.some(
+      (item) => Number(item.durationDays) === normalizedFallbackDays,
+    )
+
+    // Keep compatibility for environments where DB currently has only one boost tier.
+    if (!hasFallbackDuration) {
+      mappedPackages.unshift({
+        id: 0,
+        name: `Goi boost ${normalizedFallbackDays} ngay`,
+        description: 'Goi mac dinh theo cau hinh point he thong.',
+        durationDays: normalizedFallbackDays,
+        price: normalizedFallbackPrice,
+        isDefault: !mappedPackages.some((item) => item.isDefault),
+      })
+    }
+
+    if (mappedPackages.length > 0) {
+      return mappedPackages
+    }
+
+    return [
+      {
+        id: 0,
+        name: `Goi boost ${normalizedFallbackDays} ngay`,
+        description: 'Goi mac dinh theo cau hinh point he thong.',
+        durationDays: normalizedFallbackDays,
+        price: normalizedFallbackPrice,
+        isDefault: true,
+      },
+    ]
+  }
+
+  async resolveBoostPackage(packageDays?: number) {
+    const packages = await this.getBoostPackagesForEmployer()
+    if (!packages.length) {
+      throw new BadRequestException('Khong tim thay goi boost hop le')
+    }
+
+    if (packageDays !== undefined && packageDays !== null) {
+      const matched = packages.find(
+        (item) => Number(item.durationDays) === Number(packageDays),
+      )
+      if (!matched) {
+        throw new BadRequestException('Goi boost da chon khong ton tai hoac da ngung hoat dong')
+      }
+      return matched
+    }
+
+    const defaultPkg = packages.find((item) => item.isDefault)
+    return defaultPkg || packages[0]
+  }
+
   async createTopupCheckout(companyId: number, amountVnd: number, userId: number) {
     if (!Number.isFinite(amountVnd) || amountVnd <= 0) {
       throw new BadRequestException('Số tiền nạp không hợp lệ')
