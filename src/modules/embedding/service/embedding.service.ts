@@ -74,7 +74,6 @@ export class EmbeddingService implements OnModuleInit {
   //   const text = result.response.text()
 
   //   try {
-  //     console.log(JSON.parse(text))
   //     return JSON.parse(text) as IJobSections
   //   } catch (error) {
   //     this.logger.error('Failed to parse Gemini response', error)
@@ -160,7 +159,6 @@ export class EmbeddingService implements OnModuleInit {
     const text = result.response.text()
 
     try {
-      console.log(JSON.parse(text))
       return JSON.parse(text) as IJobSections
     } catch (error) {
       this.logger.error('Failed to parse Gemini response', {

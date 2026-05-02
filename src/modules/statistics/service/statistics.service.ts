@@ -11,7 +11,6 @@ export class StatisticsService {
   ) {}
 
   async getOverview(ownerId: number) {
-    console.log(ownerId)
     const company = await this.companyService.findByOwnerId(ownerId)
     if (!company) {
       throw new NotFoundException('Bạn chưa sở hữu công ty nào')

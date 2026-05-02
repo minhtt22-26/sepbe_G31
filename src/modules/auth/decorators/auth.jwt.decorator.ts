@@ -32,7 +32,6 @@ export const AuthJwtPayload = createParamDecorator(
     const request = ctx.switchToHttp().getRequest()
 
     const user = request.user
-    //console.log('user from jwt payload decorator', user)
     return field ? user?.[field] : user
   },
 )
