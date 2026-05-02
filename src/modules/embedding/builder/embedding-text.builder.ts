@@ -18,7 +18,6 @@ export class EmbeddingTextBuilder {
     if (profile.bio?.trim()) {
       parts.push(profile.bio)
     }
-    console.log(parts)
     return parts.join(' | ')
   }
 

@@ -75,13 +75,6 @@ export class AuthService {
       refreshTokenFromRequest,
     )
 
-    // console.log('[REFRESH DEBUG] === refreshTokens called ===')
-    // console.log(`[REFRESH DEBUG] sessionId: ${sessionId}`)
-    // console.log(`[REFRESH DEBUG] oldExp (unix): ${oldExp}`)
-    // console.log(
-    //   `[REFRESH DEBUG] oldExp (date): ${oldExp ? new Date(oldExp * 1000).toISOString() : 'N/A'}`,
-    // )
-
     const jti = this.authUtil.generateJti()
 
     const payloadAccessToken: IAuthAccessTokenPayload =
@@ -114,16 +107,6 @@ export class AuthService {
       newRefreshTokenExpired && newRefreshTokenExpired.seconds
         ? newRefreshTokenExpired.seconds
         : Math.floor(newRefreshTokenExpired.miliseconds / 1000)
-
-    // console.log(`[REFRESH DEBUG] today: ${today.toISOString()}`)
-    // console.log(`[REFRESH DEBUG] expiredAt: ${expiredAt.toISOString()}`)
-    // console.log(
-    //   `[REFRESH DEBUG] remaining seconds: ${newRefreshTokenExpireInseconds}`,
-    // )
-    // console.log(
-    //   `[REFRESH DEBUG] remaining minutes: ${Math.floor(newRefreshTokenExpireInseconds / 60)}`,
-    // )
-    // console.log(`[REFRESH DEBUG] new jti: ${jti.substring(0, 10)}...`)
 
     const newRefreshToken: string = this.authUtil.createRefreshTokens(
       jti,
@@ -180,16 +163,7 @@ export class AuthService {
   ): Promise<IAuthRefreshTokenPayload> {
     const { userId, sessionId, jti } = payload
 
-    // console.log('[REFRESH DEBUG] === validateJwtRefreshStrategy ===')
-    // console.log(`[REFRESH DEBUG] payload.userId: ${userId}`)
-    // console.log(`[REFRESH DEBUG] payload.sessionId: ${sessionId}`)
-    // console.log(`[REFRESH DEBUG] payload.jti: ${jti?.substring(0, 10)}...`)
-    // console.log(
-    //   `[REFRESH DEBUG] payload.exp: ${(payload as any).exp} → ${(payload as any).exp ? new Date((payload as any).exp * 1000).toISOString() : 'N/A'}`,
-    // )
-
     if (!userId || !sessionId || !jti) {
-      // console.error('[REFRESH DEBUG] ❌ FAIL: Missing userId/sessionId/jti')
       throw new UnauthorizedException({
         message: 'Thông tin refresh token không hợp lệ',
       })
@@ -198,30 +172,16 @@ export class AuthService {
     const session = await this.sessionService.getLogin(userId, sessionId)
 
     if (!session) {
-      // console.error(
-      //   `[REFRESH DEBUG] ❌ FAIL: Session NOT FOUND for userId=${userId}, sessionId=${sessionId}`,
-      // )
-      // console.error(`[REFRESH DEBUG] → Session may be expired or revoked`)
       throw new UnauthorizedException({
         message: 'Phiên làm việc đã hết hạn, vui lòng đăng nhập lại',
       })
     }
 
-    // console.log(
-    //   `[REFRESH DEBUG] session.jti: ${session.jti?.substring(0, 10)}...`,
-    // )
-    // console.log(`[REFRESH DEBUG] session.expiredAt: ${session.expiredAt}`)
-
     if (session.jti !== payload.jti) {
-      console.error(`[REFRESH DEBUG] ❌ FAIL: JTI MISMATCH`)
-      console.error(`[REFRESH DEBUG] → session.jti: ${session.jti}`)
-      console.error(`[REFRESH DEBUG] → payload.jti: ${jti}`)
       throw new UnauthorizedException({
         message: 'Refresh token không hợp lệ hoặc đã bị thay đổi',
       })
     }
-
-    //console.log('[REFRESH DEBUG] ✅ Validation passed')
     return payload
   }
 
@@ -282,7 +242,6 @@ export class AuthService {
 
       return true
     } catch (err: unknown) {
-      console.log(err)
       throw new UnauthorizedException({
         message: 'Google token không hợp lệ hoặc đã hết hạn',
       })

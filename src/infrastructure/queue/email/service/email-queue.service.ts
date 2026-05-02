@@ -18,7 +18,6 @@ export class EmailQueueService {
   ) {}
 
   async addSendEmailJob(data: SendEmailJobData) {
-    console.log('[QUEUE] Adding email job to queue:', data.to)
     return this.emailQueue.add('send-email', data, {
       attempts: 3,
       backoff: {
