@@ -415,6 +415,15 @@ export class WalletService {
           },
         },
       })
+
+      await tx.notification.create({
+        data: {
+          userId: order.userId,
+          title: 'Thanh toán nạp point thành công',
+          message: `Đã cộng ${pointAmount.toLocaleString('vi-VN')} point vào ví của bạn.`,
+          link: '/employer/wallet?walletTopupSuccess=1',
+        },
+      })
     })
 
     return {

@@ -43,14 +43,11 @@ export class CompanyService {
     try {
       const cached = await this.redis.get(cacheKey)
       if (cached) {
-        console.log('From Redis')
         return JSON.parse(cached)
       }
     } catch (err) {
       console.error('[CACHE] Get from Redis failed:', err?.message)
     }
-
-    console.log('From Database')
 
     const companies = await this.prisma.company.findMany({
       where: {
@@ -71,7 +68,6 @@ export class CompanyService {
     // Set directly to Redis
     try {
       await this.redis.setEx(cacheKey, 600, JSON.stringify(companies))
-      console.log('[CACHE] Set key success:', cacheKey)
     } catch (err) {
       console.error('[CACHE] Set key failed:', err?.message)
     }

@@ -15,7 +15,6 @@ export class AuthUserMiddleware implements NestMiddleware {
         req.user = payload
       } catch (error) {
         // If JWT is invalid, we don't attach anything and treat as guest
-        console.log(error)
       }
     }
     next()
