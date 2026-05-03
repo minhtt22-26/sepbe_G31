@@ -17,8 +17,6 @@ import { IMatchingConfig } from '../interfaces/ai-matching.interface'
 
 @Injectable()
 export class AIMatchingService {
-  private readonly DEFAULT_LIMIT = 20
-  private readonly MAX_LIMIT = 100
   private readonly DEFAULT_MIN_SCORE_THRESHOLD = 0
 
   constructor(
@@ -33,18 +31,11 @@ export class AIMatchingService {
   ) {}
 
   private getMinScoreThreshold(configs: IMatchingConfig[]): number {
-    const thresholdConfig = configs.find(
-      (c) => c.key === 'MIN_SCORE_THRESHOLD',
-    )
+    const thresholdConfig = configs.find((c) => c.key === 'MIN_SCORE_THRESHOLD')
     return thresholdConfig?.value ?? this.DEFAULT_MIN_SCORE_THRESHOLD
   }
 
-  async getMatchedJobs(
-    userId: number,
-    limit?: number,
-  ): Promise<MatchedJobResponseDto[]> {
-    const resolvedLimit = Math.min(limit ?? this.DEFAULT_LIMIT, this.MAX_LIMIT)
-
+  async getMatchedJobs(userId: number): Promise<MatchedJobResponseDto[]> {
     const workerProfile = await this.userService.getWorkerProfile(userId)
     const embeddings =
       await this.aiMatchingRepository.getWorkerEmbeddings(userId)
@@ -65,7 +56,6 @@ export class AIMatchingService {
     const rawJobs = await this.aiMatchingRepository.findMatchedJobs(
       embeddings.skillEmbedding,
       embeddings.cultureEmbedding as number[],
-      resolvedLimit,
     )
 
     const results = rawJobs.map((job) => {
@@ -106,7 +96,7 @@ export class AIMatchingService {
         ? 0.8 + job.skillScore * 0.2
         : job.skillScore * 0.5
 
-      const finalScore = this.scoringService.calculateFinalScore(
+      let finalScore = this.scoringService.calculateFinalScore(
         {
           skillScore: refinedSkillScore,
           benefitScore: job.benefitScore,
@@ -118,6 +108,10 @@ export class AIMatchingService {
         },
         configs,
       )
+
+      if (job.isBoosted) {
+        finalScore = Math.min(1.0, finalScore + 0.1)
+      }
 
       return {
         job: {
@@ -155,7 +149,6 @@ export class AIMatchingService {
     return results
       .filter((r) => r.scores.finalScore >= minScoreThreshold)
       .sort((a, b) => b.scores.finalScore - a.scores.finalScore)
-      .slice(0, resolvedLimit)
   }
 
   async buildJobEmbedding(jobId: number): Promise<void> {
@@ -227,10 +220,7 @@ export class AIMatchingService {
 
   async getSuggestedWorkers(
     jobId: number,
-    limit?: number,
   ): Promise<MatchedWorkerResponseDto[]> {
-    const resolvedLimit = Math.min(limit ?? this.DEFAULT_LIMIT, this.MAX_LIMIT)
-
     const job = await this.jobService.getDetail(jobId)
     if (!job) {
       throw new NotFoundException('Job không tồn tại')
@@ -249,7 +239,6 @@ export class AIMatchingService {
     const rawWorkers = await this.aiMatchingRepository.findMatchedWorkers(
       embeddings.reqEmbedding,
       embeddings.benefitEmbedding,
-      resolvedLimit,
     )
 
     const results = rawWorkers.map((worker) => {
@@ -333,7 +322,6 @@ export class AIMatchingService {
     return results
       .filter((r) => r.scores.finalScore >= minScoreThreshold)
       .sort((a, b) => b.scores.finalScore - a.scores.finalScore)
-      .slice(0, resolvedLimit)
   }
 
   async getConfigs(): Promise<IMatchingConfig[]> {
@@ -341,9 +329,7 @@ export class AIMatchingService {
   }
 
   async updateConfigs(configs: IMatchingConfig[]): Promise<IMatchingConfig[]> {
-    const weightConfigs = configs.filter(
-      (c) => c.key !== 'MIN_SCORE_THRESHOLD',
-    )
+    const weightConfigs = configs.filter((c) => c.key !== 'MIN_SCORE_THRESHOLD')
 
     if (weightConfigs.length > 0) {
       const totalWeight = weightConfigs.reduce(
@@ -352,17 +338,16 @@ export class AIMatchingService {
       )
 
       if (Math.abs(totalWeight - 1) > 0.0001) {
-        throw new BadRequestException(
-          'Tổng các trọng số phải chính xác bằng 1',
-        )
+        throw new BadRequestException('Tổng các trọng số phải chính xác bằng 1')
       }
     }
 
-    const thresholdConfig = configs.find(
-      (c) => c.key === 'MIN_SCORE_THRESHOLD',
-    )
+    const thresholdConfig = configs.find((c) => c.key === 'MIN_SCORE_THRESHOLD')
 
-    if (thresholdConfig && (thresholdConfig.value < 0 || thresholdConfig.value > 1)) {
+    if (
+      thresholdConfig &&
+      (thresholdConfig.value < 0 || thresholdConfig.value > 1)
+    ) {
       throw new BadRequestException(
         'Ngưỡng điểm tối thiểu phải nằm trong khoảng 0 - 1 (tương ứng 0% - 100%)',
       )

@@ -383,9 +383,8 @@ export class JobService {
         jobData,
         fields: dto.fields,
       })
-      const freePostingAvailable = await this.jobRepository.isFirstJobPostFree(
-        companyId,
-      )
+      const freePostingAvailable =
+        await this.jobRepository.isFirstJobPostFree(companyId)
 
       if (freePostingAvailable) {
         await this.jobRepository.publishFirstJobForFree(created.id, companyId)
@@ -450,7 +449,17 @@ export class JobService {
 
     const update = await this.jobRepository.updateJobFull(jobId, dto)
 
-    await this.aiMatchingService.buildJobEmbedding(jobId)
+    const isDescriptionChanged =
+      dto.description !== undefined && dto.description !== job.description
+    const isOccupationChanged =
+      dto.occupationId !== undefined && dto.occupationId !== job.occupationId
+
+    if (
+      (isDescriptionChanged || isOccupationChanged) &&
+      job.status === JobStatus.PUBLISHED
+    ) {
+      await this.aiMatchingService.buildJobEmbedding(jobId)
+    }
 
     return update
   }
@@ -463,9 +472,11 @@ export class JobService {
     }
 
     if (ipAddress) {
-      Promise.resolve(this.jobRepository.recordView(jobId, ipAddress)).catch((err) => {
-        this.logger.warn(`Failed to record view for job ${jobId}: ${err}`)
-      })
+      Promise.resolve(this.jobRepository.recordView(jobId, ipAddress)).catch(
+        (err) => {
+          this.logger.warn(`Failed to record view for job ${jobId}: ${err}`)
+        },
+      )
     }
 
     return job
