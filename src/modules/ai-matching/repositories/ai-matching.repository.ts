@@ -15,9 +15,7 @@ export class AIMatchingRepository {
   async findMatchedJobs(
     skillEmbedding: number[],
     cultureEmbedding: number[],
-    limit: number,
   ): Promise<IRawMatchedJob[]> {
-    const fetchLimit = limit * 3
 
     const skillVector = `[${skillEmbedding.join(',')}]`
     const cultureVector = cultureEmbedding
@@ -59,11 +57,9 @@ export class AIMatchingRepository {
             AND (j."expiredAt" IS NULL OR j."expiredAt" > NOW()) 
             AND j."reqEmbedding" IS NOT NULL
             ORDER BY (j."reqEmbedding" <=> $1::vector) + (CASE WHEN j."benefitEmbedding" IS NOT NULL AND $2::vector IS NOT NULL THEN j."benefitEmbedding" <=> $2::vector ELSE 1 END)
-            LIMIT $3  
         `,
       skillVector,
       cultureVector,
-      fetchLimit,
     )
 
     return result
@@ -223,9 +219,7 @@ export class AIMatchingRepository {
   async findMatchedWorkers(
     reqEmbedding: number[],
     benefitEmbedding: number[] | null,
-    limit: number,
   ): Promise<IRawMatchedWorker[]> {
-    const fetchLimit = limit * 3
 
     const reqVector = `[${reqEmbedding.join(',')}]`
     const benefitVector = benefitEmbedding
@@ -263,11 +257,9 @@ export class AIMatchingRepository {
             AND u.status = 'ACTIVE'
             AND u.role = 'WORKER'
             ORDER BY (wp."skillEmbedding" <=> $1::vector) + (CASE WHEN wp."cultureEmbedding" IS NOT NULL AND $2::vector IS NOT NULL THEN wp."cultureEmbedding" <=> $2::vector ELSE 1 END)
-            LIMIT $3
         `,
       reqVector,
       benefitVector,
-      fetchLimit,
     )
 
     return result
