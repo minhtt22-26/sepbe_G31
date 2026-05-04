@@ -256,6 +256,8 @@ export class AIMatchingRepository {
         WHERE wp."skillEmbedding" IS NOT NULL
             AND u.status = 'ACTIVE'
             AND u.role = 'WORKER'
+            AND u."lastLoginAt" IS NOT NULL
+            AND u."lastLoginAt" > NOW() - INTERVAL '30 days'
             ORDER BY (wp."skillEmbedding" <=> $1::vector) + (CASE WHEN wp."cultureEmbedding" IS NOT NULL AND $2::vector IS NOT NULL THEN wp."cultureEmbedding" <=> $2::vector ELSE 1 END)
         `,
       reqVector,
