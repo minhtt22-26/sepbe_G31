@@ -93,7 +93,10 @@ export class CompanyController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List companies' })
+  @AuthRoleProtected(EnumUserRole.MANAGER, EnumUserRole.ADMIN)
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'List companies for manager' })
   @ApiResponse({ status: 200, description: 'Companies retrieved successfully' })
   findAll() {
     return this.companyService.findAll()

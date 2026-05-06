@@ -398,12 +398,17 @@ export class JobController {
   @ApiResponse({ status: 200, description: 'Job reports retrieved' })
   @AuthJwtAccessProtected()
   @ApiBearerAuth('access-token')
-  async getAllJobReport(@Query('status', new ParseEnumPipe(ReportStatus, {
-    exceptionFactory: () => {
-      return new BadRequestException("Status must be PENDING, RESOLVED, REJECTED")
-    }
-  })) status: ReportStatus, @AuthJwtPayload('userId') userId: number, @Query('page') page: number, @Query('limit') limit: number) {
-    return this.jobService.getAllJobReport(userId, status, page, limit);
+  async getAllJobReport(
+    @Query('status') status: ReportStatus | 'ALL',
+    @AuthJwtPayload('userId') userId: number,
+    @Query('page') page: number,
+    @Query('limit') limit: number,
+    @Query('companyName') companyName?: string,
+    @Query('reporterName') reporterName?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+  ) {
+    return this.jobService.getAllJobReport(userId, status, page, limit, companyName, reporterName, fromDate, toDate);
   }
 
   @AuthJwtAccessProtected()

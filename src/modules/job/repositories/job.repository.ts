@@ -905,6 +905,7 @@ export class JobRepository {
       where: {
         job: {
           companyId,
+          status: { not: JobStatus.DELETED },
           ...(jobId ? { id: jobId } : {}),
         },
       },
@@ -1118,16 +1119,43 @@ export class JobRepository {
   }
   async getAllJobReport(
     userId: number,
-    status: ReportStatus,
+    status: ReportStatus | 'ALL',
     page: number,
     limit: number,
+    companyName?: string,
+    reporterName?: string,
+    fromDate?: string,
+    toDate?: string,
   ) {
     const pageNum = Number(page) || 1
     const limitNum = Number(limit) || 10
     const skip = (pageNum - 1) * limitNum
+
+    const where: any = {}
+    if (status && status !== 'ALL') {
+      where.status = status
+    }
+    if (companyName) {
+      where.job = { company: { name: { contains: companyName, mode: 'insensitive' } } }
+    }
+    if (reporterName) {
+      where.reporter = { fullName: { contains: reporterName, mode: 'insensitive' } }
+    }
+    if (fromDate || toDate) {
+      where.createdAt = {}
+      if (fromDate) {
+        const from = new Date(`${fromDate}T00:00:00.000Z`)
+        if (!isNaN(from.getTime())) where.createdAt.gte = from
+      }
+      if (toDate) {
+        const to = new Date(`${toDate}T23:59:59.999Z`)
+        if (!isNaN(to.getTime())) where.createdAt.lte = to
+      }
+    }
+
     const [data, total] = await this.prisma.$transaction([
       this.prisma.jobReport.findMany({
-        where: { status: status },
+        where,
         skip: skip,
         take: Number(limit),
         orderBy: { createdAt: 'desc' },
@@ -1147,7 +1175,7 @@ export class JobRepository {
           },
         },
       }),
-      this.prisma.jobReport.count({ where: { status: status } }),
+      this.prisma.jobReport.count({ where }),
     ])
     return { data, total, page, limit }
   }

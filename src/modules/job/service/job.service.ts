@@ -698,15 +698,23 @@ export class JobService {
 
   async getAllJobReport(
     userId: number,
-    status: ReportStatus,
+    status: ReportStatus | 'ALL',
     page: number,
     limit: number,
+    companyName?: string,
+    reporterName?: string,
+    fromDate?: string,
+    toDate?: string,
   ) {
     const allJobReports = await this.jobRepository.getAllJobReport(
       userId,
       status,
       page,
       limit,
+      companyName,
+      reporterName,
+      fromDate,
+      toDate,
     )
     if (!allJobReports) {
       throw new NotFoundException('The job report list is empty!')
