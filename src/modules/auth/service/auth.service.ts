@@ -18,7 +18,7 @@ export class AuthService {
     private readonly authUtil: AuthUtil,
     private readonly helperService: HelperService,
     private readonly sessionService: SessionService,
-  ) {}
+  ) { }
 
   createTokens(
     user: User,
@@ -243,7 +243,7 @@ export class AuthService {
       return true
     } catch (err: unknown) {
       throw new UnauthorizedException({
-        message: 'Google token không hợp lệ hoặc đã hết hạn',
+        message: 'Google token không hợp lệ hoặc đã hết hạn', err,
       })
     }
   }
