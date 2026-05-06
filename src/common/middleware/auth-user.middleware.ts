@@ -4,7 +4,7 @@ import { AuthUtil } from '../../modules/auth/utils/auth.utils'
 
 @Injectable()
 export class AuthUserMiddleware implements NestMiddleware {
-  constructor(private readonly authUtil: AuthUtil) {}
+  constructor(private readonly authUtil: AuthUtil) { }
 
   async use(req: any, res: Response, next: NextFunction) {
     const authHeader = req.headers['authorization']
@@ -13,8 +13,9 @@ export class AuthUserMiddleware implements NestMiddleware {
       try {
         const payload = await this.authUtil.verifyAccessToken(token)
         req.user = payload
-      } catch (error) {
+      } catch (error: any) {
         // If JWT is invalid, we don't attach anything and treat as guest
+        console.log('JWT is invalid: ', error.message)
       }
     }
     next()

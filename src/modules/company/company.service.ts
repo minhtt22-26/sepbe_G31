@@ -37,22 +37,7 @@ export class CompanyService {
   ) {}
 
   async findAll() {
-    const cacheKey = 'companies:approved'
-
-    // Try to get from Redis
-    try {
-      const cached = await this.redis.get(cacheKey)
-      if (cached) {
-        return JSON.parse(cached)
-      }
-    } catch (err) {
-      console.error('[CACHE] Get from Redis failed:', err?.message)
-    }
-
-    const companies = await this.prisma.company.findMany({
-      where: {
-        status: CompanyStatus.APPROVED,
-      },
+    return this.prisma.company.findMany({
       include: {
         owner: {
           select: {
@@ -63,16 +48,10 @@ export class CompanyService {
           },
         },
       },
+      orderBy: {
+        createdAt: 'desc',
+      },
     })
-
-    // Set directly to Redis
-    try {
-      await this.redis.setEx(cacheKey, 600, JSON.stringify(companies))
-    } catch (err) {
-      console.error('[CACHE] Set key failed:', err?.message)
-    }
-
-    return companies
   }
 
   async findAllByStatus(status: CompanyStatus) {
