@@ -964,9 +964,21 @@ export class JobRepository {
     applicationId: number,
     status: JobApplicationStatus,
   ) {
-    const app = await this.prisma.jobApplication.update({
+    if (status === JobApplicationStatus.VIEWED) {
+      await this.prisma.$executeRaw`
+        UPDATE "JobApplication"
+        SET "status" = ${status}, "updatedAt" = "updatedAt"
+        WHERE "id" = ${applicationId}
+      `
+    } else {
+      await this.prisma.jobApplication.update({
+        where: { id: applicationId },
+        data: { status },
+      })
+    }
+
+    const app = await this.prisma.jobApplication.findUnique({
       where: { id: applicationId },
-      data: { status },
       include: {
         job: {
           select: {
@@ -976,6 +988,10 @@ export class JobRepository {
         },
       },
     })
+
+    if (!app) {
+      throw new BadRequestException('Application not found')
+    }
 
     let title = ''
     let message = ''
