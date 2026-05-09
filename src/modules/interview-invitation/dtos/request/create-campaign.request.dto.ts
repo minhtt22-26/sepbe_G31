@@ -7,7 +7,6 @@ import {
   IsOptional,
   IsString,
   MaxLength,
-  MinLength,
   ValidateNested,
 } from 'class-validator'
 import { ApiProperty } from '@nestjs/swagger'
@@ -15,28 +14,29 @@ import { Type } from 'class-transformer'
 import { CreateCampaignSlotRequestDto } from './create-campaign-slot.request.dto'
 
 export class CreateCampaignRequestDto {
-  @ApiProperty({ description: 'Tên chiến dịch mời phỏng vấn', example: 'Mời phỏng vấn công nhân lắp ráp' })
+  @ApiProperty({
+    description: 'Tên chiến dịch mời phỏng vấn (legacy, sẽ được hệ thống tự sinh)',
+    required: false,
+  })
   @IsString()
-  @IsNotEmpty()
-  @MinLength(5)
+  @IsOptional()
   @MaxLength(200)
-  title: string
+  title?: string
 
-  @ApiProperty({ description: 'Mô tả chiến dịch', required: false })
+  @ApiProperty({ description: 'Mô tả chiến dịch (legacy)', required: false })
   @IsString()
   @IsOptional()
   @MaxLength(1000)
   description?: string
 
-  @ApiProperty({ 
-    description: 'Nội dung tin nhắn gửi đến worker', 
-    example: 'Chúng tôi rất muốn mời bạn phỏng vấn vị trí công nhân lắp ráp...' 
+  @ApiProperty({
+    description: 'Nội dung tin nhắn gửi đến worker (legacy, sẽ dùng template hệ thống)',
+    required: false,
   })
   @IsString()
-  @IsNotEmpty()
-  @MinLength(10)
+  @IsOptional()
   @MaxLength(5000)
-  message: string
+  message?: string
 
   @ApiProperty({ description: 'ID công việc liên quan (tùy chọn)', required: false })
   @IsInt()
@@ -60,7 +60,7 @@ export class CreateCampaignRequestDto {
   slots: CreateCampaignSlotRequestDto[]
 
   @ApiProperty({ 
-    description: 'Thời gian hết hạn phản hồi (ISO format)', 
+    description: 'Thời gian hết hạn đổi lịch (ISO format)', 
     example: '2024-12-31T23:59:59Z',
     required: false 
   })
@@ -68,10 +68,9 @@ export class CreateCampaignRequestDto {
   @IsOptional()
   expiresAt?: string
 
-  @ApiProperty({ 
-    description: 'Thời gian gửi dự kiến (ISO format). Nếu không có, sẽ gửi ngay lập tức',
-    example: '2024-12-25T10:00:00Z',
-    required: false 
+  @ApiProperty({
+    description: 'Thời gian gửi dự kiến (legacy)',
+    required: false,
   })
   @IsDateString()
   @IsOptional()
