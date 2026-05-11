@@ -13,6 +13,7 @@ import {
   CampaignStatus,
   EnumUserRole,
   InterviewInvitationStatus,
+  JobApplicationStatus,
   WalletTransactionType,
 } from 'src/generated/prisma/enums'
 import { Cron, CronExpression } from '@nestjs/schedule'

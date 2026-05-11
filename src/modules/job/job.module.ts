@@ -8,6 +8,7 @@ import { PrismaModule } from 'src/prisma.module'
 import { CompanyModule } from '../company/company.module'
 import { AIMatchingModule } from '../ai-matching/ai-matching.module'
 import { WalletModule } from '../wallet/wallet.module'
+import { InterviewInvitationModule } from '../interview-invitation/interview-invitation.module'
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { WalletModule } from '../wallet/wallet.module'
     CompanyModule,
     WalletModule,
     forwardRef(() => AIMatchingModule),
+    forwardRef(() => InterviewInvitationModule),
   ],
   controllers: [JobController],
   providers: [JobService, JobRepository, JobModerationService],
