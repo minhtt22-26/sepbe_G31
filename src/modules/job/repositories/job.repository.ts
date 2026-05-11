@@ -1003,10 +1003,6 @@ export class JobRepository {
         title = 'Hồ sơ đã được xem'
         message = `Nhà tuyển dụng đã xem hồ sơ của bạn cho vị trí "${app.job.title}".`
         break
-      case 'SUITABLE':
-        title = 'Hồ sơ phù hợp'
-        message = `Hồ sơ của bạn cho vị trí "${app.job.title}" được đánh giá là phù hợp!`
-        break
       case 'UNSUITABLE':
         title = 'Hồ sơ chưa phù hợp'
         message = `Rất tiếc, hồ sơ của bạn cho vị trí "${app.job.title}" chưa phù hợp ở thời điểm hiện tại.`
@@ -1078,7 +1074,19 @@ export class JobRepository {
     return !!invitation
   }
 
-  async createAutoInvitationCampaign(params: { companyId: number; jobId: number; workerId: number; slots?: { id: number }[] }) {
+  async createAutoInvitationCampaign(params: {
+    companyId: number
+    jobId: number
+    workerId: number
+    slots?: {
+      id: number
+      startAt: Date
+      endAt: Date
+      capacity: number
+      location: string | null
+      note: string | null
+    }[]
+  }) {
     const { companyId, jobId, workerId, slots } = params
 
     const job = await this.prisma.job.findUnique({ where: { id: jobId }, select: { id: true, title: true, companyId: true } })
@@ -1098,12 +1106,46 @@ export class JobRepository {
         },
       })
 
-      await tx.interviewInvitation.create({ data: { campaignId: created.id, workerId, status: InterviewInvitationStatus.PENDING } })
+      const invitation = await tx.interviewInvitation.create({
+        data: {
+          campaignId: created.id,
+          workerId,
+          status: InterviewInvitationStatus.PENDING,
+        },
+      })
 
-      // Optionally link existing slots (no-op if not provided)
+      // Clone slot definitions from existing interview schedule.
       if (slots && slots.length) {
-        await Promise.all(slots.map((s) => tx.interviewInvitationSlot.update({ where: { id: s.id }, data: { campaignId: created.id } })))
+        await tx.interviewInvitationSlot.createMany({
+          data: slots.map((slot) => ({
+            campaignId: created.id,
+            startAt: slot.startAt,
+            endAt: slot.endAt,
+            capacity: slot.capacity,
+            location: slot.location,
+            note: slot.note,
+          })),
+        })
       }
+
+      const slotSummary = (slots || [])
+        .map((slot) => {
+          const start = new Date(slot.startAt).toLocaleString('vi-VN')
+          const end = new Date(slot.endAt).toLocaleString('vi-VN')
+          return `- ${start} - ${end}${slot.location ? ` (${slot.location})` : ''}`
+        })
+        .join('\n')
+
+      await tx.notification.create({
+        data: {
+          userId: workerId,
+          title: `Bạn có lịch phỏng vấn: ${job.title}`,
+          message: slotSummary
+            ? `Bạn có lịch phỏng vấn cho vị trí "${job.title}".\n\nCác ca phỏng vấn đã được nhà tuyển dụng sắp xếp:\n${slotSummary}\n\nVui lòng mở lời mời để chọn ca phù hợp.`
+            : created.message,
+          link: `/interview-invitations/${invitation.id}`,
+        },
+      })
 
       return created
     })
