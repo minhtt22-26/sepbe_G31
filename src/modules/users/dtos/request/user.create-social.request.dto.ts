@@ -1,5 +1,4 @@
 import { IsEnum, IsOptional, IsString } from "class-validator";
-import { Transform } from "class-transformer";
 import { EnumUserRole } from "src/generated/prisma/enums";
 import { ApiPropertyOptional } from "@nestjs/swagger";
 
@@ -8,9 +7,8 @@ export class UserCreateSocialRequestDto {
     @IsString()
     fullName?: string;
 
+    /** Bắt buộc khi tạo tài khoản Google lần đầu; bỏ qua nếu user đã tồn tại */
     @IsOptional()
     @IsEnum(EnumUserRole)
-    @Transform(({ value }) => value || EnumUserRole.WORKER)
-    @ApiPropertyOptional({ example: EnumUserRole.WORKER, enum: EnumUserRole, description: 'Vai trò người dùng (mặc định: WORKER)' })
-    role: EnumUserRole;
+    role?: EnumUserRole;
 }

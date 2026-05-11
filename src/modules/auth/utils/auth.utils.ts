@@ -283,4 +283,20 @@ export class AuthUtil {
     })
     return login.getPayload()!
   }
+
+  /** Tên hiển thị từ payload OIDC của Google (đã verify chữ ký). */
+  pickGoogleDisplayName(payload: TokenPayload): string | undefined {
+    const rawName = typeof payload.name === 'string' ? payload.name.trim() : ''
+    if (rawName) return rawName
+
+    const given =
+      typeof payload.given_name === 'string' ? payload.given_name.trim() : ''
+    const family =
+      typeof payload.family_name === 'string'
+        ? payload.family_name.trim()
+        : ''
+
+    const joined = [given, family].filter(Boolean).join(' ').trim()
+    return joined || undefined
+  }
 }

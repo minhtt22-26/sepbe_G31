@@ -132,7 +132,6 @@ export class UserRepository {
 
   async findValidForgotPasswordToken(token: string) {
     const today = this.helperService.dateCreate()
-    console.log('Today:', today.toISOString())
 
     const tokenRecord = await this.prisma.verificationToken.findFirst({
       where: {
@@ -145,12 +144,6 @@ export class UserRepository {
         user: true,
       },
     })
-
-    console.log('Token expiredAt:', tokenRecord?.expiredAt?.toISOString())
-    console.log(
-      'Is expired?:',
-      tokenRecord?.expiredAt ? tokenRecord.expiredAt < today : 'no token',
-    )
     return tokenRecord
   }
 
@@ -279,7 +272,8 @@ export class UserRepository {
 
   async getUserList(filters: UserListRequestDto) {
     const { page, role, status, fromDate, toDate } = filters
-    const limit = 20
+    const rawLimit = filters.limit ?? 10
+    const limit = Math.min(Math.max(1, rawLimit), 100)
     const skip = (page - 1) * limit
 
     const andConditions: Prisma.UserWhereInput[] = [

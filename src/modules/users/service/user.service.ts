@@ -2,6 +2,8 @@ import {
   BadRequestException,
   ForbiddenException,
   forwardRef,
+  HttpException,
+  HttpStatus,
   Inject,
   Injectable,
   NotFoundException,
@@ -421,19 +423,40 @@ export class UserService {
     loginWith: EnumUserLoginWith,
     body: {
       fullName?: string
-      role: EnumUserRole
+      role?: EnumUserRole
+    },
+    /** Tên từ token Google đã verify — ưu tiên so với `body.fullName` khi tạo tài khoản mới. */
+    verifiedProfile?: {
+      googleFullName?: string
     },
     // requestLog: { ipAddress: string; userAgent: string },
   ): Promise<UserLoginResponseDto> {
     let user = await this.userRepository.findUserWithByEmail(email)
 
+    const fromGoogle =
+      verifiedProfile?.googleFullName?.trim() || undefined
+    const fromBody = body.fullName?.trim() || undefined
+    const resolvedFullName = fromGoogle || fromBody || undefined
+
     // Nếu user không tồn tại, tạo mới
     if (!user) {
+      if (!body.role) {
+        throw new HttpException(
+          {
+            statusCode: HttpStatus.BAD_REQUEST,
+            code: 'SOCIAL_ROLE_REQUIRED',
+            message:
+              'Tài khoản Google chưa có trên hệ thống. Vui lòng chọn vai trò để tạo tài khoản.',
+          },
+          HttpStatus.BAD_REQUEST,
+        )
+      }
+
       await this.validateSingleManagerConstraint(body.role)
 
       user = await this.userRepository.createBySocial(
         email,
-        body.fullName,
+        resolvedFullName,
         loginWith,
         this.helperService.dateCreate(),
         body.role,

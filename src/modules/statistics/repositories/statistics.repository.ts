@@ -283,6 +283,9 @@ export class StatisticsRepository {
     query: PaymentStatsRequestDto,
   ): Promise<PaymentStatsResponseDto> {
     const { from, to, groupBy } = query
+    const page = query.page && query.page > 0 ? query.page : 1
+    const limit = query.limit && query.limit > 0 ? Math.min(query.limit, 50) : 10
+    const skip = (page - 1) * limit
     const groupByRaw = Prisma.sql([groupBy])
 
     const totalSpent = await this.prisma.paymentOrder.aggregate({
@@ -306,12 +309,58 @@ export class StatisticsRepository {
       ORDER BY period ASC
     `
 
+    const where = {
+      userId: ownerId,
+      status: PaymentStatus.COMPLETED,
+      createdAt: {
+        gte: new Date(from),
+        lte: new Date(to),
+      },
+    }
+
+    const [transactions, total] = await this.prisma.$transaction([
+      this.prisma.paymentOrder.findMany({
+        where,
+        include: {
+          paymentPackage: {
+            select: {
+              name: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.paymentOrder.count({ where }),
+    ])
+
     return {
       totalSpent: totalSpent._sum.amount || 0,
       trends: trends.map((item) => ({
         period: item.period.toISOString(),
         amount: item.amount || 0,
       })),
+      transactions: transactions.map((item) => ({
+        id: item.id,
+        orderType: item.orderType,
+        amount: item.amount,
+        currency: item.currency,
+        status: item.status,
+        paymentMethod: item.paymentMethod,
+        packageDays: item.packageDays,
+        packageName:
+          item.paymentPackage?.name ||
+          (item.packageDays ? `${item.packageDays} ngày` : 'Chưa xác định'),
+        transactionCode: item.transactionCode || `DH-${item.id}`,
+        createdAt: item.createdAt.toISOString(),
+      })),
+      meta: {
+        page,
+        limit,
+        total,
+        totalPage: Math.max(1, Math.ceil(total / limit)),
+      },
     }
   }
 

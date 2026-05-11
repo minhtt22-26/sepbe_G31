@@ -13,11 +13,12 @@ import {
   CampaignStatus,
   EnumUserRole,
   InterviewInvitationStatus,
-  JobApplicationStatus,
+  WalletTransactionType,
 } from 'src/generated/prisma/enums'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { NotificationsService } from 'src/modules/notifications/notifications.service'
 import { ChatService } from 'src/modules/chat/service/chat.service'
+import { WalletService } from 'src/modules/wallet/wallet.service'
 
 @Injectable()
 export class InterviewInvitationService {
@@ -26,6 +27,7 @@ export class InterviewInvitationService {
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly chatService: ChatService,
+    private readonly walletService: WalletService,
   ) {}
 
   private formatSlotSummary(slot: {
@@ -72,6 +74,20 @@ export class InterviewInvitationService {
       }
       normalizedKeys.add(key)
     }
+  }
+
+  private buildCampaignTitle(jobTitle?: string | null) {
+    if (jobTitle?.trim()) {
+      return `Lịch phỏng vấn - ${jobTitle.trim()}`
+    }
+    return 'Lịch phỏng vấn ứng viên'
+  }
+
+  private buildCampaignMessage(jobTitle?: string | null) {
+    if (jobTitle?.trim()) {
+      return `Chúng tôi mời bạn tham gia phỏng vấn cho vị trí ${jobTitle.trim()}. Vui lòng chọn ca phù hợp và xác nhận tham gia đúng giờ.`
+    }
+    return 'Chúng tôi mời bạn tham gia phỏng vấn. Vui lòng chọn ca phù hợp và xác nhận tham gia đúng giờ.'
   }
 
   @Cron(CronExpression.EVERY_5_MINUTES)
@@ -280,14 +296,10 @@ export class InterviewInvitationService {
    */
   async createCampaign(dto: CreateCampaignRequestDto, companyId: number) {
     const {
-      title,
-      description,
-      message,
       jobId,
       workerIds,
       slots,
       expiresAt,
-      scheduledAt,
     } = dto
 
     // If workerIds not provided but jobId is provided, auto-select SUITABLE applicants
@@ -324,18 +336,20 @@ export class InterviewInvitationService {
       throw new BadRequestException('Một số worker không tồn tại')
     }
 
+    let jobTitle: string | null = null
     if (jobId) {
       const job = await this.prisma.job.findFirst({
         where: {
           id: jobId,
           companyId,
         },
-        select: { id: true },
+        select: { id: true, title: true },
       })
 
       if (!job) {
         throw new BadRequestException('Không tìm thấy công việc hợp lệ cho chiến dịch này')
       }
+      jobTitle = job.title
 
       const existingInvitations = await this.prisma.interviewInvitation.findMany({
         where: {
@@ -365,19 +379,36 @@ export class InterviewInvitationService {
 
     }
 
+    const earliestSlotStart = new Date(
+      Math.min(...slots.map((slot) => new Date(slot.startAt).getTime())),
+    )
+    const fallbackDeadline = new Date(earliestSlotStart.getTime() - 24 * 60 * 60 * 1000)
+    const effectiveDeadline = expiresAt ? new Date(expiresAt) : fallbackDeadline
+
+    if (Number.isNaN(effectiveDeadline.getTime())) {
+      throw new BadRequestException('Hạn đổi lịch không hợp lệ')
+    }
+
+    if (effectiveDeadline.getTime() >= earliestSlotStart.getTime()) {
+      throw new BadRequestException('Hạn đổi lịch phải trước ca phỏng vấn sớm nhất')
+    }
+
+    const campaignTitle = this.buildCampaignTitle(jobTitle)
+    const campaignMessage = this.buildCampaignMessage(jobTitle)
+
     const createdCampaign = await this.prisma.$transaction(async (tx) => {
       const campaign = await tx.interviewInvitationCampaign.create({
         data: {
           companyId,
           jobId: jobId || null,
-          title,
-          description: description || null,
-          message,
-          totalCount: finalWorkerIds.length,
-          pendingCount: finalWorkerIds.length,
-          status: scheduledAt ? CampaignStatus.SCHEDULED : CampaignStatus.DRAFT,
-          expiresAt: expiresAt ? new Date(expiresAt) : null,
-          scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+          title: campaignTitle,
+          description: null,
+          message: campaignMessage,
+          totalCount: workerIds.length,
+          pendingCount: workerIds.length,
+          status: CampaignStatus.DRAFT,
+          expiresAt: effectiveDeadline,
+          scheduledAt: null,
         },
       })
 
@@ -435,6 +466,30 @@ export class InterviewInvitationService {
         `Không thể gửi chiến dịch ở trạng thái ${campaign.status}. Chỉ có thể gửi chiến dịch ở trạng thái DRAFT hoặc SCHEDULED`,
       )
     }
+
+    const workerCount = (campaign.invitations || []).filter(
+      (invitation) => invitation.status === InterviewInvitationStatus.PENDING,
+    ).length
+    if (workerCount <= 0) {
+      throw new BadRequestException('Không có ứng viên hợp lệ để gửi lời mời')
+    }
+
+    const unitCost = await this.walletService.getPointCost(
+      'AI_INVITE_POINT_COST_PER_WORKER',
+      1000,
+    )
+    const totalCost = unitCost * workerCount
+    await this.walletService.deductPoints({
+      companyId,
+      cost: totalCost,
+      type: WalletTransactionType.AI_INVITE,
+      referenceType: 'INTERVIEW_CAMPAIGN',
+      referenceId: campaignId,
+      metadata: {
+        workerCount,
+        unitCost,
+      },
+    })
 
     // Update campaign status to IN_PROGRESS
     await this.repository.updateCampaignStatus(campaignId, CampaignStatus.IN_PROGRESS)
@@ -639,11 +694,6 @@ export class InterviewInvitationService {
       throw new BadRequestException('Lời mời đã chấp nhận chỉ có thể đổi ca phỏng vấn')
     }
 
-    // Check if expired
-    if (invitation.campaign.expiresAt && new Date() > invitation.campaign.expiresAt) {
-      throw new BadRequestException('Lời mời này đã hết hạn')
-    }
-
     // Validate response message if rejecting
     if (
       dto.status === InterviewInvitationStatus.REJECTED &&
@@ -696,6 +746,14 @@ export class InterviewInvitationService {
         const isSameSlot = latestInvitation.selectedSlotId === targetSlotId
 
         if (!isSameSlot) {
+          if (
+            latestInvitation.status === InterviewInvitationStatus.ACCEPTED &&
+            invitation.campaign.expiresAt &&
+            new Date() >= invitation.campaign.expiresAt
+          ) {
+            throw new BadRequestException('Đã quá hạn đổi lịch phỏng vấn')
+          }
+
           if (slot.bookedCount >= slot.capacity) {
             throw new BadRequestException('Ca phỏng vấn này đã đủ số lượng ứng viên')
           }

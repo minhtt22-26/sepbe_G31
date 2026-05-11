@@ -12,6 +12,7 @@ const sectorRepositoryMock = {
     create: jest.fn(),
     restore: jest.fn(),
     findAll: jest.fn(),
+    findManyPaged: jest.fn(),
     findById: jest.fn(),
     update: jest.fn(),
     softDelete: jest.fn(),
@@ -78,6 +79,24 @@ describe('SectorService', () => {
         expect(result).toEqual({ id: 10, name: 'Sản xuất', status: 'ACTIVE' })
         expect(sectorRepositoryMock.restore).toHaveBeenCalledWith(10, 'Sản xuất')
         expect(sectorRepositoryMock.create).not.toHaveBeenCalled()
+    })
+
+    it('findPage should return pagination payload', async () => {
+        sectorRepositoryMock.findManyPaged.mockResolvedValue({
+            items: [{ id: 1, name: 'A' }],
+            totalItems: 1,
+        })
+
+        const result = await service.findPage(1, 10)
+
+        expect(result).toEqual({
+            data: [{ id: 1, name: 'A' }],
+            page: 1,
+            size: 10,
+            totalItems: 1,
+            totalPages: 1,
+        })
+        expect(sectorRepositoryMock.findManyPaged).toHaveBeenCalledWith(0, 10)
     })
 
     it('findAll should return all active sectors', async () => {

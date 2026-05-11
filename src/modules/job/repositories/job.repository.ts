@@ -82,6 +82,110 @@ export class JobRepository {
     })
   }
 
+  async isFirstJobPostFree(companyId: number) {
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { firstJobPostUsedAt: true },
+    })
+    if (!company) {
+      throw new BadRequestException('Company not found')
+    }
+    return !company.firstJobPostUsedAt
+  }
+
+  async publishFirstJobForFree(jobId: number, companyId: number) {
+    return this.prisma.$transaction(async (tx) => {
+      const now = new Date()
+      const company = await tx.company.update({
+        where: { id: companyId },
+        data: {
+          firstJobPostUsedAt: now,
+        },
+        select: {
+          ownerId: true,
+        },
+      })
+      const job = await tx.job.update({
+        where: { id: jobId },
+        data: {
+          status: JobStatus.PUBLISHED,
+        },
+      })
+      await tx.notification.create({
+        data: {
+          userId: company.ownerId,
+          title: 'Đăng tin miễn phí thành công',
+          message: `Tin "${job.title}" đã được xuất bản miễn phí lần đầu.`,
+          link: '/employer',
+        },
+      })
+      return job
+    })
+  }
+
+  async publishJobByPoint(jobId: number) {
+    return this.prisma.$transaction(async (tx) => {
+      const job = await tx.job.update({
+        where: { id: jobId },
+        data: {
+          status: JobStatus.PUBLISHED,
+        },
+        include: {
+          company: { select: { ownerId: true } },
+        },
+      })
+
+      if (job.company?.ownerId) {
+        await tx.notification.create({
+          data: {
+            userId: job.company.ownerId,
+            title: 'Đăng tin thành công',
+            message: `${job.title} (đã trừ point)`,
+            link: '/employer',
+          },
+        })
+      }
+      return job
+    })
+  }
+
+  async activateBoostByPoint(params: { jobId: number; durationDays: number }) {
+    const now = new Date()
+    return this.prisma.$transaction(async (tx) => {
+      const existingJob = await tx.job.findUnique({
+        where: { id: params.jobId },
+        select: { boostExpiredAt: true, title: true, company: { select: { ownerId: true } } },
+      })
+      const baseDate =
+        existingJob?.boostExpiredAt && existingJob.boostExpiredAt > now
+          ? existingJob.boostExpiredAt
+          : now
+      const boostExpiredAt = new Date(baseDate)
+      boostExpiredAt.setDate(boostExpiredAt.getDate() + params.durationDays)
+
+      const job = await tx.job.update({
+        where: { id: params.jobId },
+        data: {
+          isBoosted: true,
+          boostExpiredAt,
+        },
+      })
+
+      if (existingJob?.company?.ownerId) {
+        await tx.notification.create({
+          data: {
+            userId: existingJob.company.ownerId,
+            title: 'Boost job thành công',
+            message: `(${params.durationDays} ngày) ${existingJob.title}`,
+            link: '/employer',
+          },
+        })
+      }
+
+      return job
+    })
+  }
+
   async findPendingJobPostingOrder(jobId: number) {
     return this.prisma.paymentOrder.findFirst({
       where: {
@@ -230,16 +334,64 @@ export class JobRepository {
     jobId: number
     amount: number
     paymentMethod: PaymentMethod
+    packageId?: number
+    packageDays?: number
   }) {
     return this.prisma.paymentOrder.create({
       data: {
         userId: params.userId,
         orderType: OrderType.BOOST_JOB,
         targetId: params.jobId,
+        packageId: params.packageId,
+        packageDays: params.packageDays,
         amount: params.amount,
         paymentMethod: params.paymentMethod,
         status: PaymentStatus.PENDING,
       },
+    })
+  }
+
+  async getActiveBoostPackages() {
+    return this.prisma.paymentPackage.findMany({
+      where: {
+        orderType: OrderType.BOOST_JOB,
+        isActive: true,
+      },
+      orderBy: [{ durationDays: 'asc' }, { price: 'asc' }, { createdAt: 'asc' }],
+    })
+  }
+
+  async getBoostPackageByDays(days: number) {
+    return this.prisma.paymentPackage.findFirst({
+      where: {
+        orderType: OrderType.BOOST_JOB,
+        durationDays: days,
+        isActive: true,
+      },
+      orderBy: [{ isDefault: 'desc' }, { updatedAt: 'desc' }],
+    })
+  }
+
+  async getDefaultFeatureListingPackage() {
+    const defaultPackage = await this.prisma.paymentPackage.findFirst({
+      where: {
+        orderType: OrderType.FEATURE_LISTING,
+        isActive: true,
+        isDefault: true,
+      },
+      orderBy: { updatedAt: 'desc' },
+    })
+
+    if (defaultPackage) {
+      return defaultPackage
+    }
+
+    return this.prisma.paymentPackage.findFirst({
+      where: {
+        orderType: OrderType.FEATURE_LISTING,
+        isActive: true,
+      },
+      orderBy: { updatedAt: 'desc' },
     })
   }
 
@@ -755,6 +907,7 @@ export class JobRepository {
       where: {
         job: {
           companyId,
+          status: { not: JobStatus.DELETED },
           ...(jobId ? { id: jobId } : {}),
         },
       },
@@ -813,9 +966,21 @@ export class JobRepository {
     applicationId: number,
     status: JobApplicationStatus,
   ) {
-    const app = await this.prisma.jobApplication.update({
+    if (status === JobApplicationStatus.VIEWED) {
+      await this.prisma.$executeRaw`
+        UPDATE "JobApplication"
+        SET "status" = ${status}, "updatedAt" = "updatedAt"
+        WHERE "id" = ${applicationId}
+      `
+    } else {
+      await this.prisma.jobApplication.update({
+        where: { id: applicationId },
+        data: { status },
+      })
+    }
+
+    const app = await this.prisma.jobApplication.findUnique({
       where: { id: applicationId },
-      data: { status },
       include: {
         job: {
           select: {
@@ -825,6 +990,10 @@ export class JobRepository {
         },
       },
     })
+
+    if (!app) {
+      throw new BadRequestException('Application not found')
+    }
 
     let title = ''
     let message = ''
@@ -1037,16 +1206,43 @@ export class JobRepository {
   }
   async getAllJobReport(
     userId: number,
-    status: ReportStatus,
+    status: ReportStatus | 'ALL',
     page: number,
     limit: number,
+    companyName?: string,
+    reporterName?: string,
+    fromDate?: string,
+    toDate?: string,
   ) {
     const pageNum = Number(page) || 1
     const limitNum = Number(limit) || 10
     const skip = (pageNum - 1) * limitNum
+
+    const where: any = {}
+    if (status && status !== 'ALL') {
+      where.status = status
+    }
+    if (companyName) {
+      where.job = { company: { name: { contains: companyName, mode: 'insensitive' } } }
+    }
+    if (reporterName) {
+      where.reporter = { fullName: { contains: reporterName, mode: 'insensitive' } }
+    }
+    if (fromDate || toDate) {
+      where.createdAt = {}
+      if (fromDate) {
+        const from = new Date(`${fromDate}T00:00:00.000Z`)
+        if (!isNaN(from.getTime())) where.createdAt.gte = from
+      }
+      if (toDate) {
+        const to = new Date(`${toDate}T23:59:59.999Z`)
+        if (!isNaN(to.getTime())) where.createdAt.lte = to
+      }
+    }
+
     const [data, total] = await this.prisma.$transaction([
       this.prisma.jobReport.findMany({
-        where: { status: status },
+        where,
         skip: skip,
         take: Number(limit),
         orderBy: { createdAt: 'desc' },
@@ -1066,7 +1262,7 @@ export class JobRepository {
           },
         },
       }),
-      this.prisma.jobReport.count({ where: { status: status } }),
+      this.prisma.jobReport.count({ where }),
     ])
     return { data, total, page, limit }
   }

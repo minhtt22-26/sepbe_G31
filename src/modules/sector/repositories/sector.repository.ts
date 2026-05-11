@@ -17,6 +17,20 @@ export class SectorRepository {
         })
     }
 
+    async findManyPaged(skip: number, take: number) {
+        const where = { status: SectorStatus.ACTIVE }
+        const [items, totalItems] = await Promise.all([
+            this.prisma.sector.findMany({
+                where,
+                skip,
+                take,
+                orderBy: { name: 'asc' },
+            }),
+            this.prisma.sector.count({ where }),
+        ])
+        return { items, totalItems }
+    }
+
     async findById(id: number) {
         return this.prisma.sector.findFirst({
             where: {

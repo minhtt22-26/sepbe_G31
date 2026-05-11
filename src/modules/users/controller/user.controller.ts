@@ -29,6 +29,7 @@ import { AuthTokenResponseDto } from 'src/modules/auth/dto/response/auth.respons
 import { ResetPasswordRequestDto } from 'src/modules/auth/dto/request/reset-password.request.dto'
 import { ForgotPasswordRequestDto } from 'src/modules/auth/dto/request/forgot-password.request.dto'
 import { AuthSocialGoogleProtected } from 'src/modules/auth/decorators/auth.social.decorator'
+import type { IAuthSocialPayload } from 'src/modules/auth/interfaces/auth.interface'
 import { UserCreateSocialRequestDto } from '../dtos/request/user.create-social.request.dto'
 import { EnumUserLoginWith, EnumUserRole } from 'src/generated/prisma/enums'
 import { User, WorkerProfile } from 'src/generated/prisma/client'
@@ -110,14 +111,15 @@ export class UserController {
   @Post('login/social/google')
   @AuthSocialGoogleProtected()
   async loginWithGoogle(
-    @AuthJwtPayload('email') email: string,
+    @AuthJwtPayload() socialUser: IAuthSocialPayload,
     @Body() body: UserCreateSocialRequestDto,
     // @Req() req: Request,
   ): Promise<UserLoginResponseDto> {
     return this.userService.loginWithSocial(
-      email,
+      socialUser.email,
       EnumUserLoginWith.SOCIAL_GOOGLE,
       body,
+      { googleFullName: socialUser.fullName },
       // {
       //   ipAddress: req.ip ?? 'unknown',
       //   userAgent: req.headers['user-agent'] ?? 'unknown',

@@ -56,4 +56,6 @@ export interface IForgotPasswordCreate {
 export interface IAuthSocialPayload {
   email: string
   emailVerified: boolean
+  /** Họ tên đầy đủ đã được Google chứng thực (claim `name` / given+family). */
+  fullName?: string
 }

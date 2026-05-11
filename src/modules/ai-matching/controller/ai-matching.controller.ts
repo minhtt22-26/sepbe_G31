@@ -20,18 +20,16 @@ export class AIMatchingController {
   )
   async getMatchedJobs(
     @AuthJwtPayload('userId') userId: number,
-    @Query('limit') limit?: number,
   ) {
-    return this.aiMatchingService.getMatchedJobs(userId, Number(limit) || 10)
+    return this.aiMatchingService.getMatchedJobs(userId)
   }
 
   @Get('workers')
   @AuthRoleProtected(EnumUserRole.EMPLOYER)
   async getSuggestedWorkers(
     @Query('jobId') jobId: number,
-    @Query('limit') limit?: number,
   ) {
-    return this.aiMatchingService.getSuggestedWorkers(jobId, limit || 10)
+    return this.aiMatchingService.getSuggestedWorkers(jobId)
   }
 
   @Get('configs')

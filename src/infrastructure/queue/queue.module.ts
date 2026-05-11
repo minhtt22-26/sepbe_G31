@@ -9,7 +9,6 @@ import { AIMatchingModule } from 'src/modules/ai-matching/ai-matching.module'
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
         const redisUrl = configService.getOrThrow<string>('REDIS_URL')
-        console.log('[QUEUE] Initializing Bull with Redis')
         return {
           redis: {
             url: redisUrl,

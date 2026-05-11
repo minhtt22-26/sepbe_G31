@@ -41,6 +41,7 @@ import {
 } from 'src/modules/auth/decorators/auth.jwt.decorator'
 import { CompanyService } from 'src/modules/company/company.service'
 import {
+  CompanyStatus,
   EnumUserRole,
   JobStatus,
   ReportStatus,
@@ -53,6 +54,14 @@ export class JobController {
     private readonly jobService: JobService,
     private readonly companyService: CompanyService,
   ) { }
+
+  private ensureCompanyCanManageJobs(company: { status: CompanyStatus }) {
+    if (company.status !== CompanyStatus.APPROVED) {
+      throw new BadRequestException(
+        'Công ty đang chờ duyệt hồ sơ/cập nhật, chưa thể đăng hoặc chỉnh sửa tin tuyển dụng',
+      )
+    }
+  }
 
   // Search jobs (Elastic)
   //api/job/search?keyword=abc&sectorId=2&workingShift=AFTERNOON&page=1&limit=10
@@ -71,6 +80,15 @@ export class JobController {
     @Query('limit') limit?: number,
   ) {
     return this.jobService.getBoostedJobs(Number(page) || 1, Number(limit) || 10)
+  }
+
+  @Get('boost/packages')
+  @AuthJwtAccessProtected()
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get active boost packages' })
+  async getBoostPackages() {
+    return this.jobService.getBoostPackages()
   }
 
   @Post('boost/sepay/webhook')
@@ -129,6 +147,7 @@ export class JobController {
   async create(@AuthJwtPayload() user: any, @Body() dto: CreateJobRequest) {
     const ownerId = user.userId
     const company = await this.companyService.findByOwnerId(ownerId)
+    this.ensureCompanyCanManageJobs(company)
     return this.jobService.createJob(dto, company.id)
   }
 
@@ -269,6 +288,7 @@ export class JobController {
   ) {
     const ownerId = user.userId
     const company = await this.companyService.findByOwnerId(ownerId)
+    this.ensureCompanyCanManageJobs(company)
     return this.jobService.updateJob(id, body, company.id)
   }
 
@@ -284,6 +304,7 @@ export class JobController {
   ) {
     const ownerId = user.userId
     const company = await this.companyService.findByOwnerId(ownerId)
+    this.ensureCompanyCanManageJobs(company)
     return this.jobService.createBoostCheckout(id, company.id, body)
   }
 
@@ -298,6 +319,7 @@ export class JobController {
   ) {
     const ownerId = user.userId
     const company = await this.companyService.findByOwnerId(ownerId)
+    this.ensureCompanyCanManageJobs(company)
     return this.jobService.createJobPostingCheckout(id, company.id)
   }
 
@@ -313,6 +335,7 @@ export class JobController {
   ) {
     const ownerId = user.userId
     const company = await this.companyService.findByOwnerId(ownerId)
+    this.ensureCompanyCanManageJobs(company)
     return this.jobService.confirmBoostPayment(id, company.id, body)
   }
 
@@ -329,6 +352,7 @@ export class JobController {
   ) {
     const ownerId = user.userId
     const company = await this.companyService.findByOwnerId(ownerId)
+    this.ensureCompanyCanManageJobs(company)
     return this.jobService.deleteJob(id, company.id)
   }
 
@@ -374,12 +398,17 @@ export class JobController {
   @ApiResponse({ status: 200, description: 'Job reports retrieved' })
   @AuthJwtAccessProtected()
   @ApiBearerAuth('access-token')
-  async getAllJobReport(@Query('status', new ParseEnumPipe(ReportStatus, {
-    exceptionFactory: () => {
-      return new BadRequestException("Status must be PENDING, RESOLVED, REJECTED")
-    }
-  })) status: ReportStatus, @AuthJwtPayload('userId') userId: number, @Query('page') page: number, @Query('limit') limit: number) {
-    return this.jobService.getAllJobReport(userId, status, page, limit);
+  async getAllJobReport(
+    @Query('status') status: ReportStatus | 'ALL',
+    @AuthJwtPayload('userId') userId: number,
+    @Query('page') page: number,
+    @Query('limit') limit: number,
+    @Query('companyName') companyName?: string,
+    @Query('reporterName') reporterName?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+  ) {
+    return this.jobService.getAllJobReport(userId, status, page, limit, companyName, reporterName, fromDate, toDate);
   }
 
   @AuthJwtAccessProtected()
