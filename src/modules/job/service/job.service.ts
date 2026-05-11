@@ -25,6 +25,7 @@ import { JobReportDto } from '../dtos/job.report.request.dto'
 import { BoostCheckoutRequestDto } from '../dtos/request/boost-checkout.request'
 import { ConfirmBoostPaymentRequestDto } from '../dtos/request/confirm-boost-payment.request'
 import { WalletService } from 'src/modules/wallet/wallet.service'
+import { InterviewInvitationService } from 'src/modules/interview-invitation/service/interview-invitation.service'
 
 @Injectable()
 export class JobService {
@@ -46,8 +47,8 @@ export class JobService {
     // private readonly embeddingQueueService: EmbeddingQueueService,
     @Inject(forwardRef(() => AIMatchingService))
     private readonly aiMatchingService: AIMatchingService,
-    @Inject(forwardRef(() => 'InterviewInvitationService'))
-    private readonly interviewInvitationService?: any,
+    @Inject(forwardRef(() => InterviewInvitationService))
+    private readonly interviewInvitationService?: InterviewInvitationService,
   ) {}
 
   async searchJobs(q: any) {

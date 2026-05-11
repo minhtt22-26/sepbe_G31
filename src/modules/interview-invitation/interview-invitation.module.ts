@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+import { Module, forwardRef } from '@nestjs/common'
 import { PrismaModule } from 'src/prisma.module'
 import { AuthModule } from '../auth/auth.module'
 import { CompanyModule } from '../company/company.module'
@@ -15,7 +15,7 @@ import { InterviewInvitationController } from './controller/interview-invitation
     AuthModule,
     CompanyModule,
     NotificationsModule,
-    ChatModule,
+    forwardRef(() => ChatModule),
     WalletModule,
   ],
   controllers: [InterviewInvitationController],
