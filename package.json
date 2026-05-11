@@ -5,6 +5,9 @@
   "author": "",
   "private": true,
   "license": "UNLICENSED",
+    "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "prebuild": "node -e \"try{require.resolve('eslint');require('child_process').execSync('npm run lint',{stdio:'inherit'});}catch(e){console.log('eslint not installed, skipping lint')}\"",
     "build": "tsc -p tsconfig.build.json && nest build",
