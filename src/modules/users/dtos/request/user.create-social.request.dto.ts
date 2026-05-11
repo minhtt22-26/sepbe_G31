@@ -1,5 +1,6 @@
 import { IsEnum, IsOptional, IsString } from "class-validator";
 import { EnumUserRole } from "src/generated/prisma/enums";
+import { ApiPropertyOptional } from "@nestjs/swagger";
 
 export class UserCreateSocialRequestDto {
     @IsOptional()

@@ -46,6 +46,8 @@ export class JobService {
     // private readonly embeddingQueueService: EmbeddingQueueService,
     @Inject(forwardRef(() => AIMatchingService))
     private readonly aiMatchingService: AIMatchingService,
+    @Inject(forwardRef(() => 'InterviewInvitationService'))
+    private readonly interviewInvitationService?: any,
   ) {}
 
   async searchJobs(q: any) {
@@ -644,8 +646,74 @@ export class JobService {
     if (application.job.companyId !== companyId) {
       throw new BadRequestException('Unauthorized to update this application')
     }
-    await this.jobRepository.updateApplicationStatus(applicationId, status)
+    
+    // Handle SUITABLE status: check if job has interview slots and auto-invite if yes
+    if (status === JobApplicationStatus.SUITABLE) {
+      await this.handleSuitableStatusChange(
+        application,
+        companyId,
+      )
+    } else {
+      // For other statuses, just update normally
+      await this.jobRepository.updateApplicationStatus(applicationId, status)
+    }
+    
     return { success: true }
+  }
+
+  /**
+   * Handle marking candidate as SUITABLE:
+   * - If job has interview slots: automatically create campaign and send invitation
+   * - If no slots: just change status to SUITABLE (will be invited when slots are created)
+   */
+  private async handleSuitableStatusChange(
+    application: any,
+    companyId: number,
+  ) {
+    const jobId = application.jobId
+    const workerId = application.userId
+
+    // Update application status to SUITABLE
+    await this.jobRepository.updateApplicationStatus(
+      application.id,
+      JobApplicationStatus.SUITABLE,
+    )
+
+    // Check if job already has interview slots
+    const existingSlots = await this.jobRepository.getInterviewSlotsByJob(
+      jobId,
+      companyId,
+    )
+
+    // If slots exist, automatically create campaign and send invitation
+    if (existingSlots && existingSlots.length > 0) {
+      try {
+        // Check if this candidate is already invited for this job
+        const alreadyInvited =
+          await this.jobRepository.checkExistingInvitation(jobId, workerId)
+
+        if (!alreadyInvited) {
+          // Create automatic campaign for single suitable candidate
+          const campaign = await this.jobRepository.createAutoInvitationCampaign(
+            {
+              companyId,
+              jobId,
+              workerId,
+              slots: existingSlots,
+            },
+          )
+
+          this.logger.log(
+            `Auto-created interview campaign #${campaign.id} for worker #${workerId} on job #${jobId}`,
+          )
+        }
+      } catch (error) {
+        // Log error but don't fail the application status update
+        this.logger.error(
+          `Failed to auto-create interview campaign for worker #${workerId} on job #${jobId}: ${error.message}`,
+        )
+      }
+    }
   }
 
   async cancelApplyJob(jobId: number, userId: number) {

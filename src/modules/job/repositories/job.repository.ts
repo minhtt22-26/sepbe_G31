@@ -6,6 +6,8 @@ import {
   PaymentMethod,
   PaymentStatus,
   ReportStatus,
+  CampaignStatus,
+  InterviewInvitationStatus,
 } from 'src/generated/prisma/enums'
 import { JobStatus } from 'src/generated/prisma/browser'
 import { PrismaService } from 'src/prisma.service'
@@ -1038,6 +1040,75 @@ export class JobRepository {
         },
       },
     })
+  }
+
+  // --- Interview invitation helpers ---
+  async getInterviewSlotsByJob(jobId: number, companyId: number) {
+    return this.prisma.interviewInvitationSlot.findMany({
+      where: {
+        campaign: {
+          jobId,
+          companyId,
+          status: { in: [CampaignStatus.IN_PROGRESS, CampaignStatus.DRAFT] },
+        },
+      },
+      orderBy: { startAt: 'asc' },
+      select: {
+        id: true,
+        startAt: true,
+        endAt: true,
+        capacity: true,
+        bookedCount: true,
+        location: true,
+        note: true,
+        campaignId: true,
+      },
+    })
+  }
+
+  async checkExistingInvitation(jobId: number, workerId: number) {
+    const invitation = await this.prisma.interviewInvitation.findFirst({
+      where: {
+        workerId,
+        campaign: { jobId },
+        status: { in: [InterviewInvitationStatus.PENDING, InterviewInvitationStatus.ACCEPTED] },
+      },
+      select: { id: true },
+    })
+    return !!invitation
+  }
+
+  async createAutoInvitationCampaign(params: { companyId: number; jobId: number; workerId: number; slots?: { id: number }[] }) {
+    const { companyId, jobId, workerId, slots } = params
+
+    const job = await this.prisma.job.findUnique({ where: { id: jobId }, select: { id: true, title: true, companyId: true } })
+    if (!job || job.companyId !== companyId) throw new BadRequestException('Invalid job or unauthorized')
+
+    const campaign = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.interviewInvitationCampaign.create({
+        data: {
+          companyId,
+          jobId,
+          title: `Mời phỏng vấn: ${job.title}`,
+          message: `Chúng tôi mời bạn tham gia phỏng vấn vị trí ${job.title}. Vui lòng chọn khung giờ phù hợp.`,
+          totalCount: 1,
+          pendingCount: 1,
+          status: CampaignStatus.IN_PROGRESS,
+          sentAt: new Date(),
+        },
+      })
+
+      await tx.interviewInvitation.create({ data: { campaignId: created.id, workerId, status: InterviewInvitationStatus.PENDING } })
+
+      // Optionally link existing slots (no-op if not provided)
+      if (slots && slots.length) {
+        await Promise.all(slots.map((s) => tx.interviewInvitationSlot.update({ where: { id: s.id }, data: { campaignId: created.id } })))
+      }
+
+      return created
+    })
+
+    return campaign
   }
 
   async getRelatedJobs(

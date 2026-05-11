@@ -302,13 +302,23 @@ export class InterviewInvitationService {
       expiresAt,
     } = dto
 
+    // If workerIds not provided but jobId is provided, auto-select SUITABLE applicants
+    let finalWorkerIds = workerIds
+    if ((!workerIds || workerIds.length === 0) && jobId) {
+      const suitableApps = await this.prisma.jobApplication.findMany({
+        where: { jobId, status: JobApplicationStatus.SUITABLE },
+        select: { userId: true },
+      })
+      finalWorkerIds = suitableApps.map((a) => a.userId)
+    }
+
     // Validate worker IDs
-    if (!workerIds || workerIds.length === 0) {
+    if (!finalWorkerIds || finalWorkerIds.length === 0) {
       throw new BadRequestException('Phải chọn ít nhất 1 worker để mời')
     }
 
     // Validate unique worker IDs
-    if (new Set(workerIds).size !== workerIds.length) {
+    if (new Set(finalWorkerIds).size !== finalWorkerIds.length) {
       throw new BadRequestException('Danh sách worker chứa ID trùng lặp')
     }
 
@@ -317,12 +327,12 @@ export class InterviewInvitationService {
     // Validate workers exist and are WORKER role
     const workers = await this.prisma.user.findMany({
       where: {
-        id: { in: workerIds },
+        id: { in: finalWorkerIds },
         role: EnumUserRole.WORKER,
       },
     })
 
-    if (workers.length !== workerIds.length) {
+    if (workers.length !== finalWorkerIds.length) {
       throw new BadRequestException('Một số worker không tồn tại')
     }
 
@@ -343,7 +353,7 @@ export class InterviewInvitationService {
 
       const existingInvitations = await this.prisma.interviewInvitation.findMany({
         where: {
-          workerId: { in: workerIds },
+          workerId: { in: finalWorkerIds },
           campaign: {
             companyId,
             jobId,
@@ -414,7 +424,7 @@ export class InterviewInvitationService {
       })
 
       await tx.interviewInvitation.createMany({
-        data: workerIds.map((workerId) => ({
+        data: finalWorkerIds.map((workerId) => ({
           campaignId: campaign.id,
           workerId,
           status: InterviewInvitationStatus.PENDING,
