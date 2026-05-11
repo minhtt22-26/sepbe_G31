@@ -3,10 +3,10 @@ import {
   IsArray,
   IsDateString,
   IsInt,
-  IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator'
 import { ApiProperty } from '@nestjs/swagger'
@@ -43,11 +43,17 @@ export class CreateCampaignRequestDto {
   @IsOptional()
   jobId?: number
 
-  @ApiProperty({ description: 'ID danh sách worker được mời', example: [1, 2, 3, 4, 5] })
+  @ApiProperty({
+    description:
+      'ID danh sách worker được mời (tùy chọn, nếu bỏ trống hệ thống sẽ tự lấy ứng viên đã được đánh dấu PHU_HOP của job)',
+    example: [1, 2, 3, 4, 5],
+    required: false,
+  })
+  @ValidateIf((_, value) => value !== undefined)
   @IsArray()
+  @ArrayMinSize(1)
   @IsInt({ each: true })
-  @IsNotEmpty()
-  workerIds: number[]
+  workerIds?: number[]
 
   @ApiProperty({
     description: 'Danh sách ca phỏng vấn để worker lựa chọn',

@@ -304,7 +304,7 @@ export class InterviewInvitationService {
     } = dto
 
     // If workerIds not provided but jobId is provided, auto-select SUITABLE applicants
-    let finalWorkerIds = workerIds
+    let finalWorkerIds = workerIds || []
     if ((!workerIds || workerIds.length === 0) && jobId) {
       const suitableApps = await this.prisma.jobApplication.findMany({
         where: { jobId, status: JobApplicationStatus.SUITABLE },
@@ -313,28 +313,30 @@ export class InterviewInvitationService {
       finalWorkerIds = suitableApps.map((a) => a.userId)
     }
 
-    // Validate worker IDs
-    if (!finalWorkerIds || finalWorkerIds.length === 0) {
+    // Validate worker IDs only when creating a campaign without job context.
+    if (!jobId && finalWorkerIds.length === 0) {
       throw new BadRequestException('Phải chọn ít nhất 1 worker để mời')
     }
 
     // Validate unique worker IDs
-    if (new Set(finalWorkerIds).size !== finalWorkerIds.length) {
+    if (finalWorkerIds.length > 0 && new Set(finalWorkerIds).size !== finalWorkerIds.length) {
       throw new BadRequestException('Danh sách worker chứa ID trùng lặp')
     }
 
     this.validateCampaignSlots(slots)
 
     // Validate workers exist and are WORKER role
-    const workers = await this.prisma.user.findMany({
-      where: {
-        id: { in: finalWorkerIds },
-        role: EnumUserRole.WORKER,
-      },
-    })
+    if (finalWorkerIds.length > 0) {
+      const workers = await this.prisma.user.findMany({
+        where: {
+          id: { in: finalWorkerIds },
+          role: EnumUserRole.WORKER,
+        },
+      })
 
-    if (workers.length !== finalWorkerIds.length) {
-      throw new BadRequestException('Một số worker không tồn tại')
+      if (workers.length !== finalWorkerIds.length) {
+        throw new BadRequestException('Một số worker không tồn tại')
+      }
     }
 
     let jobTitle: string | null = null
@@ -352,30 +354,45 @@ export class InterviewInvitationService {
       }
       jobTitle = job.title
 
-      const existingInvitations = await this.prisma.interviewInvitation.findMany({
-        where: {
-          workerId: { in: finalWorkerIds },
-          campaign: {
-            companyId,
-            jobId,
+      if (finalWorkerIds.length > 0) {
+        const existingInvitations = await this.prisma.interviewInvitation.findMany({
+          where: {
+            workerId: { in: finalWorkerIds },
+            campaign: {
+              companyId,
+              jobId,
+              status: {
+                in: [
+                  CampaignStatus.DRAFT,
+                  CampaignStatus.SCHEDULED,
+                  CampaignStatus.IN_PROGRESS,
+                ],
+              },
+            },
+            status: {
+              in: [
+                InterviewInvitationStatus.PENDING,
+                InterviewInvitationStatus.ACCEPTED,
+              ],
+            },
           },
-          status: {
-            in: [
-              InterviewInvitationStatus.PENDING,
-              InterviewInvitationStatus.ACCEPTED,
-            ],
+          select: {
+            workerId: true,
           },
-        },
-        select: {
-          workerId: true,
-        },
-      })
+        })
 
-      const invitedWorkerIdSet = new Set(existingInvitations.map((i) => i.workerId))
-      if (invitedWorkerIdSet.size > 0) {
-        throw new BadRequestException(
-          'Một số ứng viên đã được mời phỏng vấn cho job này, không thể mời lại',
-        )
+        const invitedWorkerIdSet = new Set(existingInvitations.map((i) => i.workerId))
+        if (invitedWorkerIdSet.size > 0) {
+          finalWorkerIds = finalWorkerIds.filter(
+            (workerId) => !invitedWorkerIdSet.has(workerId),
+          )
+
+          if (finalWorkerIds.length === 0) {
+            throw new BadRequestException(
+              'Các ứng viên phù hợp đã có lời mời phỏng vấn đang hiệu lực cho job này.',
+            )
+          }
+        }
       }
 
     }
@@ -405,8 +422,8 @@ export class InterviewInvitationService {
           title: campaignTitle,
           description: null,
           message: campaignMessage,
-          totalCount: workerIds.length,
-          pendingCount: workerIds.length,
+          totalCount: finalWorkerIds.length,
+          pendingCount: finalWorkerIds.length,
           status: CampaignStatus.DRAFT,
           expiresAt: effectiveDeadline,
           scheduledAt: null,
@@ -424,14 +441,16 @@ export class InterviewInvitationService {
         })),
       })
 
-      await tx.interviewInvitation.createMany({
-        data: finalWorkerIds.map((workerId) => ({
-          campaignId: campaign.id,
-          workerId,
-          status: InterviewInvitationStatus.PENDING,
-        })),
-        skipDuplicates: true,
-      })
+      if (finalWorkerIds.length > 0) {
+        await tx.interviewInvitation.createMany({
+          data: finalWorkerIds.map((workerId) => ({
+            campaignId: campaign.id,
+            workerId,
+            status: InterviewInvitationStatus.PENDING,
+          })),
+          skipDuplicates: true,
+        })
+      }
 
       return tx.interviewInvitationCampaign.findUnique({
         where: { id: campaign.id },
