@@ -3,6 +3,7 @@ import {
   forwardRef,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common'
 import { AIMatchingRepository } from '../repositories/ai-matching.repository'
@@ -17,6 +18,7 @@ import { IMatchingConfig } from '../interfaces/ai-matching.interface'
 
 @Injectable()
 export class AIMatchingService {
+  private readonly logger = new Logger(AIMatchingService.name)
   private readonly DEFAULT_MIN_SCORE_THRESHOLD = 0
 
   constructor(
@@ -158,29 +160,37 @@ export class AIMatchingService {
       throw new NotFoundException('Job không tồn tại')
     }
 
-    const sections = await this.embeddingService.extractJobSections(
-      job.description,
-    )
+    try {
+      const sections = await this.embeddingService.extractJobSections(
+        job.description,
+      )
 
-    const reqText = this.embeddingTextBuilder.buildJobReqText(
-      sections,
-      job.occupation.name,
-    )
+      const reqText = this.embeddingTextBuilder.buildJobReqText(
+        sections,
+        job.occupation.name,
+      )
 
-    const benefitText = this.embeddingTextBuilder.buildJobBenefitText(sections)
+      const benefitText =
+        this.embeddingTextBuilder.buildJobBenefitText(sections)
 
-    const [reqEmbedding, benefitEmbedding] = await Promise.all([
-      this.embeddingService.generateEmbedding(reqText),
-      benefitText
-        ? this.embeddingService.generateEmbedding(benefitText)
-        : Promise.resolve(null),
-    ])
+      const [reqEmbedding, benefitEmbedding] = await Promise.all([
+        this.embeddingService.generateEmbedding(reqText),
+        benefitText
+          ? this.embeddingService.generateEmbedding(benefitText)
+          : Promise.resolve(null),
+      ])
 
-    await this.aiMatchingRepository.updateJobEmbeddings(
-      jobId,
-      reqEmbedding,
-      benefitEmbedding,
-    )
+      await this.aiMatchingRepository.updateJobEmbeddings(
+        jobId,
+        reqEmbedding,
+        benefitEmbedding,
+      )
+    } catch (error) {
+      this.logger.error(
+        `Failed to build embedding for job #${jobId}: ${error.message}`,
+        error.stack,
+      )
+    }
   }
 
   async buildWorkerProfileEmbedding(userId: number): Promise<void> {
@@ -194,28 +204,35 @@ export class AIMatchingService {
       throw new BadRequestException('Worker profile thiếu occupation')
     }
 
-    const skillText = this.embeddingTextBuilder.buildSkillText({
-      occupation: profile.occupation,
-      experienceYear: profile.experienceYear,
-      bio: profile.bio,
-    })
+    try {
+      const skillText = this.embeddingTextBuilder.buildSkillText({
+        occupation: profile.occupation,
+        experienceYear: profile.experienceYear,
+        bio: profile.bio,
+      })
 
-    const cultureText = this.embeddingTextBuilder.buildCultureText({
-      desiredJobText: profile.desiredJobText,
-    })
+      const cultureText = this.embeddingTextBuilder.buildCultureText({
+        desiredJobText: profile.desiredJobText,
+      })
 
-    const [skillEmbedding, cultureEmbedding] = await Promise.all([
-      this.embeddingService.generateEmbedding(skillText),
-      cultureText
-        ? this.embeddingService.generateEmbedding(cultureText)
-        : Promise.resolve(null),
-    ])
+      const [skillEmbedding, cultureEmbedding] = await Promise.all([
+        this.embeddingService.generateEmbedding(skillText),
+        cultureText
+          ? this.embeddingService.generateEmbedding(cultureText)
+          : Promise.resolve(null),
+      ])
 
-    await this.aiMatchingRepository.updateWorkerEmbeddings(
-      userId,
-      skillEmbedding,
-      cultureEmbedding,
-    )
+      await this.aiMatchingRepository.updateWorkerEmbeddings(
+        userId,
+        skillEmbedding,
+        cultureEmbedding,
+      )
+    } catch (error) {
+      this.logger.error(
+        `Failed to build embedding for worker #${userId}: ${error.message}`,
+        error.stack,
+      )
+    }
   }
 
   async getSuggestedWorkers(
