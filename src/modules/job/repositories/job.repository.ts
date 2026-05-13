@@ -902,6 +902,50 @@ export class JobRepository {
     })
   }
 
+  async findSuitableApplications(companyId: number, jobId: number, page: number, limit: number, search?: string) {
+    const where: any = {
+      status: JobApplicationStatus.SUITABLE,
+      jobId: jobId,
+      job: {
+        companyId: companyId,
+        status: { not: JobStatus.DELETED }
+      }
+    }
+
+    if (search) {
+      where.user = {
+        OR: [
+          { fullName: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+          { phone: { contains: search, mode: 'insensitive' } }
+        ]
+      }
+    }
+
+    const [applications, total] = await Promise.all([
+      this.prisma.jobApplication.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          user: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              phone: true,
+              avatar: true,
+            }
+          }
+        }
+      }),
+      this.prisma.jobApplication.count({ where })
+    ])
+
+    return { applications, total }
+  }
+
   async findApplicationsForCompany(companyId: number, jobId?: number) {
     return this.prisma.jobApplication.findMany({
       where: {
@@ -1039,25 +1083,16 @@ export class JobRepository {
   }
 
   // --- Interview invitation helpers ---
-  async getInterviewSlotsByJob(jobId: number, companyId: number) {
-    return this.prisma.interviewInvitationSlot.findMany({
+  async getLatestActiveCampaignByJob(jobId: number, companyId: number) {
+    return this.prisma.interviewInvitationCampaign.findFirst({
       where: {
-        campaign: {
-          jobId,
-          companyId,
-          status: { in: [CampaignStatus.IN_PROGRESS, CampaignStatus.DRAFT] },
-        },
+        jobId,
+        companyId,
+        status: { in: [CampaignStatus.IN_PROGRESS, CampaignStatus.COMPLETED, CampaignStatus.DRAFT] },
       },
-      orderBy: { startAt: 'asc' },
-      select: {
-        id: true,
-        startAt: true,
-        endAt: true,
-        capacity: true,
-        bookedCount: true,
-        location: true,
-        note: true,
-        campaignId: true,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        slots: { orderBy: { startAt: 'asc' } },
       },
     })
   }
@@ -1074,59 +1109,35 @@ export class JobRepository {
     return !!invitation
   }
 
-  async createAutoInvitationCampaign(params: {
-    companyId: number
-    jobId: number
+  async addWorkerToCampaign(params: {
+    campaignId: number
     workerId: number
-    slots?: {
-      id: number
+    jobTitle: string
+    message: string
+    slots: {
       startAt: Date
       endAt: Date
-      capacity: number
       location: string | null
-      note: string | null
     }[]
   }) {
-    const { companyId, jobId, workerId, slots } = params
+    const { campaignId, workerId, jobTitle, message, slots } = params
 
-    const job = await this.prisma.job.findUnique({ where: { id: jobId }, select: { id: true, title: true, companyId: true } })
-    if (!job || job.companyId !== companyId) throw new BadRequestException('Invalid job or unauthorized')
-
-    const campaign = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.interviewInvitationCampaign.create({
-        data: {
-          companyId,
-          jobId,
-          title: `Mời phỏng vấn: ${job.title}`,
-          message: `Chúng tôi mời bạn tham gia phỏng vấn vị trí ${job.title}. Vui lòng chọn khung giờ phù hợp.`,
-          totalCount: 1,
-          pendingCount: 1,
-          status: CampaignStatus.IN_PROGRESS,
-          sentAt: new Date(),
-        },
-      })
-
+    return this.prisma.$transaction(async (tx) => {
       const invitation = await tx.interviewInvitation.create({
         data: {
-          campaignId: created.id,
+          campaignId,
           workerId,
           status: InterviewInvitationStatus.PENDING,
         },
       })
 
-      // Clone slot definitions from existing interview schedule.
-      if (slots && slots.length) {
-        await tx.interviewInvitationSlot.createMany({
-          data: slots.map((slot) => ({
-            campaignId: created.id,
-            startAt: slot.startAt,
-            endAt: slot.endAt,
-            capacity: slot.capacity,
-            location: slot.location,
-            note: slot.note,
-          })),
-        })
-      }
+      await tx.interviewInvitationCampaign.update({
+        where: { id: campaignId },
+        data: {
+          totalCount: { increment: 1 },
+          pendingCount: { increment: 1 },
+        },
+      })
 
       const slotSummary = (slots || [])
         .map((slot) => {
@@ -1139,18 +1150,16 @@ export class JobRepository {
       await tx.notification.create({
         data: {
           userId: workerId,
-          title: `Bạn có lịch phỏng vấn: ${job.title}`,
+          title: `Bạn có lịch phỏng vấn: ${jobTitle}`,
           message: slotSummary
-            ? `Bạn có lịch phỏng vấn cho vị trí "${job.title}".\n\nCác ca phỏng vấn đã được nhà tuyển dụng sắp xếp:\n${slotSummary}\n\nVui lòng mở lời mời để chọn ca phù hợp.`
-            : created.message,
+            ? `Bạn có lịch phỏng vấn cho vị trí "${jobTitle}".\n\nCác ca phỏng vấn đã được nhà tuyển dụng sắp xếp:\n${slotSummary}\n\nVui lòng mở lời mời để chọn ca phù hợp.`
+            : message,
           link: `/interview-invitations/${invitation.id}`,
         },
       })
 
-      return created
+      return invitation
     })
-
-    return campaign
   }
 
   async getRelatedJobs(

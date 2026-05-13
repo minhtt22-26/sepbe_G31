@@ -164,6 +164,29 @@ export class JobController {
     return this.jobService.getWistlist(user.userId, q.page, q.limit, q.skip)
   }
 
+  @Get('employer/applications/suitable')
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
+  @AuthJwtAccessProtected()
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get suitable applications for employer' })
+  async getSuitableApplications(
+    @AuthJwtPayload() user: any,
+    @Query('jobId', ParseIntPipe) jobId: number,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ) {
+    const ownerId = user.userId
+    const company = await this.companyService.findByOwnerId(ownerId)
+    return this.jobService.getSuitableApplications(
+      company.id,
+      jobId,
+      Number(page) || 1,
+      Number(limit) || 10,
+      search
+    )
+  }
+
   @Get('employer/applications')
   @AuthRoleProtected(EnumUserRole.EMPLOYER)
   @AuthJwtAccessProtected()

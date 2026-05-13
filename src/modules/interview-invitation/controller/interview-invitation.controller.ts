@@ -16,6 +16,7 @@ import {
 } from '@nestjs/swagger'
 import { InterviewInvitationService } from '../service/interview-invitation.service'
 import { CreateCampaignRequestDto } from '../dtos/request/create-campaign.request.dto'
+import { UpdateCampaignRequestDto } from '../dtos/request/update-campaign.request.dto'
 import { RespondInvitationRequestDto } from '../dtos/request/respond-invitation.request.dto'
 import { GetCampaignsRequestDto } from '../dtos/request/get-campaigns.request.dto'
 import {
@@ -66,6 +67,24 @@ export class InterviewInvitationController {
   ) {
     const company = await this.companyService.findByOwnerId(user.userId)
     return this.interviewInvitationService.sendCampaign(campaignId, company.id)
+  }
+
+  /**
+   * Employer: Sửa chiến dịch mời phỏng vấn
+   */
+  @Put('campaigns/:campaignId')
+  @AuthJwtAccessProtected()
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Cập nhật chiến dịch mời phỏng vấn' })
+  @ApiResponse({ status: 200, description: 'Chiến dịch được cập nhật thành công' })
+  async updateCampaign(
+    @AuthJwtPayload() user: any,
+    @Param('campaignId', ParseIntPipe) campaignId: number,
+    @Body() dto: UpdateCampaignRequestDto,
+  ) {
+    const company = await this.companyService.findByOwnerId(user.userId)
+    return this.interviewInvitationService.updateCampaign(campaignId, company.id, dto)
   }
 
   /**
@@ -166,11 +185,13 @@ export class InterviewInvitationController {
     @AuthJwtPayload() user: any,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('type') type?: 'job' | 'interview',
   ) {
     return this.interviewInvitationService.getInvitationsForWorker(
       user.userId,
       Number(page) || 1,
       Number(limit) || 10,
+      type,
     )
   }
 

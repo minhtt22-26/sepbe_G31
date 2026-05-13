@@ -47,7 +47,7 @@ export class InterviewInvitationService {
 
   private validateCampaignSlots(slots: CreateCampaignRequestDto['slots']) {
     if (!slots?.length) {
-      throw new BadRequestException('Phải tạo ít nhất 1 ca phỏng vấn')
+      return
     }
 
     const normalizedKeys = new Set<string>()
@@ -397,18 +397,23 @@ export class InterviewInvitationService {
 
     }
 
-    const earliestSlotStart = new Date(
-      Math.min(...slots.map((slot) => new Date(slot.startAt).getTime())),
-    )
-    const fallbackDeadline = new Date(earliestSlotStart.getTime() - 24 * 60 * 60 * 1000)
-    const effectiveDeadline = expiresAt ? new Date(expiresAt) : fallbackDeadline
+    const isSlotLess = !slots || slots.length === 0
+    let effectiveDeadline = expiresAt ? new Date(expiresAt) : null
 
-    if (Number.isNaN(effectiveDeadline.getTime())) {
-      throw new BadRequestException('Hạn đổi lịch không hợp lệ')
-    }
+    if (!isSlotLess) {
+      const earliestSlotStart = new Date(
+        Math.min(...slots.map((slot) => new Date(slot.startAt).getTime())),
+      )
+      const fallbackDeadline = new Date(earliestSlotStart.getTime() - 24 * 60 * 60 * 1000)
+      effectiveDeadline = effectiveDeadline || fallbackDeadline
 
-    if (effectiveDeadline.getTime() >= earliestSlotStart.getTime()) {
-      throw new BadRequestException('Hạn đổi lịch phải trước ca phỏng vấn sớm nhất')
+      if (Number.isNaN(effectiveDeadline.getTime())) {
+        throw new BadRequestException('Hạn đổi lịch không hợp lệ')
+      }
+
+      if (effectiveDeadline.getTime() >= earliestSlotStart.getTime()) {
+        throw new BadRequestException('Hạn đổi lịch phải trước ca phỏng vấn sớm nhất')
+      }
     }
 
     const campaignTitle = this.buildCampaignTitle(jobTitle)
@@ -430,16 +435,18 @@ export class InterviewInvitationService {
         },
       })
 
-      await tx.interviewInvitationSlot.createMany({
-        data: slots.map((slot) => ({
-          campaignId: campaign.id,
-          startAt: new Date(slot.startAt),
-          endAt: new Date(slot.endAt),
-          capacity: slot.capacity,
-          location: slot.location?.trim() || null,
-          note: slot.note?.trim() || null,
-        })),
-      })
+      if (!isSlotLess) {
+        await tx.interviewInvitationSlot.createMany({
+          data: slots.map((slot) => ({
+            campaignId: campaign.id,
+            startAt: new Date(slot.startAt),
+            endAt: new Date(slot.endAt),
+            capacity: slot.capacity,
+            location: slot.location?.trim() || null,
+            note: slot.note?.trim() || null,
+          })),
+        })
+      }
 
       if (finalWorkerIds.length > 0) {
         await tx.interviewInvitation.createMany({
@@ -464,7 +471,168 @@ export class InterviewInvitationService {
       })
     })
 
+    if (finalWorkerIds.length > 0 && createdCampaign) {
+      return this.sendCampaign(createdCampaign.id, companyId)
+    }
+
     return createdCampaign
+  }
+
+  /**
+   * Cập nhật chiến dịch mời phỏng vấn
+   */
+  async updateCampaign(campaignId: number, companyId: number, dto: any) {
+    const campaign = await this.repository.getCampaignById(campaignId)
+
+    if (!campaign) {
+      throw new NotFoundException('Chiến dịch không tồn tại')
+    }
+
+    if (campaign.companyId !== companyId) {
+      throw new ForbiddenException('Bạn không có quyền cập nhật chiến dịch này')
+    }
+
+    const updatedCampaign = await this.prisma.$transaction(async (tx) => {
+      // 1. Cập nhật thông tin cơ bản
+      await tx.interviewInvitationCampaign.update({
+        where: { id: campaignId },
+        data: {
+          title: dto.title ?? campaign.title,
+          message: dto.message ?? campaign.message,
+          expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : campaign.expiresAt,
+        },
+      })
+
+      // 2. Xử lý Slots
+      const existingSlots = campaign.slots || []
+      const incomingSlots = dto.slots || []
+
+      const incomingSlotIds = incomingSlots.filter((s) => s.id).map((s) => s.id)
+      
+      // Xóa các slot không còn trong request
+      const slotsToDelete = existingSlots.filter((s) => !incomingSlotIds.includes(s.id))
+      const deletedSlotIds = slotsToDelete.map((s) => s.id)
+
+      if (deletedSlotIds.length > 0) {
+        await tx.interviewInvitationSlot.deleteMany({
+          where: { id: { in: deletedSlotIds } },
+        })
+      }
+
+      const modifiedSlotIds: number[] = []
+
+      // Cập nhật slot hiện tại & Thêm slot mới
+      for (const slot of incomingSlots) {
+        if (slot.id) {
+          const oldSlot = existingSlots.find((s) => s.id === slot.id)
+          if (oldSlot) {
+            // Kiểm tra xem có thay đổi quan trọng không (thời gian, địa điểm)
+            const isModified =
+              new Date(slot.startAt).getTime() !== new Date(oldSlot.startAt).getTime() ||
+              new Date(slot.endAt).getTime() !== new Date(oldSlot.endAt).getTime() ||
+              (slot.location?.trim() || '') !== (oldSlot.location?.trim() || '')
+            
+            if (isModified) {
+              modifiedSlotIds.push(slot.id)
+            }
+
+            await tx.interviewInvitationSlot.update({
+              where: { id: slot.id },
+              data: {
+                startAt: new Date(slot.startAt),
+                endAt: new Date(slot.endAt),
+                capacity: slot.capacity,
+                location: slot.location?.trim() || null,
+                note: slot.note?.trim() || null,
+              },
+            })
+          }
+        } else {
+          // Tạo slot mới
+          await tx.interviewInvitationSlot.create({
+            data: {
+              campaignId,
+              startAt: new Date(slot.startAt),
+              endAt: new Date(slot.endAt),
+              capacity: slot.capacity,
+              location: slot.location?.trim() || null,
+              note: slot.note?.trim() || null,
+            },
+          })
+        }
+      }
+
+      const affectedSlotIds = [...deletedSlotIds, ...modifiedSlotIds]
+
+      // 3. Xử lý Ứng viên (Reset trạng thái nếu slot bị thay đổi/xóa)
+      let resetCount = 0
+      const invitations = campaign.invitations || []
+      const affectedWorkerIds: number[] = []
+
+      for (const invitation of invitations) {
+        if (invitation.selectedSlotId && affectedSlotIds.includes(invitation.selectedSlotId)) {
+          // Reset ứng viên này
+          await tx.interviewInvitation.update({
+            where: { id: invitation.id },
+            data: {
+              selectedSlotId: null,
+              status: InterviewInvitationStatus.PENDING,
+            },
+          })
+          affectedWorkerIds.push(invitation.workerId)
+          resetCount++
+          
+          if (invitation.status === InterviewInvitationStatus.ACCEPTED) {
+            // Cập nhật lại count
+            await tx.interviewInvitationCampaign.update({
+              where: { id: campaignId },
+              data: {
+                acceptedCount: { decrement: 1 },
+                pendingCount: { increment: 1 },
+              },
+            })
+          }
+        }
+      }
+
+      // 4. Gửi Notification
+      const jobTitle = campaign.jobId ? `Công việc #${campaign.jobId}` : campaign.title
+
+      for (const invitation of invitations) {
+        if (affectedWorkerIds.includes(invitation.workerId)) {
+          // Gửi thông báo yêu cầu chọn lại ca
+          await tx.notification.create({
+            data: {
+              userId: invitation.workerId,
+              title: `Thay đổi ca phỏng vấn: ${jobTitle}`,
+              message: `Ca phỏng vấn bạn đã chọn cho vị trí "${jobTitle}" vừa có sự thay đổi về thời gian/địa điểm hoặc đã bị hủy. Vui lòng vào ứng dụng để xem lịch mới và chọn lại ca phỏng vấn phù hợp nhé!`,
+              link: `/interview-invitations/${invitation.id}`,
+            },
+          })
+        } else {
+          // Gửi thông báo chung
+          await tx.notification.create({
+            data: {
+              userId: invitation.workerId,
+              title: `Cập nhật lịch phỏng vấn: ${jobTitle}`,
+              message: `Nhà tuyển dụng vừa cập nhật thông tin lịch phỏng vấn cho vị trí "${jobTitle}". Bạn có thể nhấn vào để xem chi tiết.`,
+              link: `/interview-invitations/${invitation.id}`,
+            },
+          })
+        }
+      }
+
+      return tx.interviewInvitationCampaign.findUnique({
+        where: { id: campaignId },
+        include: {
+          company: true,
+          invitations: true,
+          slots: { orderBy: { startAt: 'asc' } },
+        },
+      })
+    })
+
+    return updatedCampaign
   }
 
   /**
@@ -479,6 +647,10 @@ export class InterviewInvitationService {
 
     if (campaign.companyId !== companyId) {
       throw new ForbiddenException('Bạn không có quyền gửi chiến dịch này')
+    }
+
+    if (campaign.status === CampaignStatus.IN_PROGRESS || campaign.status === CampaignStatus.COMPLETED) {
+      return campaign
     }
 
     if (![CampaignStatus.DRAFT, CampaignStatus.SCHEDULED].includes(campaign.status as any)) {
@@ -637,8 +809,8 @@ export class InterviewInvitationService {
   /**
    * Lấy danh sách lời mời của worker
    */
-  async getInvitationsForWorker(workerId: number, page: number = 1, limit: number = 10) {
-    const { invitations, total } = await this.repository.getInvitationsByWorker(workerId, page, limit)
+  async getInvitationsForWorker(workerId: number, page: number = 1, limit: number = 10, type?: 'job' | 'interview') {
+    const { invitations, total } = await this.repository.getInvitationsByWorker(workerId, page, limit, type)
 
     return {
       data: invitations.map((i) => ({
@@ -702,28 +874,38 @@ export class InterviewInvitationService {
 
     if (
       invitation.status !== InterviewInvitationStatus.PENDING &&
-      invitation.status !== InterviewInvitationStatus.ACCEPTED
+      invitation.status !== InterviewInvitationStatus.ACCEPTED &&
+      invitation.status !== InterviewInvitationStatus.REJECTED
     ) {
       throw new BadRequestException('Lời mời này không còn cho phép phản hồi')
     }
 
     if (
-      invitation.status === InterviewInvitationStatus.ACCEPTED &&
+      invitation.status === InterviewInvitationStatus.REJECTED &&
       dto.status !== InterviewInvitationStatus.ACCEPTED
     ) {
-      throw new BadRequestException('Lời mời đã chấp nhận chỉ có thể đổi ca phỏng vấn')
+      throw new BadRequestException('Lời mời đã từ chối chỉ có thể chọn lại ca phỏng vấn')
     }
 
-    // Validate response message if rejecting
     if (
-      dto.status === InterviewInvitationStatus.REJECTED &&
-      (!dto.responseMessage || dto.responseMessage.trim().length === 0)
+      invitation.status === InterviewInvitationStatus.ACCEPTED &&
+      dto.status !== InterviewInvitationStatus.ACCEPTED &&
+      dto.status !== InterviewInvitationStatus.REJECTED
     ) {
-      throw new BadRequestException('Phải cung cấp lý do khi từ chối lời mời')
+      throw new BadRequestException('Lời mời đã chấp nhận chỉ có thể đổi ca phỏng vấn hoặc từ chối')
     }
+
+    // Validate response message if rejecting (now optional)
+    // Removed the requirement for responseMessage
 
     if (dto.status === InterviewInvitationStatus.ACCEPTED && !dto.selectedSlotId) {
-      throw new BadRequestException('Bạn cần chọn ca phỏng vấn trước khi chấp nhận')
+      // Allow accepting without a slot ONLY if the campaign has no slots
+      const campaignSlotsCount = await this.prisma.interviewInvitationSlot.count({
+        where: { campaignId: invitation.campaignId },
+      })
+      if (campaignSlotsCount > 0) {
+        throw new BadRequestException('Bạn cần chọn ca phỏng vấn trước khi chấp nhận')
+      }
     }
 
     let updatedInvitation: any
@@ -745,80 +927,155 @@ export class InterviewInvitationService {
 
         if (
           latestInvitation.status !== InterviewInvitationStatus.PENDING &&
-          latestInvitation.status !== InterviewInvitationStatus.ACCEPTED
+          latestInvitation.status !== InterviewInvitationStatus.ACCEPTED &&
+          latestInvitation.status !== InterviewInvitationStatus.REJECTED
         ) {
           throw new BadRequestException('Lời mời này không còn cho phép đổi ca')
         }
 
-        const targetSlotId = Number(dto.selectedSlotId)
-        if (!targetSlotId) {
-          throw new BadRequestException('Bạn cần chọn ca phỏng vấn hợp lệ')
+        let targetSlotId: number | null = null
+        if (dto.selectedSlotId) {
+          targetSlotId = Number(dto.selectedSlotId)
         }
 
-        const slot = await tx.interviewInvitationSlot.findUnique({
-          where: { id: dto.selectedSlotId },
-        })
+        const isSlotLess = targetSlotId === null
 
-        if (!slot || slot.campaignId !== latestInvitation.campaignId) {
-          throw new BadRequestException('Ca phỏng vấn đã chọn không hợp lệ')
-        }
-
-        const isSameSlot = latestInvitation.selectedSlotId === targetSlotId
-
-        if (!isSameSlot) {
-          if (
-            latestInvitation.status === InterviewInvitationStatus.ACCEPTED &&
-            invitation.campaign.expiresAt &&
-            new Date() >= invitation.campaign.expiresAt
-          ) {
-            throw new BadRequestException('Đã quá hạn đổi lịch phỏng vấn')
-          }
-
-          if (slot.bookedCount >= slot.capacity) {
-            throw new BadRequestException('Ca phỏng vấn này đã đủ số lượng ứng viên')
-          }
-
-          const reserved = await tx.interviewInvitationSlot.updateMany({
-            where: {
-              id: slot.id,
-              bookedCount: slot.bookedCount,
-            },
-            data: {
-              bookedCount: {
-                increment: 1,
-              },
-            },
+        if (!isSlotLess) {
+          const slot = await tx.interviewInvitationSlot.findUnique({
+            where: { id: dto.selectedSlotId },
           })
 
-          if (reserved.count === 0) {
-            throw new BadRequestException(
-              'Ca phỏng vấn vừa được đặt đầy. Vui lòng chọn ca khác',
-            )
+          if (!slot || slot.campaignId !== latestInvitation.campaignId) {
+            throw new BadRequestException('Ca phỏng vấn đã chọn không hợp lệ')
           }
 
-          if (latestInvitation.selectedSlotId) {
-            await tx.interviewInvitationSlot.updateMany({
+          const isSameSlot = latestInvitation.selectedSlotId === targetSlotId
+
+          if (!isSameSlot) {
+            if (
+              latestInvitation.status === InterviewInvitationStatus.ACCEPTED &&
+              invitation.campaign.expiresAt &&
+              new Date() >= invitation.campaign.expiresAt
+            ) {
+              throw new BadRequestException('Đã quá hạn đổi lịch phỏng vấn')
+            }
+
+            if (slot.bookedCount >= slot.capacity) {
+              throw new BadRequestException('Ca phỏng vấn này đã đủ số lượng ứng viên')
+            }
+
+            const reserved = await tx.interviewInvitationSlot.updateMany({
               where: {
-                id: latestInvitation.selectedSlotId,
-                bookedCount: {
-                  gte: 1,
-                },
+                id: slot.id,
+                bookedCount: slot.bookedCount,
               },
               data: {
                 bookedCount: {
-                  decrement: 1,
+                  increment: 1,
                 },
+              },
+            })
+
+            if (reserved.count === 0) {
+              throw new BadRequestException(
+                'Ca phỏng vấn vừa được đặt đầy. Vui lòng chọn ca khác',
+              )
+            }
+
+            if (latestInvitation.selectedSlotId) {
+              await tx.interviewInvitationSlot.updateMany({
+                where: {
+                  id: latestInvitation.selectedSlotId,
+                  bookedCount: {
+                    gte: 1,
+                  },
+                },
+                data: {
+                  bookedCount: {
+                    decrement: 1,
+                  },
               },
             })
           }
         }
+      }
 
-        return tx.interviewInvitation.update({
+      const result = await tx.interviewInvitation.update({
           where: { id: invitationId },
           data: {
             status: InterviewInvitationStatus.ACCEPTED,
             responseMessage: dto.responseMessage,
             selectedSlotId: targetSlotId,
+            respondedAt: new Date(),
+          },
+          include: {
+            campaign: {
+              include: {
+                slots: {
+                  orderBy: { startAt: 'asc' },
+                },
+              },
+            },
+            worker: true,
+            selectedSlot: true,
+          },
+        })
+
+        // If this is a slot-less invitation (Job Invitation), automatically create/update JobApplication to SUITABLE
+        if (isSlotLess && result.campaign.jobId) {
+          await tx.jobApplication.upsert({
+            where: {
+              jobId_userId: {
+                jobId: result.campaign.jobId,
+                userId: workerId,
+              },
+            },
+            update: {
+              status: 'SUITABLE',
+              updatedAt: new Date(),
+            },
+            create: {
+              jobId: result.campaign.jobId,
+              userId: workerId,
+              status: 'SUITABLE',
+            },
+          })
+        }
+
+        return result
+      })
+    } else if (dto.status === InterviewInvitationStatus.REJECTED) {
+      updatedInvitation = await this.prisma.$transaction(async (tx) => {
+        const latestInvitation = await tx.interviewInvitation.findUnique({
+          where: { id: invitationId },
+        })
+
+        if (!latestInvitation) {
+          throw new NotFoundException('Lời mời không tồn tại')
+        }
+
+        if (latestInvitation.selectedSlotId) {
+          await tx.interviewInvitationSlot.updateMany({
+            where: {
+              id: latestInvitation.selectedSlotId,
+              bookedCount: {
+                gte: 1,
+              },
+            },
+            data: {
+              bookedCount: {
+                decrement: 1,
+              },
+            },
+          })
+        }
+
+        return tx.interviewInvitation.update({
+          where: { id: invitationId },
+          data: {
+            status: InterviewInvitationStatus.REJECTED,
+            responseMessage: dto.responseMessage,
+            selectedSlotId: null,
             respondedAt: new Date(),
           },
           include: {
