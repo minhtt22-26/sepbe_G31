@@ -56,11 +56,12 @@ export class CreateCampaignRequestDto {
   workerIds?: number[]
 
   @ApiProperty({
-    description: 'Danh sách ca phỏng vấn để worker lựa chọn',
+    description: 'Danh sách ca phỏng vấn để worker lựa chọn (Có thể rỗng để trở thành Lời mời ứng tuyển)',
     type: [CreateCampaignSlotRequestDto],
+    required: false,
   })
   @IsArray()
-  @ArrayMinSize(1)
+  @IsOptional()
   @ValidateNested({ each: true })
   @Type(() => CreateCampaignSlotRequestDto)
   slots: CreateCampaignSlotRequestDto[]

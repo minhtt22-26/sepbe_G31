@@ -219,6 +219,7 @@ export class AIMatchingRepository {
   async findMatchedWorkers(
     reqEmbedding: number[],
     benefitEmbedding: number[] | null,
+    jobId: number,
   ): Promise<IRawMatchedWorker[]> {
 
     const reqVector = `[${reqEmbedding.join(',')}]`
@@ -258,10 +259,20 @@ export class AIMatchingRepository {
             AND u.role = 'WORKER'
             AND u."lastLoginAt" IS NOT NULL
             AND u."lastLoginAt" > NOW() - INTERVAL '30 days'
+            AND NOT EXISTS (
+                SELECT 1 FROM "InterviewInvitation" ii
+                JOIN "InterviewInvitationCampaign" iic ON iic.id = ii."campaignId"
+                WHERE ii."workerId" = wp."userId" AND iic."jobId" = $3
+            )
+            AND NOT EXISTS (
+                SELECT 1 FROM "JobApplication" ja
+                WHERE ja."userId" = wp."userId" AND ja."jobId" = $3
+            )
             ORDER BY (wp."skillEmbedding" <=> $1::vector) + (CASE WHEN wp."cultureEmbedding" IS NOT NULL AND $2::vector IS NOT NULL THEN wp."cultureEmbedding" <=> $2::vector ELSE 1 END)
         `,
       reqVector,
       benefitVector,
+      jobId,
     )
 
     return result

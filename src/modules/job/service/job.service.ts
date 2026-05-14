@@ -626,6 +626,17 @@ export class JobService {
     return { success: true, data: applications }
   }
 
+  async getSuitableApplications(companyId: number, jobId: number, page: number, limit: number, search?: string) {
+    const { applications, total } = await this.jobRepository.findSuitableApplications(
+      companyId,
+      jobId,
+      page,
+      limit,
+      search,
+    )
+    return { success: true, data: applications, total, page, limit }
+  }
+
   async getApplicationsForEmployer(companyId: number, jobId?: number) {
     const applications = await this.jobRepository.findApplicationsForCompany(
       companyId,
@@ -674,36 +685,35 @@ export class JobService {
       JobApplicationStatus.SUITABLE,
     )
 
-    // If job has existing interview slots, auto-create campaign and invite this worker
+    // Nếu job đã có chiến dịch phỏng vấn đang hoạt động, thêm ứng viên vào chiến dịch đó
     try {
-      const existingSlots = await this.jobRepository.getInterviewSlotsByJob(
+      const activeCampaign = await this.jobRepository.getLatestActiveCampaignByJob(
         jobId,
         companyId,
       )
 
-      if (existingSlots && existingSlots.length > 0) {
+      if (activeCampaign) {
         const alreadyInvited = await this.jobRepository.checkExistingInvitation(
           jobId,
           workerId,
         )
 
         if (!alreadyInvited) {
-          const campaign = await this.jobRepository.createAutoInvitationCampaign(
-            {
-              companyId,
-              jobId,
-              workerId,
-              slots: existingSlots,
-            },
-          )
+          await this.jobRepository.addWorkerToCampaign({
+            campaignId: activeCampaign.id,
+            workerId,
+            jobTitle: application.job.title,
+            message: activeCampaign.message,
+            slots: activeCampaign.slots,
+          })
           this.logger.log(
-            `Auto-created interview campaign #${campaign.id} for worker #${workerId} on job #${jobId}`,
+            `Auto-added worker #${workerId} to interview campaign #${activeCampaign.id} on job #${jobId}`,
           )
         }
       }
     } catch (error) {
       this.logger.error(
-        `Failed to auto-create interview campaign for worker #${workerId} on job #${jobId}: ${error?.message || error}`,
+        `Failed to auto-add worker #${workerId} to interview campaign on job #${jobId}: ${error?.message || error}`,
       )
     }
   }

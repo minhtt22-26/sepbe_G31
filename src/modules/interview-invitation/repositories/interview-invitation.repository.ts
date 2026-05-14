@@ -93,8 +93,14 @@ export class InterviewInvitationRepository implements IInterviewInvitationReposi
     })
   }
 
-  async getInvitationsByWorker(workerId: number, page: number, limit: number) {
-    const where = { workerId }
+  async getInvitationsByWorker(workerId: number, page: number, limit: number, type?: 'job' | 'interview') {
+    const where: any = { workerId }
+
+    if (type === 'job') {
+      where.campaign = { slots: { none: {} } }
+    } else if (type === 'interview') {
+      where.campaign = { slots: { some: {} } }
+    }
 
     const [invitations, total] = await Promise.all([
       this.prisma.interviewInvitation.findMany({

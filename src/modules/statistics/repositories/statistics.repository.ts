@@ -3,6 +3,7 @@ import {
   JobApplicationStatus,
   JobStatus,
   PaymentStatus,
+  CampaignStatus,
 } from 'src/generated/prisma/enums'
 import { Prisma } from 'src/generated/prisma/client'
 import { PrismaService } from 'src/prisma.service'
@@ -128,6 +129,34 @@ export class StatisticsRepository {
         }),
       ])
 
+    const jobsWithSuitable = await this.prisma.jobApplication.findMany({
+      where: {
+        job: { 
+          companyId,
+          status: { not: JobStatus.DELETED }
+        },
+        status: JobApplicationStatus.SUITABLE,
+      },
+      select: { jobId: true },
+      distinct: ['jobId'],
+    })
+
+    const suitableJobIds = jobsWithSuitable.map(j => j.jobId)
+
+    let hasInterviewWarning = false;
+    if (suitableJobIds.length > 0) {
+      const scheduledCampaigns = await this.prisma.interviewInvitationCampaign.findMany({
+        where: {
+          jobId: { in: suitableJobIds },
+          status: { not: CampaignStatus.CANCELLED },
+          slots: { some: {} }
+        },
+        select: { jobId: true },
+      })
+      const scheduledJobIds = new Set(scheduledCampaigns.map(c => c.jobId))
+      hasInterviewWarning = suitableJobIds.some(id => !scheduledJobIds.has(id))
+    }
+
     return {
       totalViews: {
         value: totalViewsCurrent,
@@ -158,6 +187,7 @@ export class StatisticsRepository {
         ),
       },
       newJobsThisWeek,
+      hasInterviewWarning,
     }
   }
 
