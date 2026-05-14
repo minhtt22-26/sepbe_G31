@@ -256,6 +256,7 @@ export class AIMatchingService {
     const rawWorkers = await this.aiMatchingRepository.findMatchedWorkers(
       embeddings.reqEmbedding,
       embeddings.benefitEmbedding,
+      jobId
     )
 
     const results = rawWorkers.map((worker) => {

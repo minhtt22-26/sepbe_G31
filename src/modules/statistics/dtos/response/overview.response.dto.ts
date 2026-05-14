@@ -9,4 +9,5 @@ export class OverviewResponseDto {
   conversionRate: OverviewMetricDto
   activeJobs: OverviewMetricDto
   newJobsThisWeek: number
+  hasInterviewWarning?: boolean
 }
