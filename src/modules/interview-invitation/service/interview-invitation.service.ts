@@ -29,7 +29,7 @@ export class InterviewInvitationService {
     private readonly notificationsService: NotificationsService,
     private readonly chatService: ChatService,
     private readonly walletService: WalletService,
-  ) {}
+  ) { }
 
   private formatSlotSummary(slot: {
     startAt: Date
@@ -508,7 +508,7 @@ export class InterviewInvitationService {
       const incomingSlots = dto.slots || []
 
       const incomingSlotIds = incomingSlots.filter((s) => s.id).map((s) => s.id)
-      
+
       // Xóa các slot không còn trong request
       const slotsToDelete = existingSlots.filter((s) => !incomingSlotIds.includes(s.id))
       const deletedSlotIds = slotsToDelete.map((s) => s.id)
@@ -531,7 +531,7 @@ export class InterviewInvitationService {
               new Date(slot.startAt).getTime() !== new Date(oldSlot.startAt).getTime() ||
               new Date(slot.endAt).getTime() !== new Date(oldSlot.endAt).getTime() ||
               (slot.location?.trim() || '') !== (oldSlot.location?.trim() || '')
-            
+
             if (isModified) {
               modifiedSlotIds.push(slot.id)
             }
@@ -565,7 +565,6 @@ export class InterviewInvitationService {
       const affectedSlotIds = [...deletedSlotIds, ...modifiedSlotIds]
 
       // 3. Xử lý Ứng viên (Reset trạng thái nếu slot bị thay đổi/xóa)
-      let resetCount = 0
       const invitations = campaign.invitations || []
       const affectedWorkerIds: number[] = []
 
@@ -580,8 +579,7 @@ export class InterviewInvitationService {
             },
           })
           affectedWorkerIds.push(invitation.workerId)
-          resetCount++
-          
+
           if (invitation.status === InterviewInvitationStatus.ACCEPTED) {
             // Cập nhật lại count
             await tx.interviewInvitationCampaign.update({
@@ -875,19 +873,19 @@ export class InterviewInvitationService {
         },
         company: i.campaign.company
           ? {
-              id: i.campaign.company.id,
-              name: i.campaign.company.name,
-              logoUrl: i.campaign.company.logoUrl,
-            }
+            id: i.campaign.company.id,
+            name: i.campaign.company.name,
+            logoUrl: i.campaign.company.logoUrl,
+          }
           : null,
         status: i.status,
         selectedSlot: i.selectedSlot
           ? {
-              id: i.selectedSlot.id,
-              startAt: i.selectedSlot.startAt,
-              endAt: i.selectedSlot.endAt,
-              location: i.selectedSlot.location,
-            }
+            id: i.selectedSlot.id,
+            startAt: i.selectedSlot.startAt,
+            endAt: i.selectedSlot.endAt,
+            location: i.selectedSlot.location,
+          }
           : null,
         responseMessage: i.responseMessage,
         respondedAt: i.respondedAt,
@@ -1036,13 +1034,13 @@ export class InterviewInvitationService {
                   bookedCount: {
                     decrement: 1,
                   },
-              },
-            })
+                },
+              })
+            }
           }
         }
-      }
 
-      const result = await tx.interviewInvitation.update({
+        const result = await tx.interviewInvitation.update({
           where: { id: invitationId },
           data: {
             status: InterviewInvitationStatus.ACCEPTED,
@@ -1154,7 +1152,7 @@ export class InterviewInvitationService {
     if (company) {
       const acceptedSlotText =
         dto.status === InterviewInvitationStatus.ACCEPTED &&
-        updatedInvitation.selectedSlot
+          updatedInvitation.selectedSlot
           ? ` | Ca đã chọn: ${this.formatSlotSummary(updatedInvitation.selectedSlot)}`
           : ''
 
@@ -1397,9 +1395,9 @@ export class InterviewInvitationService {
     const windowStart = hasExistingSchedule ? sortedSlots[0].startAt : null
     const windowEnd = hasExistingSchedule
       ? sortedSlots.reduce(
-          (max, slot) => (slot.endAt > max ? slot.endAt : max),
-          sortedSlots[0].endAt,
-        )
+        (max, slot) => (slot.endAt > max ? slot.endAt : max),
+        sortedSlots[0].endAt,
+      )
       : null
 
     return {
