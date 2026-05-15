@@ -19,4 +19,4 @@ async function check() {
   });
   console.log('Scheduled campaigns:', JSON.stringify(scheduledCampaigns, null, 2));
 }
-check().finally(() => prisma.\());
+check().finally(() => prisma.$disconnect());

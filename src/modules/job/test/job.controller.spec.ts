@@ -91,17 +91,17 @@ describe('JobController', () => {
       const mockJob = { id: 1, title: 'Job 1' }
       jobServiceMock.getDetail.mockResolvedValue(mockJob)
 
-      const result = await controller.getDetail(1)
+      const result = await controller.getDetail(1, '127.0.0.1')
 
       expect(result).toEqual(mockJob)
-      expect(jobServiceMock.getDetail).toHaveBeenCalledWith(1)
+      expect(jobServiceMock.getDetail).toHaveBeenCalledWith(1, '127.0.0.1')
     })
 
     it('Abnormal: should throw error when job not found', async () => {
       const error = new Error('Job not found')
       jobServiceMock.getDetail.mockRejectedValue(error)
 
-      await expect(controller.getDetail(1)).rejects.toThrow('Job not found')
+      await expect(controller.getDetail(1, '127.0.0.1')).rejects.toThrow('Job not found')
     })
   })
 

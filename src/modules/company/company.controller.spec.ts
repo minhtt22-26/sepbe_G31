@@ -107,9 +107,9 @@ describe('CompanyController', () => {
 
     companyServiceMock.review.mockResolvedValue(expected);
 
-    const result = await controller.updateStatus('3', body);
+    const result = await controller.updateStatus('3', body, { userId: 1 } as any);
 
     expect(result).toBe(expected);
-    expect(companyServiceMock.review).toHaveBeenCalledWith(3, body);
+    expect(companyServiceMock.review).toHaveBeenCalledWith(3, body, 1);
   });
 });

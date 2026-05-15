@@ -902,7 +902,7 @@ export class JobRepository {
     })
   }
 
-  async findSuitableApplications(companyId: number, jobId: number, page: number, limit: number, search?: string) {
+  async findSuitableApplications(companyId: number, jobId: number, page: number, limit: number, search?: string, interviewStatus?: string, slotId?: string) {
     const where: any = {
       status: JobApplicationStatus.SUITABLE,
       jobId: jobId,
@@ -914,12 +914,44 @@ export class JobRepository {
 
     if (search) {
       where.user = {
+        ...where.user,
         OR: [
           { fullName: { contains: search, mode: 'insensitive' } },
           { email: { contains: search, mode: 'insensitive' } },
           { phone: { contains: search, mode: 'insensitive' } }
         ]
       }
+    }
+
+    if ((interviewStatus && interviewStatus !== 'ALL') || (slotId && slotId !== 'ALL')) {
+      const allInvitations = await this.prisma.interviewInvitation.findMany({
+        where: { campaign: { jobId: jobId } },
+        orderBy: { createdAt: 'desc' },
+        select: { workerId: true, status: true, selectedSlotId: true }
+      });
+
+      const latestInvitationByWorker = new Map();
+      for (const inv of allInvitations) {
+        if (!latestInvitationByWorker.has(inv.workerId)) {
+          latestInvitationByWorker.set(inv.workerId, inv);
+        }
+      }
+
+      const filteredWorkerIds: number[] = [];
+      for (const [workerId, inv] of latestInvitationByWorker.entries()) {
+        let match = true;
+        if (interviewStatus && interviewStatus !== 'ALL') {
+          match = inv.status === interviewStatus;
+        }
+        if (match && slotId && slotId !== 'ALL') {
+          match = inv.selectedSlotId === parseInt(slotId);
+        }
+        if (match) {
+          filteredWorkerIds.push(workerId);
+        }
+      }
+
+      where.userId = { in: filteredWorkerIds };
     }
 
     const [applications, total] = await Promise.all([
@@ -936,6 +968,12 @@ export class JobRepository {
               email: true,
               phone: true,
               avatar: true,
+              interviewInvitations: {
+                where: { campaign: { jobId: jobId } },
+                orderBy: { createdAt: 'desc' },
+                take: 1,
+                include: { selectedSlot: true }
+              }
             }
           }
         }
