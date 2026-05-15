@@ -173,6 +173,21 @@ export class InterviewInvitationController {
   }
 
   /**
+   * Worker: Lấy trạng thái có lời mời đang pending không
+   */
+  @Get('my-invitations/pending-status')
+  @AuthJwtAccessProtected()
+  @AuthRoleProtected(EnumUserRole.WORKER)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Lấy trạng thái lời mời đang chờ phản hồi' })
+  @ApiResponse({ status: 200, description: 'Trạng thái lời mời pending' })
+  async getPendingInvitationsStatus(
+    @AuthJwtPayload() user: any,
+  ) {
+    return this.interviewInvitationService.getPendingInvitationsStatus(user.userId)
+  }
+
+  /**
    * Worker: Lấy danh sách lời mời phỏng vấn
    */
   @Get('my-invitations')

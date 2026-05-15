@@ -132,7 +132,7 @@ describe('JobService - Boost Features', () => {
       })
 
       expect(result.success).toBe(true)
-      expect(result.data.paymentOrderId).toBe(100)
+      expect((result.data as any).paymentOrderId).toBe(100)
       expect(result.data.packageDays).toBe(7)
       expect(jobRepository.createBoostPaymentOrder).toHaveBeenCalledWith({
         userId: 10,
@@ -334,7 +334,7 @@ describe('JobService - Boost Features', () => {
       mockSepayService.isValidWebhookAuthorization.mockReturnValue(true)
 
       await expect(
-        service.handleSepayWebhook('valid-key', null)
+        service.handleSepayWebhook('valid-key', null as any)
       ).rejects.toThrow()
     })
 

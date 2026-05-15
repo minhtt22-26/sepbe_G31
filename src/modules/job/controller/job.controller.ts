@@ -175,6 +175,8 @@ export class JobController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('search') search?: string,
+    @Query('interviewStatus') interviewStatus?: string,
+    @Query('slotId') slotId?: string,
   ) {
     const ownerId = user.userId
     const company = await this.companyService.findByOwnerId(ownerId)
@@ -183,7 +185,9 @@ export class JobController {
       jobId,
       Number(page) || 1,
       Number(limit) || 10,
-      search
+      search,
+      interviewStatus,
+      slotId
     )
   }
 

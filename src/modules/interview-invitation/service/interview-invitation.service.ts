@@ -807,6 +807,48 @@ export class InterviewInvitationService {
   }
 
   /**
+   * Lấy trạng thái lời mời đang chờ phản hồi
+   */
+  async getPendingInvitationsStatus(workerId: number) {
+    const pendingJobCount = await this.prisma.interviewInvitation.count({
+      where: {
+        workerId,
+        status: InterviewInvitationStatus.PENDING,
+        campaign: {
+          slots: {
+            none: {}
+          },
+          OR: [
+            { expiresAt: { gt: new Date() } },
+            { expiresAt: null }
+          ]
+        }
+      }
+    })
+
+    const pendingInterviewCount = await this.prisma.interviewInvitation.count({
+      where: {
+        workerId,
+        status: InterviewInvitationStatus.PENDING,
+        campaign: {
+          slots: {
+            some: {}
+          },
+          OR: [
+            { expiresAt: { gt: new Date() } },
+            { expiresAt: null }
+          ]
+        }
+      }
+    })
+
+    return {
+      hasPendingJob: pendingJobCount > 0,
+      hasPendingInterview: pendingInterviewCount > 0
+    }
+  }
+
+  /**
    * Lấy danh sách lời mời của worker
    */
   async getInvitationsForWorker(workerId: number, page: number = 1, limit: number = 10, type?: 'job' | 'interview') {

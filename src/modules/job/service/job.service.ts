@@ -626,13 +626,15 @@ export class JobService {
     return { success: true, data: applications }
   }
 
-  async getSuitableApplications(companyId: number, jobId: number, page: number, limit: number, search?: string) {
+  async getSuitableApplications(companyId: number, jobId: number, page: number, limit: number, search?: string, interviewStatus?: string, slotId?: string) {
     const { applications, total } = await this.jobRepository.findSuitableApplications(
       companyId,
       jobId,
       page,
       limit,
       search,
+      interviewStatus,
+      slotId
     )
     return { success: true, data: applications, total, page, limit }
   }
