@@ -472,9 +472,7 @@ model Job {
   boostExpiredAt DateTime?
 
   
-  fraudScore         Float                       @default(0)
-  fraudCheckedAt     DateTime?
-  isFlagged          Boolean                     @default(false)
+
 
     // --- AI EMBEDDINGS (Multi-Vector) ---
   reqEmbedding      Unsupported("vector(3072)")? // Vector phần "Yêu cầu công việc" 
@@ -489,7 +487,6 @@ model Job {
 
   applications JobApplication[]
   savedBy      SavedJob[]
-  applyForms   JobApplyForm[]
   reports      JobReport[]
   views JobView[]
 
@@ -544,54 +541,12 @@ model JobApplication {
 
   job     Job                    @relation(fields: [jobId], references: [id], onDelete: Cascade)
   user    User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  answers JobApplicationAnswer[]
 
   @@unique([jobId, userId])
   @@index([jobId])
   @@index([status])
 }
 
-// =====================
-// APPLY FORMS
-// =====================
-
-model JobApplyForm {
-  id        Int      @id @default(autoincrement())
-  jobId     Int
-  createdAt DateTime @default(now())
-
-  job    Job                 @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  fields JobApplyFormField[]
-
-  @@index([jobId])
-}
-
-model JobApplyFormField {
-  id         Int     @id @default(autoincrement())
-  formId     Int
-  label      String
-  fieldType  String // e.g., "text", "textarea", "select", "radio", "checkbox"
-  isRequired Boolean @default(false)
-  options    String? // JSON string for select/radio/checkbox options
-
-  form    JobApplyForm           @relation(fields: [formId], references: [id], onDelete: Cascade)
-  answers JobApplicationAnswer[]
-
-  @@index([formId])
-}
-
-model JobApplicationAnswer {
-  id               Int    @id @default(autoincrement())
-  jobApplicationId Int
-  fieldId          Int
-  value            String
-
-  application JobApplication    @relation(fields: [jobApplicationId], references: [id], onDelete: Cascade)
-  field       JobApplyFormField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
-
-  @@index([jobApplicationId])
-  @@index([fieldId])
-}
 
 // =====================
 // PAYMENTS & TERMS

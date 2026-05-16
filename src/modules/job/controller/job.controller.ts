@@ -31,7 +31,6 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger'
-import { ApplyJobRequest } from '../dtos/request/apply-job.request'
 import { BoostCheckoutRequestDto } from '../dtos/request/boost-checkout.request'
 import { ConfirmBoostPaymentRequestDto } from '../dtos/request/confirm-boost-payment.request'
 import {
@@ -53,7 +52,7 @@ export class JobController {
   constructor(
     private readonly jobService: JobService,
     private readonly companyService: CompanyService,
-  ) { }
+  ) {}
 
   private ensureCompanyCanManageJobs(company: { status: CompanyStatus }) {
     if (company.status !== CompanyStatus.APPROVED) {
@@ -74,12 +73,18 @@ export class JobController {
 
   @Get('boosted')
   @ApiOperation({ summary: 'Get boosted jobs' })
-  @ApiResponse({ status: 200, description: 'Boosted jobs retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Boosted jobs retrieved successfully',
+  })
   async getBoostedJobs(
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
-    return this.jobService.getBoostedJobs(Number(page) || 1, Number(limit) || 10)
+    return this.jobService.getBoostedJobs(
+      Number(page) || 1,
+      Number(limit) || 10,
+    )
   }
 
   @Get('boost/packages')
@@ -108,7 +113,8 @@ export class JobController {
   @ApiHeader({
     name: 'authorization',
     required: true,
-    description: 'SePay webhook auth header. Format: apikey <SEPAY_WEBHOOK_API_KEY>',
+    description:
+      'SePay webhook auth header. Format: apikey <SEPAY_WEBHOOK_API_KEY>',
   })
   @ApiOperation({ summary: 'SePay webhook callback for boost payments' })
   async handleSepayWebhook(
@@ -133,7 +139,10 @@ export class JobController {
   @AuthRoleProtected(EnumUserRole.EMPLOYER)
   @ApiBearerAuth('access-token')
   @Get('get-for-employer')
-  async getForEmployer(@AuthJwtPayload() user: any, @Query() q: GetJobsByEmployerDto) {
+  async getForEmployer(
+    @AuthJwtPayload() user: any,
+    @Query() q: GetJobsByEmployerDto,
+  ) {
     const ownerId = user.userId
     const company = await this.companyService.findByOwnerId(ownerId)
     return this.jobService.getJobsByEmployer(company.id, q)
@@ -231,18 +240,10 @@ export class JobController {
   // GET JOB DETAIL
   @Get(':id')
   @ApiOperation({ summary: 'Get job detail by id' })
-  async getDetail(
-    @Param('id', ParseIntPipe) id: number,
-    @Ip() ip: string,
-  ) {
-    return ip ? this.jobService.getDetail(id, ip) : this.jobService.getDetail(id)
-  }
-
-  @Get(':id/apply-form')
-  @AuthRoleProtected(EnumUserRole.WORKER)
-  @ApiOperation({ summary: 'Get apply form by job id' })
-  async getApplyForm(@Param('id', ParseIntPipe) id: number) {
-    return this.jobService.getApplyForm(id)
+  async getDetail(@Param('id', ParseIntPipe) id: number, @Ip() ip: string) {
+    return ip
+      ? this.jobService.getDetail(id, ip)
+      : this.jobService.getDetail(id)
   }
 
   @Get('me/applications')
@@ -255,40 +256,15 @@ export class JobController {
   }
 
   @Post(':id/apply')
-  @ApiOperation({ summary: 'Apply job with form answers' })
+  @ApiOperation({ summary: 'Apply job' })
   @ApiBearerAuth('access-token')
   @ApiParam({ name: 'id', type: Number, example: 1, description: 'Job ID' })
-  @ApiBody({
-    type: ApplyJobRequest,
-    examples: {
-      default: {
-        summary: 'Apply payload mẫu',
-        value: {
-          answers: [
-            {
-              fieldId: 1,
-              value: 'Nguyễn Văn A - 3 năm kinh nghiệm',
-            },
-            {
-              fieldId: 2,
-              value: 'Java, Spring Boot, PostgreSQL',
-            },
-            {
-              fieldId: 3,
-              value: 'Có thể đi làm từ 15/03/2026',
-            },
-          ],
-        },
-      },
-    },
-  })
   @AuthJwtAccessProtected()
   async applyJob(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: ApplyJobRequest,
     @AuthJwtPayload('userId') userId: number,
   ) {
-    return this.jobService.applyJob(id, userId, body)
+    return this.jobService.applyJob(id, userId)
   }
 
   @Patch(':id/cancel-apply')
@@ -366,7 +342,6 @@ export class JobController {
     return this.jobService.confirmBoostPayment(id, company.id, body)
   }
 
-
   // DELETE JOB
   @Delete(':id')
   @AuthRoleProtected(EnumUserRole.EMPLOYER)
@@ -416,8 +391,11 @@ export class JobController {
   @ApiResponse({ status: 201, description: 'Job report successfully' })
   @AuthJwtAccessProtected()
   @ApiBearerAuth('access-token')
-  async reportJob(@Body() body: JobReportDto, @AuthJwtPayload('userId') userId: number) {
-    return this.jobService.reportJob(userId, body);
+  async reportJob(
+    @Body() body: JobReportDto,
+    @AuthJwtPayload('userId') userId: number,
+  ) {
+    return this.jobService.reportJob(userId, body)
   }
   //get all job reports by status (for manager)
   @Get('report/all')
@@ -435,7 +413,16 @@ export class JobController {
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
   ) {
-    return this.jobService.getAllJobReport(userId, status, page, limit, companyName, reporterName, fromDate, toDate);
+    return this.jobService.getAllJobReport(
+      userId,
+      status,
+      page,
+      limit,
+      companyName,
+      reporterName,
+      fromDate,
+      toDate,
+    )
   }
 
   @AuthJwtAccessProtected()
@@ -446,7 +433,7 @@ export class JobController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { status: ReportStatus },
   ) {
-    return this.jobService.updateJobReportStatus(id, body.status);
+    return this.jobService.updateJobReportStatus(id, body.status)
   }
   @Get('moderation/warning')
   @ApiOperation({ summary: 'Get jobs pending moderation (WARNING status)' })

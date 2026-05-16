@@ -218,7 +218,11 @@ describe('JobController - Boost Endpoints', () => {
         success: true,
       })
 
+<<<<<<< HEAD
       await controller.getBoostedJobs(3, 15)
+=======
+      await controller.getBoostedJobs('3' as any, '15' as any)
+>>>>>>> f968211 (refactor: schemaprisma update test chatmanagerment)
 
       expect(jobService.getBoostedJobs).toHaveBeenCalledWith(3, 15)
     })

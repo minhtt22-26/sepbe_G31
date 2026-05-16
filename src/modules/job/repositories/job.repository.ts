@@ -28,23 +28,6 @@ export class JobRepository {
       ...data.jobData,
     }
 
-    if (data.fields && data.fields.length > 0) {
-      jobDataCreate.applyForms = {
-        create: [
-          {
-            fields: {
-              create: data.fields.map((f: any) => ({
-                label: f.label,
-                fieldType: f.fieldType,
-                isRequired: f.isRequired,
-                options: f.options,
-              })),
-            },
-          },
-        ],
-      }
-    }
-
     return this.prisma.job.create({
       data: jobDataCreate,
       include: {
@@ -53,11 +36,6 @@ export class JobRepository {
             id: true,
             ownerId: true,
             name: true,
-          },
-        },
-        applyForms: {
-          include: {
-            fields: true,
           },
         },
       },
@@ -154,7 +132,11 @@ export class JobRepository {
     return this.prisma.$transaction(async (tx) => {
       const existingJob = await tx.job.findUnique({
         where: { id: params.jobId },
-        select: { boostExpiredAt: true, title: true, company: { select: { ownerId: true } } },
+        select: {
+          boostExpiredAt: true,
+          title: true,
+          company: { select: { ownerId: true } },
+        },
       })
       const baseDate =
         existingJob?.boostExpiredAt && existingJob.boostExpiredAt > now
@@ -357,7 +339,11 @@ export class JobRepository {
         orderType: OrderType.BOOST_JOB,
         isActive: true,
       },
-      orderBy: [{ durationDays: 'asc' }, { price: 'asc' }, { createdAt: 'asc' }],
+      orderBy: [
+        { durationDays: 'asc' },
+        { price: 'asc' },
+        { createdAt: 'asc' },
+      ],
     })
   }
 
@@ -508,119 +494,9 @@ export class JobRepository {
     return this.prisma.$transaction(async (tx) => {
       const { fields, ...jobData } = dto
 
-      // Update job info trước (luôn cho phép)
-      await tx.job.update({
+      const updatedJob = await tx.job.update({
         where: { id: jobId },
         data: jobData,
-      })
-
-      // Lấy form hiện tại
-      let form = await tx.jobApplyForm.findFirst({
-        where: { jobId },
-        include: { fields: true },
-      })
-
-      if (!form) {
-        // Tạo biến form mới nếu chưa có
-        form = await tx.jobApplyForm.create({
-          data: { jobId },
-          include: { fields: true },
-        })
-      }
-
-      if (!fields || !Array.isArray(fields)) {
-        const updatedJob = await tx.job.findUnique({
-          where: { id: jobId },
-          include: {
-            applyForms: {
-              include: { fields: true },
-            },
-          },
-        })
-        return { success: true, data: updatedJob }
-      }
-
-      const existingFields = form.fields
-
-      // Kiểm tra có application chưa
-      const applicationCount = await tx.jobApplication.count({
-        where: { jobId },
-      })
-
-      // ===============================
-      // CASE 1: ĐÃ CÓ APPLICATION
-      // ===============================
-      if (applicationCount > 0) {
-        for (const field of fields) {
-          // Nếu có id => đang cố update field cũ → block
-          if (field.id) {
-            throw new Error(
-              'Cannot modify existing form fields because applications already exist',
-            )
-          }
-
-          // Không có id => tạo mới
-          await tx.jobApplyFormField.create({
-            data: {
-              formId: form.id,
-              label: field.label,
-              fieldType: field.fieldType,
-              isRequired: field.isRequired,
-              options: field.options,
-            },
-          })
-        }
-
-        return { success: true, message: 'Job updated (only new fields added)' }
-      }
-
-      // ===============================
-      // CASE 2: CHƯA CÓ APPLICATION
-      // ===============================
-
-      const existingIds = existingFields.map((f) => f.id)
-      const dtoIds = fields.filter((f: any) => f.id).map((f: any) => f.id)
-
-      // 🗑 Delete removed fields
-      const toDelete = existingIds.filter((id) => !dtoIds.includes(id))
-
-      if (toDelete.length > 0) {
-        await tx.jobApplyFormField.deleteMany({
-          where: { id: { in: toDelete } },
-        })
-      }
-
-      // Update or Create
-      for (const field of fields) {
-        if (field.id) {
-          await tx.jobApplyFormField.update({
-            where: { id: field.id },
-            data: {
-              label: field.label,
-              fieldType: field.fieldType,
-              isRequired: field.isRequired,
-              options: field.options,
-            },
-          })
-        } else {
-          await tx.jobApplyFormField.create({
-            data: {
-              formId: form.id,
-              label: field.label,
-              fieldType: field.fieldType,
-              isRequired: field.isRequired,
-              options: field.options,
-            },
-          })
-        }
-      }
-      const updatedJob = await tx.job.findUnique({
-        where: { id: jobId },
-        include: {
-          applyForms: {
-            include: { fields: true },
-          },
-        },
       })
 
       return { success: true, data: updatedJob }
@@ -630,11 +506,6 @@ export class JobRepository {
     return this.prisma.job.findUnique({
       where: { id: jobId },
       include: {
-        applyForms: {
-          include: {
-            fields: true,
-          },
-        },
         company: {
           select: {
             id: true,
@@ -698,23 +569,6 @@ export class JobRepository {
         id: true,
         title: true,
         status: true,
-        applyForms: {
-          orderBy: { id: 'asc' },
-          take: 1,
-          select: {
-            id: true,
-            fields: {
-              orderBy: { id: 'asc' },
-              select: {
-                id: true,
-                label: true,
-                fieldType: true,
-                isRequired: true,
-                options: true,
-              },
-            },
-          },
-        },
       },
     })
   }
@@ -734,11 +588,7 @@ export class JobRepository {
     })
   }
 
-  async applyJob(data: {
-    jobId: number
-    userId: number
-    answers: { fieldId: number; value: string }[]
-  }) {
+  async applyJob(data: { jobId: number; userId: number }) {
     return this.prisma.$transaction(async (tx) => {
       const existing = await tx.jobApplication.findUnique({
         where: {
@@ -781,28 +631,11 @@ export class JobRepository {
             status: JobApplicationStatus.APPLIED,
           },
         })
-
-        await tx.jobApplicationAnswer.deleteMany({
-          where: {
-            jobApplicationId: existing.id,
-          },
-        })
       }
-
-      await tx.jobApplicationAnswer.createMany({
-        data: data.answers.map((answer) => ({
-          jobApplicationId: applicationId!,
-          fieldId: answer.fieldId,
-          value: answer.value,
-        })),
-      })
 
       const application = await tx.jobApplication.findUnique({
         where: {
           id: applicationId,
-        },
-        include: {
-          answers: true,
         },
       })
 
@@ -883,33 +716,26 @@ export class JobRepository {
             company: { select: { id: true, name: true } },
           },
         },
-        answers: {
-          select: {
-            fieldId: true,
-            value: true,
-            field: {
-              select: {
-                id: true,
-                label: true,
-                fieldType: true,
-                isRequired: true,
-                options: true,
-              },
-            },
-          },
-        },
       },
     })
   }
 
-  async findSuitableApplications(companyId: number, jobId: number, page: number, limit: number, search?: string, interviewStatus?: string, slotId?: string) {
+  async findSuitableApplications(
+    companyId: number,
+    jobId: number,
+    page: number,
+    limit: number,
+    search?: string,
+    interviewStatus?: string,
+    slotId?: string,
+  ) {
     const where: any = {
       status: JobApplicationStatus.SUITABLE,
       jobId: jobId,
       job: {
         companyId: companyId,
-        status: { not: JobStatus.DELETED }
-      }
+        status: { not: JobStatus.DELETED },
+      },
     }
 
     if (search) {
@@ -918,40 +744,43 @@ export class JobRepository {
         OR: [
           { fullName: { contains: search, mode: 'insensitive' } },
           { email: { contains: search, mode: 'insensitive' } },
-          { phone: { contains: search, mode: 'insensitive' } }
-        ]
+          { phone: { contains: search, mode: 'insensitive' } },
+        ],
       }
     }
 
-    if ((interviewStatus && interviewStatus !== 'ALL') || (slotId && slotId !== 'ALL')) {
+    if (
+      (interviewStatus && interviewStatus !== 'ALL') ||
+      (slotId && slotId !== 'ALL')
+    ) {
       const allInvitations = await this.prisma.interviewInvitation.findMany({
         where: { campaign: { jobId: jobId } },
         orderBy: { createdAt: 'desc' },
-        select: { workerId: true, status: true, selectedSlotId: true }
-      });
+        select: { workerId: true, status: true, selectedSlotId: true },
+      })
 
-      const latestInvitationByWorker = new Map();
+      const latestInvitationByWorker = new Map()
       for (const inv of allInvitations) {
         if (!latestInvitationByWorker.has(inv.workerId)) {
-          latestInvitationByWorker.set(inv.workerId, inv);
+          latestInvitationByWorker.set(inv.workerId, inv)
         }
       }
 
-      const filteredWorkerIds: number[] = [];
+      const filteredWorkerIds: number[] = []
       for (const [workerId, inv] of latestInvitationByWorker.entries()) {
-        let match = true;
+        let match = true
         if (interviewStatus && interviewStatus !== 'ALL') {
-          match = inv.status === interviewStatus;
+          match = inv.status === interviewStatus
         }
         if (match && slotId && slotId !== 'ALL') {
-          match = inv.selectedSlotId === parseInt(slotId);
+          match = inv.selectedSlotId === parseInt(slotId)
         }
         if (match) {
-          filteredWorkerIds.push(workerId);
+          filteredWorkerIds.push(workerId)
         }
       }
 
-      where.userId = { in: filteredWorkerIds };
+      where.userId = { in: filteredWorkerIds }
     }
 
     const [applications, total] = await Promise.all([
@@ -972,13 +801,13 @@ export class JobRepository {
                 where: { campaign: { jobId: jobId } },
                 orderBy: { createdAt: 'desc' },
                 take: 1,
-                include: { selectedSlot: true }
-              }
-            }
-          }
-        }
+                include: { selectedSlot: true },
+              },
+            },
+          },
+        },
       }),
-      this.prisma.jobApplication.count({ where })
+      this.prisma.jobApplication.count({ where }),
     ])
 
     return { applications, total }
@@ -1025,19 +854,6 @@ export class JobRepository {
             id: true,
             title: true,
             companyId: true,
-          },
-        },
-        answers: {
-          select: {
-            fieldId: true,
-            value: true,
-            field: {
-              select: {
-                id: true,
-                label: true,
-                fieldType: true,
-              },
-            },
           },
         },
       },
@@ -1126,7 +942,13 @@ export class JobRepository {
       where: {
         jobId,
         companyId,
-        status: { in: [CampaignStatus.IN_PROGRESS, CampaignStatus.COMPLETED, CampaignStatus.DRAFT] },
+        status: {
+          in: [
+            CampaignStatus.IN_PROGRESS,
+            CampaignStatus.COMPLETED,
+            CampaignStatus.DRAFT,
+          ],
+        },
       },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -1140,7 +962,12 @@ export class JobRepository {
       where: {
         workerId,
         campaign: { jobId },
-        status: { in: [InterviewInvitationStatus.PENDING, InterviewInvitationStatus.ACCEPTED] },
+        status: {
+          in: [
+            InterviewInvitationStatus.PENDING,
+            InterviewInvitationStatus.ACCEPTED,
+          ],
+        },
       },
       select: { id: true },
     })
@@ -1312,10 +1139,14 @@ export class JobRepository {
       where.status = status
     }
     if (companyName) {
-      where.job = { company: { name: { contains: companyName, mode: 'insensitive' } } }
+      where.job = {
+        company: { name: { contains: companyName, mode: 'insensitive' } },
+      }
     }
     if (reporterName) {
-      where.reporter = { fullName: { contains: reporterName, mode: 'insensitive' } }
+      where.reporter = {
+        fullName: { contains: reporterName, mode: 'insensitive' },
+      }
     }
     if (fromDate || toDate) {
       where.createdAt = {}
@@ -1484,8 +1315,8 @@ export class JobRepository {
       title = 'Tin tuyển dụng bị từ chối/gỡ bỏ'
       message = `Tin tuyển dụng "${job.title}" của bạn đã bị từ chối hoặc gỡ bỏ do vi phạm quy định.`
     } else if (status === JobStatus.WARNING) {
-      title = 'Tin tuyển dụng bị tạm ngưng'
-      message = `Tin tuyển dụng "${job.title}" đang chờ kiểm duyệt thủ công do có dấu hiệu nghi ngờ.`
+      title = 'Tin tuyển dụng chờ thanh toán'
+      message = `Tin tuyển dụng "${job.title}" của bạn đã được tạo thành công và đang chờ thanh toán để được hiển thị.`
     }
 
     if (title && job.company) {

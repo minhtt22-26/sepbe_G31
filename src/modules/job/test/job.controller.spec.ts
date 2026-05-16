@@ -8,7 +8,7 @@ jest.mock('src/prisma.service', () => ({
 }))
 
 const jobServiceMock = {
-  getApplyForm: jest.fn(),
+
   applyJob: jest.fn(),
   cancelApplyJob: jest.fn(),
   getApplicationsByUser: jest.fn(),
@@ -45,25 +45,14 @@ describe('JobController', () => {
     jest.clearAllMocks()
   })
 
-  it('getApplyForm should call service.getApplyForm', async () => {
-    const expected = { success: true, data: { formId: 10 } }
-    jobServiceMock.getApplyForm.mockResolvedValue(expected)
-
-    const result = await controller.getApplyForm(1)
-
-    expect(result).toBe(expected)
-    expect(jobServiceMock.getApplyForm).toHaveBeenCalledWith(1)
-  })
-
   it('applyJob should call service.applyJob', async () => {
-    const body = { answers: [{ fieldId: 1, value: 'a' }] }
     const expected = { success: true, data: { id: 200 } }
     jobServiceMock.applyJob.mockResolvedValue(expected)
 
-    const result = await controller.applyJob(5, body, 42)
+    const result = await controller.applyJob(5, 42)
 
     expect(result).toBe(expected)
-    expect(jobServiceMock.applyJob).toHaveBeenCalledWith(5, 42, body)
+    expect(jobServiceMock.applyJob).toHaveBeenCalledWith(5, 42)
   })
 
   it('cancelApply should call service.cancelApplyJob', async () => {
@@ -91,7 +80,11 @@ describe('JobController', () => {
       const mockJob = { id: 1, title: 'Job 1' }
       jobServiceMock.getDetail.mockResolvedValue(mockJob)
 
+<<<<<<< HEAD
       const result = await controller.getDetail(1, '127.0.0.1')
+=======
+      const result = await controller.getDetail(1, '')
+>>>>>>> f968211 (refactor: schemaprisma update test chatmanagerment)
 
       expect(result).toEqual(mockJob)
       expect(jobServiceMock.getDetail).toHaveBeenCalledWith(1, '127.0.0.1')
@@ -101,7 +94,11 @@ describe('JobController', () => {
       const error = new Error('Job not found')
       jobServiceMock.getDetail.mockRejectedValue(error)
 
+<<<<<<< HEAD
       await expect(controller.getDetail(1, '127.0.0.1')).rejects.toThrow('Job not found')
+=======
+      await expect(controller.getDetail(1, '')).rejects.toThrow('Job not found')
+>>>>>>> f968211 (refactor: schemaprisma update test chatmanagerment)
     })
   })
 

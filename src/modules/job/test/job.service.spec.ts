@@ -5,7 +5,7 @@ import { JobApplicationStatus, JobStatus } from 'src/generated/prisma/enums'
 import { JobService } from '../service/job.service'
 import { SepayService } from '../service/sepay.service'
 import { AIMatchingService } from 'src/modules/ai-matching/service/ai-matching.service'
-import { JobModerationService } from '../service/job-moderation.service'
+
 
 jest.mock('src/prisma.service', () => ({
   PrismaService: class {},
@@ -33,9 +33,7 @@ const aiMatchingServiceMock = {
   syncJobApplications: jest.fn(),
 }
 
-const jobModerationServiceMock = {
-  moderateJobContent: jest.fn(),
-}
+
 
 describe('JobService', () => {
   let service: JobService
@@ -56,10 +54,7 @@ describe('JobService', () => {
           provide: AIMatchingService,
           useValue: aiMatchingServiceMock,
         },
-        {
-          provide: JobModerationService,
-          useValue: jobModerationServiceMock,
-        },
+
       ],
     }).compile()
 
@@ -74,118 +69,24 @@ describe('JobService', () => {
     expect(service).toBeDefined()
   })
 
-  it('getApplyForm should throw when job not found', async () => {
-    jobRepositoryMock.findJobWithApplyForm.mockResolvedValue(null)
 
-    await expect(service.getApplyForm(1)).rejects.toBeInstanceOf(
-      NotFoundException,
-    )
-  })
-
-  it('getApplyForm should return first form fields', async () => {
-    jobRepositoryMock.findJobWithApplyForm.mockResolvedValue({
-      id: 1,
-      title: 'Công nhân may',
-      status: JobStatus.PUBLISHED,
-      applyForms: [
-        {
-          id: 10,
-          fields: [
-            { id: 100, label: 'Họ tên', fieldType: 'text', isRequired: true },
-          ],
-        },
-      ],
-    })
-
-    const result = await service.getApplyForm(1)
-
-    expect(result.success).toBe(true)
-    expect(result.data.formId).toBe(10)
-  })
-
-  it('applyJob should throw if required field is missing', async () => {
-    jobRepositoryMock.findJobById.mockResolvedValue({
-      id: 1,
-      status: JobStatus.PUBLISHED,
-    })
-    jobRepositoryMock.findJobWithApplyForm.mockResolvedValue({
-      id: 1,
-      title: 'Công nhân may',
-      status: JobStatus.PUBLISHED,
-      applyForms: [
-        {
-          id: 10,
-          fields: [
-            {
-              id: 100,
-              label: 'Họ tên',
-              fieldType: 'text',
-              isRequired: true,
-              options: null,
-            },
-          ],
-        },
-      ],
-    })
-
-    await expect(
-      service.applyJob(1, 2, {
-        answers: [],
-      }),
-    ).rejects.toBeInstanceOf(BadRequestException)
-  })
 
   it('applyJob should call repository when payload is valid', async () => {
     jobRepositoryMock.findJobById.mockResolvedValue({
       id: 1,
       status: JobStatus.PUBLISHED,
     })
-    jobRepositoryMock.findJobWithApplyForm.mockResolvedValue({
-      id: 1,
-      title: 'Công nhân may',
-      status: JobStatus.PUBLISHED,
-      applyForms: [
-        {
-          id: 10,
-          fields: [
-            {
-              id: 100,
-              label: 'Họ tên',
-              fieldType: 'text',
-              isRequired: true,
-              options: null,
-            },
-            {
-              id: 101,
-              label: 'Ca làm',
-              fieldType: 'select',
-              isRequired: true,
-              options: '["MORNING","AFTERNOON"]',
-            },
-          ],
-        },
-      ],
-    })
     jobRepositoryMock.applyJob.mockResolvedValue({
       id: 200,
       status: JobApplicationStatus.APPLIED,
     })
 
-    const result = await service.applyJob(1, 2, {
-      answers: [
-        { fieldId: 100, value: 'Nguyễn Văn A' },
-        { fieldId: 101, value: 'MORNING' },
-      ],
-    })
+    const result = await service.applyJob(1, 2)
 
     expect(result.success).toBe(true)
     expect(jobRepositoryMock.applyJob).toHaveBeenCalledWith({
       jobId: 1,
       userId: 2,
-      answers: [
-        { fieldId: 100, value: 'Nguyễn Văn A' },
-        { fieldId: 101, value: 'MORNING' },
-      ],
     })
   })
 
@@ -227,19 +128,6 @@ describe('JobService', () => {
         id: 200,
         status: JobApplicationStatus.APPLIED,
         job: { id: 10, title: 'Test Job', company: { id: 5, name: 'Acme' } },
-        answers: [
-          {
-            fieldId: 100,
-            value: 'Nguyễn Văn A',
-            field: {
-              id: 100,
-              label: 'Họ tên',
-              fieldType: 'text',
-              isRequired: true,
-              options: null,
-            },
-          },
-        ],
       },
     ])
 
