@@ -218,7 +218,7 @@ describe('JobController - Boost Endpoints', () => {
         success: true,
       })
 
-      await controller.getBoostedJobs(3 as any, 15 as any)
+      await controller.getBoostedJobs(3, 15)
 
       expect(jobService.getBoostedJobs).toHaveBeenCalledWith(3, 15)
     })
