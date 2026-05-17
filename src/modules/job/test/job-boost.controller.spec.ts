@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { JobController } from '../controller/job.controller'
 import { JobService } from '../service/job.service'
 import { CompanyService } from 'src/modules/company/company.service'
+import { CompanyStatus } from 'src/generated/prisma/enums'
 
 describe('JobController - Boost Endpoints', () => {
   let controller: JobController
@@ -46,7 +47,7 @@ describe('JobController - Boost Endpoints', () => {
   describe('POST /job/:id/boost/checkout', () => {
     it('should call createBoostCheckout with correct parameters', async () => {
       const mockUser = { userId: 10 }
-      const mockCompany = { id: 5, ownerId: 10 }
+      const mockCompany = { id: 5, ownerId: 10, status: CompanyStatus.APPROVED }
       const mockCheckout = {
         success: true,
         data: { paymentOrderId: 100 },
@@ -55,24 +56,20 @@ describe('JobController - Boost Endpoints', () => {
       mockCompanyService.findByOwnerId.mockResolvedValue(mockCompany)
       mockJobService.createBoostCheckout.mockResolvedValue(mockCheckout)
 
-      const result = await controller.createBoostCheckout(
-        mockUser,
-        1,
-        { packageDays: 7 }
-      )
+      const result = await controller.createBoostCheckout(mockUser, 1, {
+        packageDays: 7,
+      })
 
       expect(companyService.findByOwnerId).toHaveBeenCalledWith(10)
-      expect(jobService.createBoostCheckout).toHaveBeenCalledWith(
-        1,
-        5,
-        { packageDays: 7 }
-      )
+      expect(jobService.createBoostCheckout).toHaveBeenCalledWith(1, 5, {
+        packageDays: 7,
+      })
       expect(result).toEqual(mockCheckout)
     })
 
     it('should pass custom amount to service', async () => {
       const mockUser = { userId: 10 }
-      const mockCompany = { id: 5, ownerId: 10 }
+      const mockCompany = { id: 5, ownerId: 10, status: CompanyStatus.APPROVED }
       const mockCheckout = { success: true }
 
       mockCompanyService.findByOwnerId.mockResolvedValue(mockCompany)
@@ -86,7 +83,7 @@ describe('JobController - Boost Endpoints', () => {
       expect(jobService.createBoostCheckout).toHaveBeenCalledWith(
         1,
         5,
-        expect.objectContaining({ amount: 75000 })
+        expect.objectContaining({ amount: 75000 }),
       )
     })
   })
@@ -94,30 +91,26 @@ describe('JobController - Boost Endpoints', () => {
   describe('POST /job/:id/boost/confirm', () => {
     it('should call confirmBoostPayment with correct parameters', async () => {
       const mockUser = { userId: 10 }
-      const mockCompany = { id: 5, ownerId: 10 }
+      const mockCompany = { id: 5, ownerId: 10, status: CompanyStatus.APPROVED }
       const mockResult = { success: true }
 
       mockCompanyService.findByOwnerId.mockResolvedValue(mockCompany)
       mockJobService.confirmBoostPayment.mockResolvedValue(mockResult)
 
-      const result = await controller.confirmBoostPayment(
-        mockUser,
-        1,
-        { paymentOrderId: 100 }
-      )
+      const result = await controller.confirmBoostPayment(mockUser, 1, {
+        paymentOrderId: 100,
+      })
 
       expect(companyService.findByOwnerId).toHaveBeenCalledWith(10)
-      expect(jobService.confirmBoostPayment).toHaveBeenCalledWith(
-        1,
-        5,
-        { paymentOrderId: 100 }
-      )
+      expect(jobService.confirmBoostPayment).toHaveBeenCalledWith(1, 5, {
+        paymentOrderId: 100,
+      })
       expect(result).toEqual(mockResult)
     })
 
     it('should pass transactionCode to service', async () => {
       const mockUser = { userId: 10 }
-      const mockCompany = { id: 5, ownerId: 10 }
+      const mockCompany = { id: 5, ownerId: 10, status: CompanyStatus.APPROVED }
 
       mockCompanyService.findByOwnerId.mockResolvedValue(mockCompany)
       mockJobService.confirmBoostPayment.mockResolvedValue({ success: true })
@@ -130,7 +123,7 @@ describe('JobController - Boost Endpoints', () => {
       expect(jobService.confirmBoostPayment).toHaveBeenCalledWith(
         1,
         5,
-        expect.objectContaining({ transactionCode: 'TXN123' })
+        expect.objectContaining({ transactionCode: 'TXN123' }),
       )
     })
   })
@@ -141,20 +134,17 @@ describe('JobController - Boost Endpoints', () => {
 
       mockJobService.handleSepayWebhook.mockResolvedValue(mockWebhookResult)
 
-      const result = await controller.handleSepayWebhook(
-        'apikey test-key',
-        {
-          transferType: 'in',
-          transferAmount: 50000,
-        }
-      )
+      const result = await controller.handleSepayWebhook('apikey test-key', {
+        transferType: 'in',
+        transferAmount: 50000,
+      })
 
       expect(jobService.handleSepayWebhook).toHaveBeenCalledWith(
         'apikey test-key',
         {
           transferType: 'in',
           transferAmount: 50000,
-        }
+        },
       )
       expect(result).toEqual(mockWebhookResult)
     })
@@ -164,10 +154,9 @@ describe('JobController - Boost Endpoints', () => {
 
       await controller.handleSepayWebhook(undefined, { transferType: 'in' })
 
-      expect(jobService.handleSepayWebhook).toHaveBeenCalledWith(
-        undefined,
-        { transferType: 'in' }
-      )
+      expect(jobService.handleSepayWebhook).toHaveBeenCalledWith(undefined, {
+        transferType: 'in',
+      })
     })
 
     it('should handle missing body', async () => {
@@ -177,7 +166,7 @@ describe('JobController - Boost Endpoints', () => {
 
       expect(jobService.handleSepayWebhook).toHaveBeenCalledWith(
         'apikey test-key',
-        undefined
+        undefined,
       )
     })
   })
@@ -218,7 +207,7 @@ describe('JobController - Boost Endpoints', () => {
         success: true,
       })
 
-      await controller.getBoostedJobs(3, 15)
+      await controller.getBoostedJobs('3' as any, '15' as any)
 
       expect(jobService.getBoostedJobs).toHaveBeenCalledWith(3, 15)
     })

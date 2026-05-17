@@ -1107,11 +1107,6 @@
 //           ageMax,
 //           expiredAt: faker.date.future({ years: 1 }),
 //           isBoosted: Math.random() < 0.15,
-//           isFlagged: Math.random() < 0.03,
-//           fraudScore:
-//             Math.random() < 0.03
-//               ? faker.number.float({ min: 0.5, max: 0.95 })
-//               : 0,
 //           createdAt: getRandomDate(),
 //           updatedAt: getRandomDate(),
 //         },

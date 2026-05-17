@@ -163,7 +163,7 @@ describe('SepayService', () => {
     })
 
     it('should return null for invalid orderId', () => {
-      const payload = { code: 'BOOST-123', content: '', description: '' }
+      const payload = { code: 'BOOST-ABC', content: '', description: '' }
       const result = service.extractOrderIdFromPayload(payload)
       expect(result).toBeNull()
     })

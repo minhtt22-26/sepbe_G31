@@ -16,7 +16,6 @@ import {
   ReportStatus,
   WalletTransactionType,
 } from 'src/generated/prisma/enums'
-import { ApplyJobRequest } from '../dtos/request/apply-job.request'
 import { GetJobsByEmployerDto } from '../dtos/request/get-jobs-employer.dto'
 import { JOB_CONSTANTS } from '../constant/job.constant'
 import { AIMatchingService } from 'src/modules/ai-matching/service/ai-matching.service'
@@ -497,33 +496,7 @@ export class JobService {
     return { success: true }
   }
 
-  async getApplyForm(jobId: number) {
-    const jobWithForm = await this.jobRepository.findJobWithApplyForm(jobId)
-
-    if (!jobWithForm) {
-      throw new NotFoundException('Job not found')
-    }
-
-    if (jobWithForm.status !== JobStatus.PUBLISHED) {
-      throw new BadRequestException('Job is not available for apply')
-    }
-
-    if (!jobWithForm.applyForms?.length) {
-      throw new BadRequestException('Apply form has not been created')
-    }
-
-    return {
-      success: true,
-      data: {
-        jobId: jobWithForm.id,
-        title: jobWithForm.title,
-        formId: jobWithForm.applyForms[0].id,
-        fields: jobWithForm.applyForms[0].fields,
-      },
-    }
-  }
-
-  async applyJob(jobId: number, userId: number, body: ApplyJobRequest) {
+  async applyJob(jobId: number, userId: number) {
     // Check job exists and published
     const job = await this.jobRepository.findJobById(jobId)
     if (!job) {
@@ -534,85 +507,9 @@ export class JobService {
       throw new BadRequestException('Job is not available for apply')
     }
 
-    // Get form if exists (optional now)
-    const jobWithForm = await this.jobRepository.findJobWithApplyForm(jobId)
-    const form = jobWithForm?.applyForms?.[0]
-    const answers = body.answers || []
-
-    // Validate answers only if form exists
-    if (form && form.fields.length > 0) {
-      const answerByFieldId = new Map<number, string>()
-
-      for (const answer of answers) {
-        if (answerByFieldId.has(answer.fieldId)) {
-          throw new BadRequestException(
-            `Duplicate answer for fieldId ${answer.fieldId}`,
-          )
-        }
-        answerByFieldId.set(answer.fieldId, answer.value?.trim())
-      }
-
-      for (const field of form.fields) {
-        const value = answerByFieldId.get(field.id)
-
-        if (field.isRequired && !value) {
-          throw new BadRequestException(`Field "${field.label}" is required`)
-        }
-
-        if (value && field.options) {
-          let parsedOptions: string[] = []
-
-          try {
-            const raw = JSON.parse(field.options)
-            if (Array.isArray(raw)) {
-              parsedOptions = raw.map((item: any) => String(item))
-            }
-          } catch {
-            parsedOptions = []
-          }
-
-          if (parsedOptions.length > 0) {
-            const selected =
-              field.fieldType === 'checkbox'
-                ? value
-                    .split(',')
-                    .map((item) => item.trim())
-                    .filter(Boolean)
-                : [value]
-
-            const hasInvalid = selected.some(
-              (item) => !parsedOptions.includes(item),
-            )
-
-            if (hasInvalid) {
-              throw new BadRequestException(
-                `Field "${field.label}" has invalid option`,
-              )
-            }
-          }
-        }
-      }
-
-      const invalidField = answers.find(
-        (answer) => !form.fields.some((field) => field.id === answer.fieldId),
-      )
-
-      if (invalidField) {
-        throw new BadRequestException(
-          `fieldId ${invalidField.fieldId} does not belong to apply form`,
-        )
-      }
-    }
-
-    const payloadAnswers = answers.map((answer) => ({
-      fieldId: answer.fieldId,
-      value: answer.value.trim(),
-    }))
-
     const applied = await this.jobRepository.applyJob({
       jobId,
       userId,
-      answers: payloadAnswers,
     })
 
     return {
@@ -626,16 +523,25 @@ export class JobService {
     return { success: true, data: applications }
   }
 
-  async getSuitableApplications(companyId: number, jobId: number, page: number, limit: number, search?: string, interviewStatus?: string, slotId?: string) {
-    const { applications, total } = await this.jobRepository.findSuitableApplications(
-      companyId,
-      jobId,
-      page,
-      limit,
-      search,
-      interviewStatus,
-      slotId
-    )
+  async getSuitableApplications(
+    companyId: number,
+    jobId: number,
+    page: number,
+    limit: number,
+    search?: string,
+    interviewStatus?: string,
+    slotId?: string,
+  ) {
+    const { applications, total } =
+      await this.jobRepository.findSuitableApplications(
+        companyId,
+        jobId,
+        page,
+        limit,
+        search,
+        interviewStatus,
+        slotId,
+      )
     return { success: true, data: applications, total, page, limit }
   }
 
@@ -660,7 +566,7 @@ export class JobService {
     if (application.job.companyId !== companyId) {
       throw new BadRequestException('Unauthorized to update this application')
     }
-    
+
     // Handle SUITABLE status separately
     if (status === JobApplicationStatus.SUITABLE) {
       await this.handleSuitableStatusChange(application, companyId)
@@ -668,7 +574,7 @@ export class JobService {
       // For other statuses, just update normally
       await this.jobRepository.updateApplicationStatus(applicationId, status)
     }
-    
+
     return { success: true }
   }
 
@@ -677,7 +583,10 @@ export class JobService {
    * - Always allow employer to mark SUITABLE
    * - Interview invitations will be sent later when employer creates interview schedule
    */
-  private async handleSuitableStatusChange(application: any, companyId: number) {
+  private async handleSuitableStatusChange(
+    application: any,
+    companyId: number,
+  ) {
     const jobId = application.jobId
     const workerId = application.userId
 
@@ -689,10 +598,8 @@ export class JobService {
 
     // Nếu job đã có chiến dịch phỏng vấn đang hoạt động, thêm ứng viên vào chiến dịch đó
     try {
-      const activeCampaign = await this.jobRepository.getLatestActiveCampaignByJob(
-        jobId,
-        companyId,
-      )
+      const activeCampaign =
+        await this.jobRepository.getLatestActiveCampaignByJob(jobId, companyId)
 
       if (activeCampaign) {
         const alreadyInvited = await this.jobRepository.checkExistingInvitation(
