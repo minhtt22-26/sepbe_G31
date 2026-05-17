@@ -79,12 +79,7 @@ describe('JobController', () => {
     it('Normal: should return job detail when job exists', async () => {
       const mockJob = { id: 1, title: 'Job 1' }
       jobServiceMock.getDetail.mockResolvedValue(mockJob)
-
-<<<<<<< HEAD
       const result = await controller.getDetail(1, '127.0.0.1')
-=======
-      const result = await controller.getDetail(1, '')
->>>>>>> f968211 (refactor: schemaprisma update test chatmanagerment)
 
       expect(result).toEqual(mockJob)
       expect(jobServiceMock.getDetail).toHaveBeenCalledWith(1, '127.0.0.1')
@@ -93,12 +88,7 @@ describe('JobController', () => {
     it('Abnormal: should throw error when job not found', async () => {
       const error = new Error('Job not found')
       jobServiceMock.getDetail.mockRejectedValue(error)
-
-<<<<<<< HEAD
       await expect(controller.getDetail(1, '127.0.0.1')).rejects.toThrow('Job not found')
-=======
-      await expect(controller.getDetail(1, '')).rejects.toThrow('Job not found')
->>>>>>> f968211 (refactor: schemaprisma update test chatmanagerment)
     })
   })
 

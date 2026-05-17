@@ -8,7 +8,6 @@ import {
 import { Prisma } from 'src/generated/prisma/client'
 import { PrismaService } from 'src/prisma.service'
 import { OverviewResponseDto } from '../dtos/response/overview.response.dto'
-import { ApplicationFunnelResponseDto } from '../dtos/response/application-funnel.response.dto'
 import { PaymentStatsResponseDto } from '../dtos/response/payment-stats.response.dto'
 import { PaymentStatsRequestDto } from '../dtos/request/payment-stats.request.dto'
 import { JobStatusResponseDto } from '../dtos/response/job-status.response.dto'
@@ -381,13 +380,6 @@ export class StatisticsRepository {
     const [transactions, total] = await this.prisma.$transaction([
       this.prisma.paymentOrder.findMany({
         where,
-        include: {
-          paymentPackage: {
-            select: {
-              name: true,
-            },
-          },
-        },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
@@ -408,10 +400,8 @@ export class StatisticsRepository {
         currency: item.currency,
         status: item.status,
         paymentMethod: item.paymentMethod,
-        packageDays: item.packageDays,
-        packageName:
-          item.paymentPackage?.name ||
-          (item.packageDays ? `${item.packageDays} ngày` : 'Chưa xác định'),
+        packageDays: null,
+        packageName: null,
         transactionCode: item.transactionCode || `DH-${item.id}`,
         createdAt: item.createdAt.toISOString(),
       })),

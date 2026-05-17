@@ -33,6 +33,7 @@ const cloudinaryMock = {
 const redisMock = {
   get: jest.fn(),
   setEx: jest.fn(),
+  del: jest.fn(),
 };
 
 const companyRepositoryMock = {
@@ -67,7 +68,6 @@ describe('CompanyService', () => {
 
     expect(result).toBe(expected);
     expect(prismaMock.company.findMany).toHaveBeenCalledWith({
-      where: { status: CompanyStatus.APPROVED },
       include: {
         owner: {
           select: {
@@ -77,6 +77,9 @@ describe('CompanyService', () => {
             avatar: true,
           },
         },
+      },
+      orderBy: {
+        createdAt: 'desc',
       },
     });
   });

@@ -5,6 +5,8 @@ import { JobApplicationStatus, JobStatus } from 'src/generated/prisma/enums'
 import { JobService } from '../service/job.service'
 import { SepayService } from '../service/sepay.service'
 import { AIMatchingService } from 'src/modules/ai-matching/service/ai-matching.service'
+import { WalletService } from 'src/modules/wallet/wallet.service'
+import { InterviewInvitationService } from 'src/modules/interview-invitation/service/interview-invitation.service'
 
 
 jest.mock('src/prisma.service', () => ({
@@ -31,8 +33,15 @@ const sepayServiceMock = {
 
 const aiMatchingServiceMock = {
   syncJobApplications: jest.fn(),
+  buildJobEmbedding: jest.fn(),
 }
 
+const walletServiceMock = {
+  getPointCost: jest.fn(),
+  deductPoints: jest.fn(),
+}
+
+const interviewInvitationServiceMock = {}
 
 
 describe('JobService', () => {
@@ -54,7 +63,14 @@ describe('JobService', () => {
           provide: AIMatchingService,
           useValue: aiMatchingServiceMock,
         },
-
+        {
+          provide: WalletService,
+          useValue: walletServiceMock,
+        },
+        {
+          provide: InterviewInvitationService,
+          useValue: interviewInvitationServiceMock,
+        },
       ],
     }).compile()
 

@@ -496,7 +496,7 @@ export class JobService {
     return { success: true }
   }
 
-  async applyJob(jobId: number, userId: number, body?: any) {
+  async applyJob(jobId: number, userId: number) {
     // Check job exists and published
     const job = await this.jobRepository.findJobById(jobId)
     if (!job) {

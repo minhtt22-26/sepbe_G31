@@ -4,19 +4,19 @@ import { JobService } from '../service/job.service'
 import { JobRepository } from '../repositories/job.repository'
 import { SepayService } from '../service/sepay.service'
 import { AIMatchingService } from 'src/modules/ai-matching/service/ai-matching.service'
+import { WalletService } from 'src/modules/wallet/wallet.service'
+import { InterviewInvitationService } from 'src/modules/interview-invitation/service/interview-invitation.service'
+import { JobStatus, WalletTransactionType } from 'src/generated/prisma/enums'
 
-import { JobStatus, PaymentMethod, PaymentStatus, OrderType } from 'src/generated/prisma/enums'
-
-describe('JobService - Boost Features', () => {
+describe('JobService - Boost Features (Point-Only Flow)', () => {
   let service: JobService
   let jobRepository: JobRepository
-  let sepayService: SepayService
+  let walletService: WalletService
 
   const mockJobRepository = {
     findJobById: jest.fn(),
-    createBoostPaymentOrder: jest.fn(),
-    findPaymentOrderById: jest.fn(),
-    activateBoostAfterPayment: jest.fn(),
+    activateBoostByPoint: jest.fn(),
+    publishJobByPoint: jest.fn(),
   }
 
   const mockSepayService = {
@@ -29,7 +29,14 @@ describe('JobService - Boost Features', () => {
     buildJobEmbedding: jest.fn(),
   }
 
+  const mockWalletService = {
+    getBoostPackagesForEmployer: jest.fn(),
+    resolveBoostPackage: jest.fn(),
+    deductPoints: jest.fn(),
+    getPointCost: jest.fn(),
+  }
 
+  const mockInterviewInvitationService = {}
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -47,13 +54,20 @@ describe('JobService - Boost Features', () => {
           provide: AIMatchingService,
           useValue: mockAIMatchingService,
         },
-
+        {
+          provide: WalletService,
+          useValue: mockWalletService,
+        },
+        {
+          provide: InterviewInvitationService,
+          useValue: mockInterviewInvitationService,
+        },
       ],
     }).compile()
 
     service = module.get<JobService>(JobService)
     jobRepository = module.get<JobRepository>(JobRepository)
-    sepayService = module.get<SepayService>(SepayService)
+    walletService = module.get<WalletService>(WalletService)
   })
 
   afterEach(() => {
@@ -87,119 +101,53 @@ describe('JobService - Boost Features', () => {
       ).rejects.toThrow(BadRequestException)
     })
 
-    it('should throw for invalid package days', async () => {
+    it('should deduct points and activate boost on successful point-only checkout', async () => {
+      const mockPackage = {
+        id: 2,
+        name: 'Gói 7 ngày',
+        durationDays: 7,
+        price: 50000,
+      }
+      const mockBoostedJobResult = {
+        id: 1,
+        isBoosted: true,
+        boostExpiredAt: new Date('2026-06-01T00:00:00Z'),
+      }
+
       mockJobRepository.findJobById.mockResolvedValue(mockJob)
-
-      await expect(
-        service.createBoostCheckout(1, 5, { packageDays: 14 })
-      ).rejects.toThrow(BadRequestException)
-    })
-
-    it('should throw for non-SEPAY payment method', async () => {
-      mockJobRepository.findJobById.mockResolvedValue(mockJob)
-
-      await expect(
-        service.createBoostCheckout(1, 5, {
-          packageDays: 7,
-          paymentMethod: 'CREDIT_CARD',
-        })
-      ).rejects.toThrow(BadRequestException)
-    })
-
-    it('should create boost checkout with default amount', async () => {
-      mockJobRepository.findJobById.mockResolvedValue(mockJob)
-      mockJobRepository.createBoostPaymentOrder.mockResolvedValue({
-        id: 100,
-        amount: 50000,
-        status: PaymentStatus.PENDING,
-      })
-      mockSepayService.buildBoostCheckout.mockReturnValue({
-        paymentCode: 'BOOST1',
-        paymentUrl: 'https://vietqr.io/...',
-        transferNote: 'BOOST1',
-        bankCode: 'BIDV',
-        accountNumber: '123456',
-        accountName: 'Test Company',
-      })
+      mockWalletService.resolveBoostPackage.mockResolvedValue(mockPackage)
+      mockWalletService.deductPoints.mockResolvedValue(undefined)
+      mockJobRepository.activateBoostByPoint.mockResolvedValue(mockBoostedJobResult)
 
       const result = await service.createBoostCheckout(1, 5, {
         packageDays: 7,
       })
 
       expect(result.success).toBe(true)
-      expect((result.data as any).paymentOrderId).toBe(100)
+      expect(result.data.jobId).toBe(1)
+      expect(result.data.packageId).toBe(2)
+      expect(result.data.packageName).toBe('Gói 7 ngày')
       expect(result.data.packageDays).toBe(7)
-      expect(jobRepository.createBoostPaymentOrder).toHaveBeenCalledWith({
-        userId: 10,
-        jobId: 1,
-        amount: 50000,
-        paymentMethod: PaymentMethod.SEPAY,
-      })
-    })
+      expect(result.data.pointCost).toBe(50000)
+      expect(result.data.boostExpiredAt).toEqual(mockBoostedJobResult.boostExpiredAt)
 
-    it('should create boost checkout with custom amount', async () => {
-      mockJobRepository.findJobById.mockResolvedValue(mockJob)
-      mockJobRepository.createBoostPaymentOrder.mockResolvedValue({
-        id: 101,
-        amount: 75000,
-      })
-      mockSepayService.buildBoostCheckout.mockReturnValue({
-        paymentCode: 'BOOST1',
-        paymentUrl: 'https://vietqr.io/...',
-        transferNote: 'BOOST1',
-        bankCode: 'BIDV',
-        accountNumber: '123456',
-        accountName: 'Test Company',
-      })
-
-      await service.createBoostCheckout(1, 5, {
-        packageDays: 7,
-        amount: 75000,
-      })
-
-      expect(jobRepository.createBoostPaymentOrder).toHaveBeenCalledWith(
-        expect.objectContaining({
-          amount: 75000,
-        })
-      )
-    })
-
-    it('should throw for invalid amount', async () => {
-      mockJobRepository.findJobById.mockResolvedValue(mockJob)
-
-      await expect(
-        service.createBoostCheckout(1, 5, {
+      expect(walletService.resolveBoostPackage).toHaveBeenCalledWith(7)
+      expect(walletService.deductPoints).toHaveBeenCalledWith({
+        companyId: 5,
+        cost: 50000,
+        type: WalletTransactionType.BOOST_JOB,
+        referenceType: 'JOB',
+        referenceId: 1,
+        metadata: {
+          packageId: 2,
+          packageName: 'Gói 7 ngày',
           packageDays: 7,
-          amount: -1000,
-        })
-      ).rejects.toThrow(BadRequestException)
-    })
-
-    it('should handle 30-day package', async () => {
-      mockJobRepository.findJobById.mockResolvedValue(mockJob)
-      mockJobRepository.createBoostPaymentOrder.mockResolvedValue({
-        id: 102,
-        amount: 300000,
+        },
       })
-      mockSepayService.buildBoostCheckout.mockReturnValue({
-        paymentCode: 'BOOST2',
-        paymentUrl: 'https://vietqr.io/...',
-        transferNote: 'BOOST2',
-        bankCode: 'BIDV',
-        accountNumber: '123456',
-        accountName: 'Test Company',
+      expect(jobRepository.activateBoostByPoint).toHaveBeenCalledWith({
+        jobId: 1,
+        durationDays: 7,
       })
-
-      const result = await service.createBoostCheckout(1, 5, {
-        packageDays: 30,
-      })
-
-      expect(result.data.packageDays).toBe(30)
-      expect(jobRepository.createBoostPaymentOrder).toHaveBeenCalledWith(
-        expect.objectContaining({
-          amount: 300000,
-        })
-      )
     })
   })
 
@@ -210,12 +158,6 @@ describe('JobService - Boost Features', () => {
       isBoosted: false,
       boostExpiredAt: null,
     }
-    const mockOrder = {
-      id: 100,
-      status: PaymentStatus.PENDING,
-      amount: 50000,
-      targetId: 1,
-    }
 
     it('should throw when job not found', async () => {
       mockJobRepository.findJobById.mockResolvedValue(null)
@@ -225,222 +167,37 @@ describe('JobService - Boost Features', () => {
       ).rejects.toThrow(NotFoundException)
     })
 
-    it('should throw when order not found', async () => {
+    it('should return deprecated warning directly when job is found', async () => {
       mockJobRepository.findJobById.mockResolvedValue(mockJob)
-      mockJobRepository.findPaymentOrderById.mockResolvedValue(null)
 
-      await expect(
-        service.confirmBoostPayment(1, 5, { paymentOrderId: 100 })
-      ).rejects.toThrow(NotFoundException)
-    })
+      const result = await service.confirmBoostPayment(1, 5, { paymentOrderId: 100 })
 
-    it('should return success when order already completed', async () => {
-      mockJobRepository.findJobById.mockResolvedValue(mockJob)
-      mockJobRepository.findPaymentOrderById.mockResolvedValue({
-        ...mockOrder,
-        status: PaymentStatus.COMPLETED,
-      })
-
-      const result = await service.confirmBoostPayment(1, 5, {
-        paymentOrderId: 100,
-      })
-
-      expect(result.success).toBe(true)
-      expect(result.message).toContain('đã được xác nhận trước đó')
-    })
-
-    it('should throw when order status is not PENDING', async () => {
-      mockJobRepository.findJobById.mockResolvedValue(mockJob)
-      mockJobRepository.findPaymentOrderById.mockResolvedValue({
-        ...mockOrder,
-        status: PaymentStatus.FAILED,
-      })
-
-      await expect(
-        service.confirmBoostPayment(1, 5, { paymentOrderId: 100 })
-      ).rejects.toThrow(BadRequestException)
-    })
-
-    it('should activate boost for 7 days with amount 50000', async () => {
-      mockJobRepository.findJobById.mockResolvedValue(mockJob)
-      mockJobRepository.findPaymentOrderById.mockResolvedValue(mockOrder)
-      mockJobRepository.activateBoostAfterPayment.mockResolvedValue({
-        order: { id: 100 },
-        job: { id: 1, isBoosted: true, boostExpiredAt: '2026-04-05' },
-      })
-
-      const result = await service.confirmBoostPayment(1, 5, {
-        paymentOrderId: 100,
-        transactionCode: 'TXN123',
-      })
-
-      expect(result.success).toBe(true)
-      expect(jobRepository.activateBoostAfterPayment).toHaveBeenCalledWith({
-        orderId: 100,
-        jobId: 1,
-        durationDays: 7,
-        transactionCode: 'TXN123',
-      })
-    })
-
-    it('should activate boost for 30 days with amount 300000', async () => {
-      const largeOrder = {
-        ...mockOrder,
-        amount: 300000,
-      }
-      mockJobRepository.findJobById.mockResolvedValue(mockJob)
-      mockJobRepository.findPaymentOrderById.mockResolvedValue(largeOrder)
-      mockJobRepository.activateBoostAfterPayment.mockResolvedValue({
-        order: { id: 100 },
-        job: { id: 1, isBoosted: true, boostExpiredAt: '2026-04-28' },
-      })
-
-      await service.confirmBoostPayment(1, 5, { paymentOrderId: 100 })
-
-      expect(jobRepository.activateBoostAfterPayment).toHaveBeenCalledWith(
-        expect.objectContaining({
-          durationDays: 30,
-        })
-      )
+      expect(result.success).toBe(false)
+      expect(result.message).toContain('Endpoint xác nhận payment boost đã ngưng')
     })
   })
 
   describe('handleSepayWebhook', () => {
-    const mockOrder = {
-      id: 100,
-      status: PaymentStatus.PENDING,
-      amount: 50000,
-      orderType: OrderType.BOOST_JOB,
-      paymentMethod: PaymentMethod.SEPAY,
-      targetId: 1,
-    }
-
-    it('should throw on invalid webhook authorization', async () => {
-      sepayService.isValidWebhookAuthorization = jest
-        .fn()
-        .mockReturnValue(false)
-
-      await expect(
-        service.handleSepayWebhook('invalid-key', {})
-      ).rejects.toThrow()
-    })
-
-    it('should throw on invalid payload', async () => {
-      mockSepayService.isValidWebhookAuthorization.mockReturnValue(true)
-
-      await expect(
-        service.handleSepayWebhook('valid-key', null as any)
-      ).rejects.toThrow()
-    })
-
-    it('should ignore outgoing transfer', async () => {
-      mockSepayService.isValidWebhookAuthorization.mockReturnValue(true)
-
-      const result = await service.handleSepayWebhook('valid-key', {
-        transferType: 'out',
-      })
+    it('should return deprecated warning directly', async () => {
+      const result = await service.handleSepayWebhook('some-header', {})
 
       expect(result.success).toBe(true)
-      expect(result.message).toContain('Bỏ qua')
+      expect(result.message).toContain('Luồng webhook SePay cho job/boost đã ngưng')
     })
+  })
 
-    it('should ignore transfer without order code', async () => {
-      mockSepayService.isValidWebhookAuthorization.mockReturnValue(true)
-      mockSepayService.extractOrderIdFromPayload.mockReturnValue(null)
+  describe('getBoostPackages', () => {
+    it('should return boost packages for employer', async () => {
+      const mockPackages = [
+        { id: 1, name: 'Gói 7 ngày', durationDays: 7, price: 50000, isDefault: true }
+      ]
+      mockWalletService.getBoostPackagesForEmployer.mockResolvedValue(mockPackages)
 
-      const result = await service.handleSepayWebhook('valid-key', {
-        transferType: 'in',
-      })
+      const result = await service.getBoostPackages()
 
       expect(result.success).toBe(true)
-    })
-
-    it('should ignore transfer for non-boost order', async () => {
-      mockSepayService.isValidWebhookAuthorization.mockReturnValue(true)
-      mockSepayService.extractOrderIdFromPayload.mockReturnValue(100)
-      mockJobRepository.findPaymentOrderById.mockResolvedValue({
-        ...mockOrder,
-        orderType: 'OTHER_TYPE',
-      })
-
-      const result = await service.handleSepayWebhook('valid-key', {
-        transferType: 'in',
-      })
-
-      expect(result.success).toBe(true)
-    })
-
-    it('should return error when amount insufficient', async () => {
-      mockSepayService.isValidWebhookAuthorization.mockReturnValue(true)
-      mockSepayService.extractOrderIdFromPayload.mockReturnValue(100)
-      mockJobRepository.findPaymentOrderById.mockResolvedValue(mockOrder)
-
-      const result = await service.handleSepayWebhook('valid-key', {
-        transferType: 'in',
-        transferAmount: 30000,
-      })
-
-      expect(result.success).toBe(true)
-      expect(result.message).toContain('chưa đủ')
-    })
-
-    it('should activate boost on valid webhook', async () => {
-      mockSepayService.isValidWebhookAuthorization.mockReturnValue(true)
-      mockSepayService.extractOrderIdFromPayload.mockReturnValue(100)
-      mockJobRepository.findPaymentOrderById.mockResolvedValue(mockOrder)
-      mockJobRepository.activateBoostAfterPayment.mockResolvedValue({
-        order: { id: 100 },
-        job: { id: 1, isBoosted: true, boostExpiredAt: '2026-04-05' },
-      })
-
-      const result = await service.handleSepayWebhook('valid-key', {
-        transferType: 'in',
-        transferAmount: 50000,
-        transactionCode: 'TXN456',
-      })
-
-      expect(result.success).toBe(true)
-      expect(result.message).toContain('xác nhận')
-      expect(jobRepository.activateBoostAfterPayment).toHaveBeenCalled()
-    })
-
-    it('should use fallback transaction code', async () => {
-      mockSepayService.isValidWebhookAuthorization.mockReturnValue(true)
-      mockSepayService.extractOrderIdFromPayload.mockReturnValue(100)
-      mockJobRepository.findPaymentOrderById.mockResolvedValue(mockOrder)
-      mockJobRepository.activateBoostAfterPayment.mockResolvedValue({
-        order: { id: 100 },
-        job: { id: 1 },
-      })
-
-      await service.handleSepayWebhook('valid-key', {
-        transferType: 'in',
-        transferAmount: 50000,
-        id: 'webhook-123',
-      })
-
-      expect(jobRepository.activateBoostAfterPayment).toHaveBeenCalledWith(
-        expect.objectContaining({
-          transactionCode: expect.any(String),
-        })
-      )
-    })
-
-    it('should ignore when order already completed', async () => {
-      mockSepayService.isValidWebhookAuthorization.mockReturnValue(true)
-      mockSepayService.extractOrderIdFromPayload.mockReturnValue(100)
-      mockJobRepository.findPaymentOrderById.mockResolvedValue({
-        ...mockOrder,
-        status: PaymentStatus.COMPLETED,
-      })
-
-      const result = await service.handleSepayWebhook('valid-key', {
-        transferType: 'in',
-        transferAmount: 50000,
-      })
-
-      expect(result.success).toBe(true)
-      expect(result.message).toContain('đã xử lý')
+      expect(result.items).toEqual(mockPackages)
+      expect(walletService.getBoostPackagesForEmployer).toHaveBeenCalled()
     })
   })
 })

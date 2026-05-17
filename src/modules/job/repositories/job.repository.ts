@@ -3,8 +3,6 @@ import {
   EnumUserRole,
   JobApplicationStatus,
   OrderType,
-  PaymentMethod,
-  PaymentStatus,
   ReportStatus,
   CampaignStatus,
   InterviewInvitationStatus,
@@ -38,24 +36,6 @@ export class JobRepository {
             name: true,
           },
         },
-      },
-    })
-  }
-
-  async createJobPostingPaymentOrder(params: {
-    userId: number
-    jobId: number
-    amount: number
-    paymentMethod: PaymentMethod
-  }) {
-    return this.prisma.paymentOrder.create({
-      data: {
-        userId: params.userId,
-        orderType: OrderType.FEATURE_LISTING,
-        targetId: params.jobId,
-        amount: params.amount,
-        paymentMethod: params.paymentMethod,
-        status: PaymentStatus.PENDING,
       },
     })
   }
@@ -165,18 +145,6 @@ export class JobRepository {
       }
 
       return job
-    })
-  }
-
-  async findPendingJobPostingOrder(jobId: number) {
-    return this.prisma.paymentOrder.findFirst({
-      where: {
-        targetId: jobId,
-        orderType: OrderType.FEATURE_LISTING,
-        status: PaymentStatus.PENDING,
-        paymentMethod: PaymentMethod.SEPAY,
-      },
-      orderBy: { createdAt: 'desc' },
     })
   }
 
@@ -311,28 +279,6 @@ export class JobRepository {
     return { items, total }
   }
 
-  async createBoostPaymentOrder(params: {
-    userId: number
-    jobId: number
-    amount: number
-    paymentMethod: PaymentMethod
-    packageId?: number
-    packageDays?: number
-  }) {
-    return this.prisma.paymentOrder.create({
-      data: {
-        userId: params.userId,
-        orderType: OrderType.BOOST_JOB,
-        targetId: params.jobId,
-        packageId: params.packageId,
-        packageDays: params.packageDays,
-        amount: params.amount,
-        paymentMethod: params.paymentMethod,
-        status: PaymentStatus.PENDING,
-      },
-    })
-  }
-
   async getActiveBoostPackages() {
     return this.prisma.paymentPackage.findMany({
       where: {
@@ -381,106 +327,6 @@ export class JobRepository {
     })
   }
 
-  async findPaymentOrderById(orderId: number) {
-    return this.prisma.paymentOrder.findUnique({
-      where: { id: orderId },
-    })
-  }
-
-  async activateBoostAfterPayment(params: {
-    orderId: number
-    jobId: number
-    durationDays: number
-    transactionCode?: string
-  }) {
-    const now = new Date()
-
-    return this.prisma.$transaction(async (tx) => {
-      const existingJob = await tx.job.findUnique({
-        where: { id: params.jobId },
-        select: { boostExpiredAt: true },
-      })
-
-      const baseDate =
-        existingJob?.boostExpiredAt && existingJob.boostExpiredAt > now
-          ? existingJob.boostExpiredAt
-          : now
-
-      const boostExpiredAt = new Date(baseDate)
-      boostExpiredAt.setDate(boostExpiredAt.getDate() + params.durationDays)
-
-      const order = await tx.paymentOrder.update({
-        where: { id: params.orderId },
-        data: {
-          status: PaymentStatus.COMPLETED,
-          transactionCode: params.transactionCode,
-        },
-      })
-
-      const job = await tx.job.update({
-        where: { id: params.jobId },
-        data: {
-          isBoosted: true,
-          boostExpiredAt,
-        },
-        include: {
-          company: { select: { ownerId: true } },
-        },
-      })
-
-      if (job.company?.ownerId) {
-        await tx.notification.create({
-          data: {
-            userId: job.company.ownerId,
-            title: 'Thanh toán đẩy tin thành công',
-            message: `(${params.durationDays} ngày) ${job.title}`,
-            link: `/employer`,
-          },
-        })
-      }
-
-      return { order, job }
-    })
-  }
-
-  async activateJobPostingAfterPayment(params: {
-    orderId: number
-    jobId: number
-    transactionCode?: string
-  }) {
-    return this.prisma.$transaction(async (tx) => {
-      const order = await tx.paymentOrder.update({
-        where: { id: params.orderId },
-        data: {
-          status: PaymentStatus.COMPLETED,
-          transactionCode: params.transactionCode,
-        },
-      })
-
-      const job = await tx.job.update({
-        where: { id: params.jobId },
-        data: {
-          status: JobStatus.PUBLISHED,
-        },
-        include: {
-          company: { select: { ownerId: true } },
-        },
-      })
-
-      if (job.company?.ownerId) {
-        await tx.notification.create({
-          data: {
-            userId: job.company.ownerId,
-            title: 'Thanh toán tin tuyển dụng thành công',
-            message: job.title,
-            link: `/employer`,
-          },
-        })
-      }
-
-      return { order, job }
-    })
-  }
 
   async deleteJob(jobId: number) {
     return this.prisma.job.update({
@@ -492,7 +338,8 @@ export class JobRepository {
   }
   async updateJobFull(jobId: number, dto: any) {
     return this.prisma.$transaction(async (tx) => {
-      const { fields, ...jobData } = dto
+      const jobData = { ...dto }
+      delete jobData.fields
 
       const updatedJob = await tx.job.update({
         where: { id: jobId },
