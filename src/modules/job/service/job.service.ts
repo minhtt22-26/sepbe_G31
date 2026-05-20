@@ -491,6 +491,21 @@ export class JobService {
       throw new Error('Job not found or unauthorized')
     }
 
+    // Check if there are interview campaigns with future slots
+    const lastSlot = await this.jobRepository.getLastInterviewSlotByJob(jobId)
+    if (lastSlot && new Date(lastSlot.endAt) > new Date()) {
+      const endTime = new Date(lastSlot.endAt).toLocaleString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      })
+      throw new BadRequestException(
+        `Không thể xóa tin tuyển dụng này vì vẫn còn lịch phỏng vấn chưa kết thúc. Ca phỏng vấn cuối cùng kết thúc lúc ${endTime}. Vui lòng đợi sau thời gian đó để xóa.`,
+      )
+    }
+
     await this.jobRepository.deleteJob(jobId)
 
     return { success: true }

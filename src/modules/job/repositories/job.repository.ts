@@ -644,6 +644,22 @@ export class JobRepository {
               email: true,
               phone: true,
               avatar: true,
+              workerProfile: {
+                select: {
+                  gender: true,
+                  birthYear: true,
+                  province: true,
+                  experienceYear: true,
+                  expectedSalary: true,
+                  shift: true,
+                  bio: true,
+                  occupation: {
+                    select: {
+                      name: true,
+                    },
+                  },
+                },
+              },
               interviewInvitations: {
                 where: { campaign: { jobId: jobId } },
                 orderBy: { createdAt: 'desc' },
@@ -752,6 +768,10 @@ export class JobRepository {
         title = 'Hồ sơ chưa phù hợp'
         message = `Rất tiếc, hồ sơ của bạn cho vị trí "${app.job.title}" chưa phù hợp ở thời điểm hiện tại.`
         break
+      case 'SUITABLE':
+        title = 'Hồ sơ phù hợp'
+        message = `Chúc mừng! Hồ sơ của bạn cho vị trí "${app.job.title}" đã được đánh giá phù hợp. Nhà tuyển dụng sẽ liên hệ với bạn sớm.`
+        break
     }
 
     if (title && app.userId) {
@@ -784,6 +804,16 @@ export class JobRepository {
   }
 
   // --- Interview invitation helpers ---
+  async getLastInterviewSlotByJob(jobId: number) {
+    return this.prisma.interviewInvitationSlot.findFirst({
+      where: {
+        campaign: { jobId },
+      },
+      orderBy: { endAt: 'desc' },
+      select: { id: true, endAt: true },
+    })
+  }
+
   async getLatestActiveCampaignByJob(jobId: number, companyId: number) {
     return this.prisma.interviewInvitationCampaign.findFirst({
       where: {
@@ -863,10 +893,8 @@ export class JobRepository {
         data: {
           userId: workerId,
           title: `Bạn có lịch phỏng vấn: ${jobTitle}`,
-          message: slotSummary
-            ? `Bạn có lịch phỏng vấn cho vị trí "${jobTitle}".\n\nCác ca phỏng vấn đã được nhà tuyển dụng sắp xếp:\n${slotSummary}\n\nVui lòng mở lời mời để chọn ca phù hợp.`
-            : message,
-          link: `/interview-invitations/${invitation.id}`,
+          message: `Bạn đã nhận được lịch phỏng vấn cho vị trí "${jobTitle}". Vui lòng mở lời mời để chọn ca phù hợp.`,
+          link: `/interview-invitations?invitationId=${invitation.id}`,
         },
       })
 

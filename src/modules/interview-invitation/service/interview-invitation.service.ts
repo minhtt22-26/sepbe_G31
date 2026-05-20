@@ -77,14 +77,26 @@ export class InterviewInvitationService {
     }
   }
 
-  private buildCampaignTitle(jobTitle?: string | null) {
+  private buildCampaignTitle(jobTitle?: string | null, isSlotLess = false) {
+    if (isSlotLess) {
+      if (jobTitle?.trim()) {
+        return `Đề xuất ứng tuyển - ${jobTitle.trim()}`
+      }
+      return 'Đề xuất ứng tuyển'
+    }
     if (jobTitle?.trim()) {
       return `Lịch phỏng vấn - ${jobTitle.trim()}`
     }
     return 'Lịch phỏng vấn ứng viên'
   }
 
-  private buildCampaignMessage(jobTitle?: string | null) {
+  private buildCampaignMessage(jobTitle?: string | null, isSlotLess = false) {
+    if (isSlotLess) {
+      if (jobTitle?.trim()) {
+        return `Chúng tôi nhận thấy hồ sơ của bạn phù hợp với vị trí ${jobTitle.trim()}. Nếu bạn quan tâm, hãy xác nhận để chúng tôi xem xét hồ sơ của bạn.`
+      }
+      return 'Chúng tôi nhận thấy hồ sơ của bạn phù hợp với công việc này. Nếu bạn quan tâm, hãy xác nhận để chúng tôi xem xét hồ sơ của bạn.'
+    }
     if (jobTitle?.trim()) {
       return `Chúng tôi mời bạn tham gia phỏng vấn cho vị trí ${jobTitle.trim()}. Vui lòng chọn ca phù hợp và xác nhận tham gia đúng giờ.`
     }
@@ -416,8 +428,8 @@ export class InterviewInvitationService {
       }
     }
 
-    const campaignTitle = this.buildCampaignTitle(jobTitle)
-    const campaignMessage = this.buildCampaignMessage(jobTitle)
+    const campaignTitle = dto.title?.trim() || this.buildCampaignTitle(jobTitle, isSlotLess)
+    const campaignMessage = dto.message?.trim() || this.buildCampaignMessage(jobTitle, isSlotLess)
 
     const createdCampaign = await this.prisma.$transaction(async (tx) => {
       const campaign = await tx.interviewInvitationCampaign.create({
@@ -594,7 +606,11 @@ export class InterviewInvitationService {
       }
 
       // 4. Gửi Notification
-      const jobTitle = campaign.jobId ? `Công việc #${campaign.jobId}` : campaign.title
+      let jobTitle = campaign.title
+      if (campaign.jobId) {
+        const job = await tx.job.findUnique({ where: { id: campaign.jobId }, select: { title: true } })
+        jobTitle = job?.title || campaign.title
+      }
 
       for (const invitation of invitations) {
         if (affectedWorkerIds.includes(invitation.workerId)) {
@@ -604,7 +620,7 @@ export class InterviewInvitationService {
               userId: invitation.workerId,
               title: `Thay đổi ca phỏng vấn: ${jobTitle}`,
               message: `Ca phỏng vấn bạn đã chọn cho vị trí "${jobTitle}" vừa có sự thay đổi về thời gian/địa điểm hoặc đã bị hủy. Vui lòng vào ứng dụng để xem lịch mới và chọn lại ca phỏng vấn phù hợp nhé!`,
-              link: `/interview-invitations/${invitation.id}`,
+              link: `/interview-invitations?invitationId=${invitation.id}`,
             },
           })
         } else {
@@ -614,7 +630,7 @@ export class InterviewInvitationService {
               userId: invitation.workerId,
               title: `Cập nhật lịch phỏng vấn: ${jobTitle}`,
               message: `Nhà tuyển dụng vừa cập nhật thông tin lịch phỏng vấn cho vị trí "${jobTitle}". Bạn có thể nhấn vào để xem chi tiết.`,
-              link: `/interview-invitations/${invitation.id}`,
+              link: `/interview-invitations?invitationId=${invitation.id}`,
             },
           })
         }
@@ -706,23 +722,30 @@ export class InterviewInvitationService {
    */
   private async sendNotificationsToWorkers(campaign: any) {
     const invitations = campaign.invitations || []
-    const slots = (campaign.slots || [])
-      .map((slot) => `- ${this.formatSlotSummary(slot)}`)
-      .join('\n')
 
-    const messageWithSlots = slots
-      ? `${campaign.message}\n\nCác ca phỏng vấn:\n${slots}\n\nVui lòng mở lời mời để chọn ca phù hợp.`
-      : campaign.message
+    // Lấy tên công việc thay vì dùng campaign title
+    let jobTitle = campaign.title
+    if (campaign.jobId) {
+      const job = await this.prisma.job.findUnique({ where: { id: campaign.jobId }, select: { title: true } })
+      jobTitle = job?.title || campaign.title
+    }
 
     for (const invitation of invitations) {
       try {
         // Send notification
+        const isSlotLessCampaign = !campaign.slots || campaign.slots.length === 0
+        const notifTitle = isSlotLessCampaign
+          ? `Đề xuất việc làm: ${jobTitle}`
+          : `Mời phỏng vấn: ${jobTitle}`
+        const notifLink = isSlotLessCampaign
+          ? `/job-invitations?invitationId=${invitation.id}`
+          : `/interview-invitations?invitationId=${invitation.id}`
         await this.prisma.notification.create({
           data: {
             userId: invitation.workerId,
-            title: `Mời phỏng vấn: ${campaign.title}`,
-            message: messageWithSlots,
-            link: `/interview-invitations/${invitation.id}`,
+            title: notifTitle,
+            message: campaign.message,
+            link: notifLink,
           },
         })
 
@@ -857,6 +880,7 @@ export class InterviewInvitationService {
         id: i.id,
         campaign: {
           id: i.campaign.id,
+          jobId: i.campaign.jobId,
           title: i.campaign.title,
           message: i.campaign.message,
           expiresAt: i.campaign.expiresAt,
@@ -1150,6 +1174,12 @@ export class InterviewInvitationService {
 
     // Send notification to company owner
     if (company) {
+      let notifJobTitle = invitation.campaign.title
+      if (invitation.campaign.jobId) {
+        const job = await this.prisma.job.findUnique({ where: { id: invitation.campaign.jobId }, select: { title: true } })
+        notifJobTitle = job?.title || invitation.campaign.title
+      }
+
       const acceptedSlotText =
         dto.status === InterviewInvitationStatus.ACCEPTED &&
           updatedInvitation.selectedSlot
@@ -1159,11 +1189,136 @@ export class InterviewInvitationService {
       await this.prisma.notification.create({
         data: {
           userId: company.ownerId,
-          title: `Worker ${invitation.worker.fullName} đã phản hồi lời mời`,
-          message: `${invitation.worker.fullName} đã ${dto.status === InterviewInvitationStatus.ACCEPTED ? 'chấp nhận' : 'từ chối'} lời mời phỏng vấn cho ${invitation.campaign.title}${acceptedSlotText}`,
+          title: `Ứng viên ${invitation.worker.fullName} đã phản hồi lời mời`,
+          message: `${invitation.worker.fullName} đã ${dto.status === InterviewInvitationStatus.ACCEPTED ? 'chấp nhận' : 'từ chối'} lời mời phỏng vấn cho "${notifJobTitle}"${acceptedSlotText}`,
           link: `/campaigns/${invitation.campaign.id}`,
         },
       })
+    }
+
+    // Auto-add worker to existing interview campaign (with slots) if this was a slot-less acceptance
+    let autoAddDebug: any = {}
+    const isSlotLessAcceptance =
+      dto.status === InterviewInvitationStatus.ACCEPTED &&
+      updatedInvitation?.campaign?.jobId &&
+      (updatedInvitation.campaign.slots || []).length === 0
+
+    autoAddDebug = {
+      dtoStatus: dto.status,
+      hasJobId: !!updatedInvitation?.campaign?.jobId,
+      jobId: updatedInvitation?.campaign?.jobId,
+      slotsLength: (updatedInvitation?.campaign?.slots || []).length,
+      isSlotLessAcceptance,
+      currentCampaignId: updatedInvitation?.campaign?.id,
+    }
+    console.log('[AUTO-ADD DEBUG] Step 1 - Checking:', autoAddDebug)
+
+    if (isSlotLessAcceptance) {
+      try {
+        const jobId = updatedInvitation.campaign.jobId
+        const companyId = updatedInvitation.campaign.companyId || invitation.campaign.companyId
+        const currentCampaignId = updatedInvitation.campaign.id
+
+        autoAddDebug.step2 = { jobId, companyId, currentCampaignId }
+        console.log('[AUTO-ADD DEBUG] Step 2 - Search params:', autoAddDebug.step2)
+
+        // Find an active campaign WITH slots for the same job (exclude current slot-less campaign)
+        const activeCampaignWithSlots = await this.prisma.interviewInvitationCampaign.findFirst({
+          where: {
+            jobId,
+            companyId,
+            id: { not: currentCampaignId },
+            status: {
+              in: [
+                CampaignStatus.DRAFT,
+                CampaignStatus.SCHEDULED,
+                CampaignStatus.IN_PROGRESS,
+                CampaignStatus.COMPLETED,
+              ],
+            },
+            slots: { some: {} },
+          },
+          orderBy: { createdAt: 'desc' },
+          include: {
+            slots: { orderBy: { startAt: 'asc' } },
+          },
+        })
+
+        autoAddDebug.step3 = activeCampaignWithSlots
+          ? { id: activeCampaignWithSlots.id, status: activeCampaignWithSlots.status, slotsCount: activeCampaignWithSlots.slots.length }
+          : 'NOT_FOUND'
+        console.log('[AUTO-ADD DEBUG] Step 3 - Found campaign:', autoAddDebug.step3)
+
+        if (activeCampaignWithSlots) {
+          // Check if worker already has an active invitation in that campaign
+          const alreadyInvited = await this.prisma.interviewInvitation.findFirst({
+            where: {
+              workerId,
+              campaignId: activeCampaignWithSlots.id,
+              status: {
+                in: [InterviewInvitationStatus.PENDING, InterviewInvitationStatus.ACCEPTED],
+              },
+            },
+            select: { id: true },
+          })
+
+          autoAddDebug.step4 = { alreadyInvited: !!alreadyInvited }
+          console.log('[AUTO-ADD DEBUG] Step 4 - Already invited:', !!alreadyInvited)
+
+          if (!alreadyInvited) {
+            const job = await this.prisma.job.findUnique({
+              where: { id: jobId },
+              select: { title: true },
+            })
+
+            await this.prisma.$transaction(async (tx) => {
+              const newInv = await tx.interviewInvitation.create({
+                data: {
+                  campaignId: activeCampaignWithSlots.id,
+                  workerId,
+                  status: InterviewInvitationStatus.PENDING,
+                },
+              })
+
+              await tx.interviewInvitationCampaign.update({
+                where: { id: activeCampaignWithSlots.id },
+                data: {
+                  totalCount: { increment: 1 },
+                  pendingCount: { increment: 1 },
+                },
+              })
+
+              const jobTitle = job?.title || activeCampaignWithSlots.title
+              await tx.notification.create({
+                data: {
+                  userId: workerId,
+                  title: `Bạn có lịch phỏng vấn: ${jobTitle}`,
+                  message: `Bạn đã nhận được lịch phỏng vấn cho vị trí "${jobTitle}". Vui lòng mở lời mời để chọn ca phù hợp.`,
+                  link: `/interview-invitations?invitationId=${newInv.id}`,
+                },
+              })
+
+              autoAddDebug.step5 = { success: true, newInvitationId: newInv.id, campaignId: activeCampaignWithSlots.id }
+              return newInv
+            })
+
+            console.log(
+              `[AUTO-ADD] Successfully added worker #${workerId} to interview campaign #${activeCampaignWithSlots.id} for job #${jobId}`,
+            )
+          }
+        }
+      } catch (error) {
+        autoAddDebug.error = String(error)
+        console.error(
+          `[AUTO-ADD ERROR] Failed to auto-add worker #${workerId} to interview campaign:`,
+          error,
+        )
+      }
+    }
+
+    // Temporarily attach debug info to response
+    if (updatedInvitation) {
+      updatedInvitation._autoAddDebug = autoAddDebug
     }
 
     return updatedInvitation
@@ -1282,15 +1437,21 @@ export class InterviewInvitationService {
 
     await this.updateCampaignStats(campaignId)
 
+    let cancelJobTitle = campaign.title
+    if (campaign.jobId) {
+      const job = await this.prisma.job.findUnique({ where: { id: campaign.jobId }, select: { title: true } })
+      cancelJobTitle = job?.title || campaign.title
+    }
+
     for (const invitation of affectedInvitations) {
       try {
         await this.prisma.notification.create({
           data: {
             userId: invitation.workerId,
-            title: `Lịch phỏng vấn đã bị hủy: ${campaign.title}`,
+            title: `Lịch phỏng vấn đã bị hủy: ${cancelJobTitle}`,
             message:
-              'Nhà tuyển dụng đã hủy lịch phỏng vấn cho chiến dịch này. Bạn không cần tham gia buổi phỏng vấn đã chọn trước đó.',
-            link: `/interview-invitations/${invitation.id}`,
+              `Nhà tuyển dụng đã hủy lịch phỏng vấn cho vị trí "${cancelJobTitle}". Bạn không cần tham gia buổi phỏng vấn đã chọn trước đó.`,
+            link: `/interview-invitations?invitationId=${invitation.id}`,
           },
         })
       } catch (error) {
@@ -1319,6 +1480,45 @@ export class InterviewInvitationService {
     }
 
     return this.repository.getCampaignStats(campaignId)
+  }
+
+  async getInvitedWorkersByJob(jobId: number, companyId: number) {
+    const invitations = await this.prisma.interviewInvitation.findMany({
+      where: {
+        campaign: {
+          jobId,
+          companyId,
+        },
+      },
+      include: {
+        worker: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            phone: true,
+            avatar: true,
+          },
+        },
+        campaign: {
+          select: {
+            id: true,
+            title: true,
+            slots: { select: { id: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    return invitations.map((inv) => ({
+      id: inv.id,
+      status: inv.status,
+      respondedAt: inv.respondedAt,
+      createdAt: inv.createdAt,
+      type: (inv.campaign.slots || []).length > 0 ? 'INTERVIEW' : 'JOB_INVITE',
+      worker: inv.worker,
+    }))
   }
 
   async getJobInviteConstraints(jobId: number, companyId: number) {

@@ -34,7 +34,7 @@ export class CompanyService {
     private readonly cloudinary: CloudinaryService,
     private readonly companyRepository: CompanyRepository,
     @Inject(REDIS_CLIENT) private redis: RedisClientType,
-  ) {}
+  ) { }
 
   async findAll() {
     return this.prisma.company.findMany({
@@ -308,6 +308,17 @@ export class CompanyService {
     },
     ownerId: number,
   ) {
+    // Kiểm tra trùng mã số thuế
+    if (data.taxCode) {
+      const existingCompany = await this.prisma.company.findFirst({
+        where: { taxCode: data.taxCode },
+        select: { id: true },
+      })
+      if (existingCompany) {
+        throw new BadRequestException('Mã số thuế đã được đăng ký')
+      }
+    }
+
     try {
       let logoUrl: string | undefined
       let businessLicenseUrl: string | undefined

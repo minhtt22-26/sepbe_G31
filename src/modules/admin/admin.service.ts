@@ -221,6 +221,9 @@ export class AdminService {
     // 3. Jobs
     const totalJobs = await this.prisma.job.count();
 
+    // Total applications
+    const totalApplications = await this.prisma.jobApplication.count();
+
     // Reports Unresolved
     const unresolvedReports = await this.prisma.jobReport.count({
       where: { status: 'PENDING' as any }
@@ -233,15 +236,46 @@ export class AdminService {
     });
     const totalRevenue = revenueAggr._sum.amount || 0;
 
+    // Revenue by order type (filtered by year)
+    const yearStart = new Date(targetYear, 0, 1);
+    const yearEnd = new Date(targetYear + 1, 0, 1);
+
+    const revenueByType = await this.prisma.paymentOrder.groupBy({
+      by: ['orderType'],
+      _sum: { amount: true },
+      where: {
+        status: 'COMPLETED' as any,
+        createdAt: { gte: yearStart, lt: yearEnd },
+      },
+    });
+    const revenueByTypeMap: Record<string, number> = {};
+    for (const item of revenueByType) {
+      revenueByTypeMap[item.orderType] = item._sum.amount || 0;
+    }
+
+    // Point spending by wallet transaction type (POST_JOB, BOOST_JOB, AI_INVITE)
+    const pointSpending = await this.prisma.walletTransaction.groupBy({
+      by: ['type'],
+      _sum: { pointDelta: true },
+      where: {
+        pointDelta: { lt: 0 },
+        createdAt: { gte: yearStart, lt: yearEnd },
+      },
+    });
+    const pointSpendingByType: Record<string, number> = {};
+    for (const item of pointSpending) {
+      pointSpendingByType[item.type] = Math.abs(item._sum.pointDelta || 0);
+    }
+
     // Time-series for Charts (12 Months of selected year)
     const labels: string[] = [];
     const revenue: number[] = [];
     const newUsers: number[] = [];
+    const newJobs: number[] = [];
+    const newApplications: number[] = [];
     
     for (let month = 0; month < 12; month++) {
-      // Start of the month
       const startD = new Date(targetYear, month, 1);
-      // Start of the next month
       const endD = new Date(targetYear, month + 1, 1);
       
       const monStr = `Tháng ${month + 1}`;
@@ -252,6 +286,16 @@ export class AdminService {
       });
       newUsers.push(usersCount);
 
+      const jobsCount = await this.prisma.job.count({
+        where: { createdAt: { gte: startD, lt: endD } }
+      });
+      newJobs.push(jobsCount);
+
+      const appsCount = await this.prisma.jobApplication.count({
+        where: { createdAt: { gte: startD, lt: endD } }
+      });
+      newApplications.push(appsCount);
+
       const revAggr = await this.prisma.paymentOrder.aggregate({
         _sum: { amount: true },
         where: { 
@@ -261,6 +305,30 @@ export class AdminService {
       });
       revenue.push(revAggr._sum.amount || 0);
     }
+
+    // Top 10 occupations by job count (filtered by year)
+    const topOccupationsRaw = await this.prisma.job.groupBy({
+      by: ['occupationId'],
+      _count: { id: true },
+      where: {
+        createdAt: { gte: yearStart, lt: yearEnd },
+      },
+      orderBy: { _count: { id: 'desc' } },
+      take: 10,
+    });
+
+    const occupationIds = topOccupationsRaw.map((o) => o.occupationId);
+    const occupations = await this.prisma.occupation.findMany({
+      where: { id: { in: occupationIds } },
+      select: { id: true, name: true },
+    });
+    const occMap = new Map(occupations.map((o) => [o.id, o.name]));
+
+    const topOccupations = topOccupationsRaw.map((o) => ({
+      occupationId: o.occupationId,
+      name: occMap.get(o.occupationId) || `Nghề #${o.occupationId}`,
+      jobCount: o._count.id,
+    }));
 
     return {
       users: { 
@@ -276,16 +344,24 @@ export class AdminService {
       jobs: { 
         total: totalJobs 
       },
+      applications: {
+        total: totalApplications,
+      },
       reports: {
         unresolved: unresolvedReports
       },
       payments: { 
-        totalRevenue 
+        totalRevenue,
+        revenueByType: revenueByTypeMap,
+        pointSpendingByType,
       },
+      topOccupations,
       charts: {
         labels,
         revenue,
-        newUsers
+        newUsers,
+        newJobs,
+        newApplications,
       }
     };
   }
