@@ -173,6 +173,23 @@ export class InterviewInvitationController {
   }
 
   /**
+   * Employer: Lấy danh sách ứng viên đã mời theo job
+   */
+  @Get('jobs/:jobId/invited-workers')
+  @AuthJwtAccessProtected()
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Lấy danh sách ứng viên đã mời theo job' })
+  @ApiResponse({ status: 200, description: 'Danh sách ứng viên đã mời' })
+  async getInvitedWorkers(
+    @AuthJwtPayload() user: any,
+    @Param('jobId', ParseIntPipe) jobId: number,
+  ) {
+    const company = await this.companyService.findByOwnerId(user.userId)
+    return this.interviewInvitationService.getInvitedWorkersByJob(jobId, company.id)
+  }
+
+  /**
    * Worker: Lấy trạng thái có lời mời đang pending không
    */
   @Get('my-invitations/pending-status')
