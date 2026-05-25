@@ -1,0 +1,33 @@
+# ── Stage 1: Install production dependencies (no scripts to skip postinstall) ──
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev --ignore-scripts
+
+# ── Stage 2: Full build (install all deps, generate Prisma, compile TypeScript) ──
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npx prisma generate
+RUN npm run build
+
+# ── Stage 3: Production runtime ──
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# Production node_modules (no devDeps)
+COPY --from=deps /app/node_modules ./node_modules
+# Prisma native query engine binary (generated in builder)
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+# Compiled app
+COPY --from=builder /app/dist ./dist
+# Prisma schema (needed for migrations at startup)
+COPY prisma ./prisma
+
+EXPOSE 4000
+
+CMD ["node", "dist/src/main"]
