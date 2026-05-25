@@ -42,6 +42,14 @@ export default tseslint.config(
       // 🟡 CHỈ CẢNH BÁO
       '@typescript-eslint/no-misused-promises': 'warn',
 
+      // 🟡 CHO PHÉP BIẾN _ PREFIX (intentionally unused)
+      '@typescript-eslint/no-unused-vars': ['error', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+        destructuredArrayIgnorePattern: '^_',
+      }],
+
       // ❌ TẮT STYLE RULE
       '@typescript-eslint/semi': 'off',
       semi: 'off',
