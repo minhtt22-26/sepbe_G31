@@ -104,26 +104,14 @@ export class InterviewInvitationService {
   }
 
   @Cron(CronExpression.EVERY_5_MINUTES)
-  async handleEmployerInterviewReminders() {
+  async handleInterviewReminders() {
     try {
-      await Promise.all([
-        this.sendEmployerSlotReminders(24),
-        this.sendEmployerSlotReminders(1),
-      ])
+      await this.sendEmployerSlotReminders(24)
+      await this.sendEmployerSlotReminders(1)
+      await this.sendWorkerInvitationReminders(24)
+      await this.sendWorkerInvitationReminders(1)
     } catch (error) {
-      console.error('Error sending employer interview reminders:', error)
-    }
-  }
-
-  @Cron(CronExpression.EVERY_5_MINUTES)
-  async handleWorkerInterviewReminders() {
-    try {
-      await Promise.all([
-        this.sendWorkerInvitationReminders(24),
-        this.sendWorkerInvitationReminders(1),
-      ])
-    } catch (error) {
-      console.error('Error sending worker interview reminders:', error)
+      console.error('Error sending interview reminders:', error)
     }
   }
 
@@ -206,34 +194,34 @@ export class InterviewInvitationService {
       current.acceptedCount += 1
     }
 
-    for (const [slotKey, item] of grouped.entries()) {
-      const reminderTag = `${hoursBefore}h`
+    const reminderTag = `${hoursBefore}h`
+    const candidates = Array.from(grouped.entries()).map(([slotKey, item]) => {
       const link = `/employer?campaignId=${item.campaignId}&slotReminder=${slotKey}&before=${reminderTag}`
-
-      const existed = await this.prisma.notification.findFirst({
-        where: {
-          userId: item.ownerId,
-          link,
-        },
-        select: {
-          id: true,
-        },
-      })
-
-      if (existed) continue
-
       const startText = new Date(item.startAt).toLocaleString('vi-VN')
       const endText = new Date(item.endAt).toLocaleString('vi-VN')
       const locationText = item.location || 'Chưa cập nhật địa điểm'
+      return {
+        userId: item.ownerId,
+        title: `Nhắc lịch phỏng vấn trước ${hoursBefore} giờ`,
+        message: `Ca phỏng vấn của chiến dịch "${item.title}" sẽ diễn ra lúc ${startText} - ${endText} tại ${locationText}. Hiện có ${item.acceptedCount} ứng viên đã xác nhận.`,
+        link,
+      }
+    })
 
-      await this.prisma.notification.create({
-        data: {
-          userId: item.ownerId,
-          title: `Nhắc lịch phỏng vấn trước ${hoursBefore} giờ`,
-          message: `Ca phỏng vấn của chiến dịch "${item.title}" sẽ diễn ra lúc ${startText} - ${endText} tại ${locationText}. Hiện có ${item.acceptedCount} ứng viên đã xác nhận.`,
-          link,
-        },
-      })
+    if (!candidates.length) return
+
+    const existingLinks = new Set(
+      (
+        await this.prisma.notification.findMany({
+          where: { link: { in: candidates.map((c) => c.link) } },
+          select: { link: true },
+        })
+      ).map((n) => n.link),
+    )
+
+    const toCreate = candidates.filter((c) => !existingLinks.has(c.link))
+    if (toCreate.length) {
+      await this.prisma.notification.createMany({ data: toCreate })
     }
   }
 
@@ -271,36 +259,37 @@ export class InterviewInvitationService {
       },
     })
 
-    for (const invitation of acceptedInvitations) {
-      if (!invitation.selectedSlot) continue
-
-      const reminderTag = `${hoursBefore}h`
-      const link = `/interview-invitations/${invitation.id}?before=${reminderTag}&slotId=${invitation.selectedSlot.id}`
-
-      const existed = await this.prisma.notification.findFirst({
-        where: {
-          userId: invitation.workerId,
-          link,
-        },
-        select: {
-          id: true,
-        },
-      })
-
-      if (existed) continue
-
-      const startText = new Date(invitation.selectedSlot.startAt).toLocaleString('vi-VN')
-      const endText = new Date(invitation.selectedSlot.endAt).toLocaleString('vi-VN')
-      const locationText = invitation.selectedSlot.location || 'Chưa cập nhật địa điểm'
-
-      await this.prisma.notification.create({
-        data: {
-          userId: invitation.workerId,
+    const reminderTag = `${hoursBefore}h`
+    const candidates = acceptedInvitations
+      .filter((inv) => inv.selectedSlot)
+      .map((inv) => {
+        const slot = inv.selectedSlot!
+        const link = `/interview-invitations/${inv.id}?before=${reminderTag}&slotId=${slot.id}`
+        const startText = new Date(slot.startAt).toLocaleString('vi-VN')
+        const endText = new Date(slot.endAt).toLocaleString('vi-VN')
+        const locationText = slot.location || 'Chưa cập nhật địa điểm'
+        return {
+          userId: inv.workerId,
           title: `Nhắc lịch phỏng vấn trước ${hoursBefore} giờ`,
-          message: `Buổi phỏng vấn "${invitation.campaign.title}" của bạn sẽ diễn ra lúc ${startText} - ${endText} tại ${locationText}. Vui lòng chuẩn bị trước giờ hẹn.`,
+          message: `Buổi phỏng vấn "${inv.campaign.title}" của bạn sẽ diễn ra lúc ${startText} - ${endText} tại ${locationText}. Vui lòng chuẩn bị trước giờ hẹn.`,
           link,
-        },
+        }
       })
+
+    if (!candidates.length) return
+
+    const existingLinks = new Set(
+      (
+        await this.prisma.notification.findMany({
+          where: { link: { in: candidates.map((c) => c.link) } },
+          select: { link: true },
+        })
+      ).map((n) => n.link),
+    )
+
+    const toCreate = candidates.filter((c) => !existingLinks.has(c.link))
+    if (toCreate.length) {
+      await this.prisma.notification.createMany({ data: toCreate })
     }
   }
 

@@ -1,4 +1,4 @@
-import { Process, Processor } from '@nestjs/bull'
+import { OnQueueFailed, Process, Processor } from '@nestjs/bull'
 import type { Job } from 'bull'
 import { Logger } from '@nestjs/common'
 import { EmailService } from 'src/infrastructure/email/service/email.service'
@@ -23,9 +23,29 @@ export class EmailQueueProcessor {
       )
       this.logger.log(`[QUEUE] ✓ Email job #${job.id} sent to ${job.data.to}`)
       return { success: true, to: job.data.to, jobId: job.id }
-    } catch (error) {
-      this.logger.error(`[QUEUE] ✗ Email job #${job.id} failed: ${error?.message}`)
+    } catch (err) {
+      const error = err as Error
+      this.logger.error(
+        `[QUEUE] ✗ Email job #${job.id} failed (attempt ${job.attemptsMade + 1}): ${error?.message}`,
+      )
       throw error
     }
+  }
+
+  @OnQueueFailed()
+  async handleJobFailed(job: Job<SendEmailJobData>, error: Error) {
+    const maxAttempts = job.opts.attempts ?? 1
+    const isPermanentFailure = job.attemptsMade >= maxAttempts
+    if (!isPermanentFailure) return
+
+    this.logger.error(
+      `[EMAIL-QUEUE] ===== JOB #${job.id} FAILED PERMANENTLY =====\n` +
+        `  To: ${job.data.to}\n` +
+        `  Subject: ${job.data.subject}\n` +
+        `  Attempts: ${job.attemptsMade}/${maxAttempts}\n` +
+        `  Error: ${error.message}\n` +
+        `  Stack: ${error.stack}\n` +
+        `  HINT: Kiểm tra EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASSWORD trong .env`,
+    )
   }
 }
