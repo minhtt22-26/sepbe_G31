@@ -1,7 +1,7 @@
 services:
   # ── PostgreSQL ──────────────────────────────────────────────────────────────
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: sep-db
     restart: unless-stopped
     environment:

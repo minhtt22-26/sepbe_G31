@@ -23,9 +23,11 @@ ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 # Compiled app — Prisma 7.x prisma-client provider embeds WASM in JS, no separate binary needed
 COPY --from=builder /app/dist ./dist
+# Prisma config for migrations — ESM file provides DATABASE_URL to prisma migrate deploy
+COPY prisma.config.mjs ./prisma.config.mjs
 # Prisma schema (needed for migrations at startup)
 COPY prisma ./prisma
 
 EXPOSE 4000
 
-CMD ["node", "dist/src/main"]
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/src/main"]
