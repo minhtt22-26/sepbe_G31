@@ -1,14 +1,14 @@
-# ── Stage 1: Install production dependencies (no scripts to skip postinstall) ──
+# ── Stage 1: Install production dependencies ──────────────────────────────────
 FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --omit=dev --ignore-scripts
+RUN npm install --omit=dev --ignore-scripts
 
 # ── Stage 2: Full build (install all deps, generate Prisma, compile TypeScript) ──
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 COPY . .
 RUN npx prisma generate
 RUN npm run build
