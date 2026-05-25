@@ -24,6 +24,7 @@ import { PrismaModule } from 'src/prisma.module'
             url: redisUrl,
             maxRetriesPerRequest: null,
             enableReadyCheck: false,
+            connectTimeout: 10000,
           },
         }
       },

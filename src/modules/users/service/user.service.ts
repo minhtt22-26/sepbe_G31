@@ -397,10 +397,12 @@ export class UserService {
       <p>Liên kết này sẽ hết hạn sau 15 phút.</p>
       <p>Nếu bạn không yêu cầu điều này, vui lòng bỏ qua email này.</p>
     `
-    await this.emailQueueService.addSendEmailJob({
+    this.emailQueueService.addSendEmailJob({
       to: user.email!,
       subject: 'Khôi phục mật khẩu của bạn',
       html,
+    }).catch((err: Error) => {
+      console.error(`[FORGOT-PASSWORD] Failed to queue email for ${user.email}: ${err?.message}`)
     })
   }
 
