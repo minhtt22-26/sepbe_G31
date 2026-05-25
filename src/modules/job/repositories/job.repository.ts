@@ -862,7 +862,7 @@ export class JobRepository {
       location: string | null
     }[]
   }) {
-    const { campaignId, workerId, jobTitle, message, slots } = params
+    const { campaignId, workerId, jobTitle, message: _message, slots } = params
 
     return this.prisma.$transaction(async (tx) => {
       const invitation = await tx.interviewInvitation.create({
@@ -881,7 +881,7 @@ export class JobRepository {
         },
       })
 
-      const slotSummary = (slots || [])
+      const _slotSummary = (slots || [])
         .map((slot) => {
           const start = new Date(slot.startAt).toLocaleString('vi-VN')
           const end = new Date(slot.endAt).toLocaleString('vi-VN')

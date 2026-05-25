@@ -1,7 +1,9 @@
 services:
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
   db:
-    image: postgres:16
-    container_name: sepbe-db
+    image: pgvector/pgvector:pg16
+    container_name: sep-db
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -9,7 +11,51 @@ services:
     ports:
       - '5432:5432'
     volumes:
-      - sepbe_db_data:/var/lib/postgresql/data
+      - sep_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: sep-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - sep_redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── NestJS Backend ──────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    container_name: sep-backend
+    restart: unless-stopped
+    ports:
+      - '4000:4000'
+    env_file:
+      - .env
+    environment:
+      # Override URLs to point at Docker service names
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/sepbe
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
-  sepbe_db_data:
+  sep_db_data:
+  sep_redis_data:
