@@ -53,7 +53,7 @@ export class WalletService {
     }
   }
 
-  private isValidWebhookAuthorization(authorizationHeader?: string) {
+  validateWebhookAuthorization(authorizationHeader?: string): boolean {
     if (!this.paymentCfg.sepayWebhookApiKey) {
       return true
     }
@@ -307,13 +307,11 @@ export class WalletService {
     }
   }
 
-  async processTopupWebhook(
-    authorizationHeader?: string,
-    payload?: Record<string, unknown>,
-  ) {
-    if (!this.isValidWebhookAuthorization(authorizationHeader)) {
-      throw new UnauthorizedException('SePay webhook authorization không hợp lệ')
-    }
+  async processTopupWebhookPayload(payload?: Record<string, unknown>): Promise<{
+    success: boolean
+    message: string
+    data?: { paymentOrderId: number; companyId: number; pointAmount: number }
+  }> {
     if (!payload || typeof payload !== 'object') {
       throw new BadRequestException('Payload webhook không hợp lệ')
     }
@@ -435,6 +433,16 @@ export class WalletService {
         pointAmount,
       },
     }
+  }
+
+  async processTopupWebhook(
+    authorizationHeader?: string,
+    payload?: Record<string, unknown>,
+  ) {
+    if (!this.validateWebhookAuthorization(authorizationHeader)) {
+      throw new UnauthorizedException('SePay webhook authorization không hợp lệ')
+    }
+    return this.processTopupWebhookPayload(payload)
   }
 
   async deductPoints(params: {

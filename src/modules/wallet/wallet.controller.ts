@@ -4,10 +4,12 @@ import {
   Controller,
   Get,
   Headers,
+  HttpCode,
   Param,
   ParseIntPipe,
   Post,
   Query,
+  UnauthorizedException,
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiBody, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { WalletService } from './wallet.service'
@@ -18,6 +20,7 @@ import {
   AuthRoleProtected,
 } from '../auth/decorators/auth.jwt.decorator'
 import { EnumUserRole } from 'src/generated/prisma/enums'
+import { PaymentQueueService } from 'src/infrastructure/queue/payment/service/payment-queue.service'
 
 @ApiTags('Wallet')
 @Controller('wallet')
@@ -25,6 +28,7 @@ export class WalletController {
   constructor(
     private readonly walletService: WalletService,
     private readonly companyService: CompanyService,
+    private readonly paymentQueueService: PaymentQueueService,
   ) {}
 
   @Get('me')
@@ -109,6 +113,7 @@ export class WalletController {
   }
 
   @Post('topup/sepay/webhook')
+  @HttpCode(200)
   @ApiBody({
     schema: {
       type: 'object',
@@ -120,11 +125,18 @@ export class WalletController {
     required: true,
     description: 'SePay webhook auth header. Format: apikey <SEPAY_WEBHOOK_API_KEY>',
   })
-  @ApiOperation({ summary: 'SePay webhook callback for wallet topup' })
+  @ApiOperation({ summary: 'SePay webhook callback for wallet topup (async queue processing)' })
   async handleTopupWebhook(
     @Headers('authorization') authorization?: string,
     @Body() body?: Record<string, unknown>,
   ) {
-    return this.walletService.processTopupWebhook(authorization, body)
+    if (!this.walletService.validateWebhookAuthorization(authorization)) {
+      throw new UnauthorizedException('SePay webhook authorization không hợp lệ')
+    }
+    await this.paymentQueueService.queueTopupWebhook({
+      gateway: 'SEPAY',
+      payload: body ?? {},
+    })
+    return { success: true, message: 'Webhook đã được tiếp nhận và đang xử lý' }
   }
 }
