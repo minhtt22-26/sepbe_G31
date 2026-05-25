@@ -21,10 +21,11 @@ ENV NODE_ENV=production
 
 # Production node_modules (no devDeps)
 COPY --from=deps /app/node_modules ./node_modules
-# Prisma native query engine binary (generated in builder)
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-# Compiled app
+# Compiled app (includes compiled Prisma client JS)
 COPY --from=builder /app/dist ./dist
+# Prisma generated client + native query engine binary (custom output: src/generated/prisma)
+# tsc only compiles .ts files; binary engine must be copied separately to where compiled code looks
+COPY --from=builder /app/src/generated/prisma ./dist/src/generated/prisma
 # Prisma schema (needed for migrations at startup)
 COPY prisma ./prisma
 
