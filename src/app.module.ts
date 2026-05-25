@@ -11,8 +11,8 @@ import { UserModule } from './modules/users/user.module'
 import { CompanyModule } from './modules/company/company.module'
 import { NotificationsModule } from './modules/notifications/notifications.module'
 import { EmailModule } from './infrastructure/email/email.module'
-// import { QueueModule } from './infrastructure/queue/queue.module'
-// import { QueueTestModule } from './modules/queue-test/queue-test.module'
+import { QueueModule } from './infrastructure/queue/queue.module'
+import { QueueTestModule } from './modules/queue-test/queue-test.module'
 import emailConfig from './config/email.config'
 import embeddingConfig from './config/embedding.config'
 import paymentConfig from './config/payment.config'
@@ -88,7 +88,7 @@ import { WalletModule } from './modules/wallet/wallet.module'
     */
 
     // Queue module - import early to avoid circular dependencies
-    // QueueModule,
+    QueueModule,
 
     HealthModule,
     AuthModule,
@@ -98,7 +98,7 @@ import { WalletModule } from './modules/wallet/wallet.module'
     CompanyModule,
     NotificationsModule,
     EmailModule,
-    // QueueTestModule,
+    QueueTestModule,
     JobModule,
     OccupationModule,
     SectorModule,

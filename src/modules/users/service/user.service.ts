@@ -31,6 +31,7 @@ import { ISessionCreate } from 'src/modules/session/interfaces/session.interface
 import { ForgotPasswordRequestDto } from 'src/modules/auth/dto/request/forgot-password.request.dto'
 import { ResetPasswordRequestDto } from 'src/modules/auth/dto/request/reset-password.request.dto'
 import { EmailService } from 'src/infrastructure/email/service/email.service'
+import { EmailQueueService } from 'src/infrastructure/queue/email/service/email-queue.service'
 import { UserInfoRequestDto } from '../dtos/request/user.info.request.dto'
 import { UserChangePasswordRequestDto } from '../dtos/request/user.change-passwrod.dto'
 import { CloudinaryService } from 'src/infrastructure/cloudinary/cloudinary.service'
@@ -49,6 +50,7 @@ export class UserService {
     private readonly userRepository: UserRepository,
     private readonly sessionService: SessionService,
     private readonly emailService: EmailService,
+    private readonly emailQueueService: EmailQueueService,
     private readonly cloudinaryService: CloudinaryService,
     // private readonly embeddingQueueService: EmbeddingQueueService,
     @Inject(forwardRef(() => AIMatchingService))
@@ -379,12 +381,27 @@ export class UserService {
       forgotPassword.expiredAt,
     )
 
-    // TODO: Gửi email chứa link reset password
-    await this.emailService.sendForgotPasswordEmail(
-      user.email!,
-      forgotPassword.link,
-      user.fullName,
-    )
+    const username = user.fullName ?? 'User'
+    const html = `
+      <h1>Khôi phục mật khẩu</h1>
+      <p>Hi ${username},</p>
+      <p>Bạn đã yêu cầu khôi phục mật khẩu. Vui lòng click vào liên kết bên dưới:</p>
+      <a href="${forgotPassword.link}" style="
+        display: inline-block;
+        padding: 12px 24px;
+        background-color: #007bff;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+      ">Khôi phục mật khẩu</a>
+      <p>Liên kết này sẽ hết hạn sau 15 phút.</p>
+      <p>Nếu bạn không yêu cầu điều này, vui lòng bỏ qua email này.</p>
+    `
+    await this.emailQueueService.addSendEmailJob({
+      to: user.email!,
+      subject: 'Khôi phục mật khẩu của bạn',
+      html,
+    })
   }
 
   async resetPassword(
