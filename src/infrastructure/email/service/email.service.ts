@@ -5,6 +5,15 @@ import { MailerService } from '@nestjs-modules/mailer';
 export class EmailService {
   constructor(private readonly mailerService: MailerService) {}
 
+  async sendMail(to: string, subject: string, html: string, from?: string): Promise<void> {
+    await this.mailerService.sendMail({
+      to,
+      subject,
+      html,
+      ...(from && { from }),
+    })
+  }
+
   async sendForgotPasswordEmail(
     email: string,
     resetLink: string,

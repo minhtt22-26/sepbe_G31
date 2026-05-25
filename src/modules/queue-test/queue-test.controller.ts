@@ -1,93 +1,80 @@
-import { Controller, Post, Get } from '@nestjs/common'
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger'
+import { Body, Controller, Get, Post } from '@nestjs/common'
+import { ApiTags, ApiOperation, ApiProperty } from '@nestjs/swagger'
+import { IsEmail, IsNotEmpty } from 'class-validator'
 import { EmailQueueService } from 'src/infrastructure/queue/email/service/email-queue.service'
 
+export class ForgotPasswordQueueTestDto {
+  @ApiProperty({ example: 'test@example.com' })
+  @IsEmail()
+  @IsNotEmpty()
+  email: string
+}
+
 @ApiTags('Queue Test')
-@Controller('api/queue-test')
+@Controller('queue-test')
 export class QueueTestController {
   constructor(private readonly emailQueueService: EmailQueueService) {}
 
+  @Post('forgot-password')
+  @ApiOperation({ summary: 'Test gửi email forgot-password qua queue' })
+  async testForgotPasswordEmail(@Body() body: ForgotPasswordQueueTestDto) {
+    try {
+      const resetLink = 'http://localhost:3000/reset-password?token=TEST_TOKEN_123'
+      const html = `
+        <h1>Khôi phục mật khẩu</h1>
+        <p>Hi User,</p>
+        <p>Bạn đã yêu cầu khôi phục mật khẩu. Vui lòng click vào liên kết bên dưới:</p>
+        <a href="${resetLink}" style="
+          display: inline-block;
+          padding: 12px 24px;
+          background-color: #007bff;
+          color: white;
+          text-decoration: none;
+          border-radius: 4px;
+        ">Khôi phục mật khẩu</a>
+        <p>Liên kết này sẽ hết hạn sau 15 phút.</p>
+        <p>Đây là email test từ Queue — không cần thao tác gì thêm.</p>
+      `
+      const job = await this.emailQueueService.addSendEmailJob({
+        to: body.email,
+        subject: '[TEST] Khôi phục mật khẩu của bạn',
+        html,
+      })
+
+      return {
+        success: true,
+        message: 'Email job đã được thêm vào queue thành công',
+        jobId: job.id,
+        to: body.email,
+      }
+    } catch (error) {
+      return { success: false, message: error?.message }
+    }
+  }
+
   @Post('send-email')
-  @ApiOperation({ summary: 'Add single email to queue' })
-  @ApiResponse({
-    status: 200,
-    description: 'Email job added successfully',
-  })
+  @ApiOperation({ summary: 'Test thêm 1 email bất kỳ vào queue' })
   async testSendEmail() {
     try {
       const job = await this.emailQueueService.addSendEmailJob({
         to: 'test@example.com',
         subject: 'Test Email from Queue',
-        html: '<h1>Hello Queue!</h1>',
+        html: '<h1>Hello Queue!</h1><p>Email này được gửi qua Bull queue.</p>',
       })
-
-      return {
-        success: true,
-        message: 'Email job added to queue',
-        jobId: job.id,
-      }
+      return { success: true, message: 'Email job đã thêm vào queue', jobId: job.id }
     } catch (error) {
-      return {
-        success: false,
-        message: error?.message,
-      }
+      return { success: false, message: error?.message }
     }
   }
 
   @Get('queue-stats')
-  @ApiOperation({ summary: 'Get queue statistics' })
-  @ApiResponse({
-    status: 200,
-    description: 'Queue stats returned',
-  })
+  @ApiOperation({ summary: 'Xem trạng thái queue (waiting / active / completed / failed)' })
   async getQueueStats() {
     try {
       const stats = await this.emailQueueService.getQueueStats()
-      return {
-        success: true,
-        stats,
-      }
+      return { success: true, stats }
     } catch (error) {
-      return {
-        success: false,
-        message: error?.message,
-      }
-    }
-  }
-
-  @Post('send-bulk-emails')
-  @ApiOperation({ summary: 'Add multiple emails to queue' })
-  @ApiResponse({
-    status: 200,
-    description: 'Multiple email jobs added',
-  })
-  async testBulkEmails() {
-    try {
-      const emails = [
-        { to: 'user1@example.com', name: 'User 1' },
-        { to: 'user2@example.com', name: 'User 2' },
-      ]
-
-      const jobs = await Promise.all(
-        emails.map((email) =>
-          this.emailQueueService.addSendEmailJob({
-            to: email.to,
-            subject: `Welcome ${email.name}!`,
-            html: `<h1>Hello ${email.name}</h1>`,
-          }),
-        ),
-      )
-
-      return {
-        success: true,
-        message: `${jobs.length} email jobs added`,
-        jobIds: jobs.map((j) => j.id),
-      }
-    } catch (error) {
-      return {
-        success: false,
-        message: error?.message,
-      }
+      return { success: false, message: error?.message }
     }
   }
 }
