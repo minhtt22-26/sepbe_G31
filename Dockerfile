@@ -27,7 +27,9 @@ COPY --from=builder /app/dist ./dist
 COPY prisma.config.mjs ./prisma.config.mjs
 # Prisma schema (needed for migrations at startup)
 COPY prisma ./prisma
+COPY start.sh ./start.sh
+RUN chmod +x start.sh
 
 EXPOSE 4000
 
-CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/src/main"]
+CMD ["sh", "start.sh"]
