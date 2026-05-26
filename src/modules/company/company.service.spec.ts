@@ -15,6 +15,7 @@ const prismaMock = {
   company: {
     findMany: jest.fn(),
     findUnique: jest.fn(),
+    findFirst: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
   },
@@ -191,6 +192,7 @@ describe('CompanyService', () => {
       .mockResolvedValueOnce({ secure_url: 'license-url' });
 
     const expected = { id: 1 };
+    prismaMock.company.findFirst.mockResolvedValue(null);
     prismaMock.company.create.mockResolvedValue(expected);
     prismaMock.user.findFirst.mockResolvedValue({ id: 2 });
     prismaMock.notification.create.mockResolvedValue({ id: 1 });
