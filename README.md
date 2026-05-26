@@ -189,19 +189,73 @@ GEMINI_LLM_MODEL=gemini-2.5-flash-lite
 GEMINI_LLM_TEMPERATURE=0
 ```
 
-## Install & Run
+## Running the Project
+
+### Option A — Local development (recommended)
+
+Spin up PostgreSQL (with pgvector) + Redis via Docker, then run NestJS natively for hot-reload:
 
 ```bash
-docker compose up -d          # start PostgreSQL + Redis locally
+# 1. Start database + cache
+docker compose up -d db redis
 
+# 2. Install dependencies & prepare DB
 npm install
 npx prisma migrate dev
-npm run start:dev             # development server with hot reload
+
+# 3. Start dev server
+npm run start:dev
 ```
 
-Default URLs:
+URLs:
 - API: `http://localhost:4000/api`
-- Swagger: `http://localhost:4000/api/docs`
+- Swagger UI: `http://localhost:4000/api/docs`
+
+---
+
+### Option B — Full Docker (production-like)
+
+Runs the entire backend stack (PostgreSQL + Redis + NestJS) in containers. Migrations run automatically on startup via `start.sh`.
+
+```bash
+cp .env.example .env   # fill in GEMINI_API_KEY, Cloudinary, SePay, etc.
+
+docker compose up --build
+```
+
+| Service | Container | Port |
+|---|---|---|
+| PostgreSQL 16 + pgvector | `sep-db` | `5432` |
+| Redis 7 | `sep-redis` | `6379` |
+| NestJS backend | `sep-backend` | `4000` |
+
+Stop & clean up:
+
+```bash
+docker compose down          # stop containers (keep volumes)
+docker compose down -v       # stop + delete database volumes
+```
+
+---
+
+### Option C — Backend + Frontend together
+
+Run both stacks in their own repos simultaneously:
+
+```bash
+# Terminal 1 — backend
+cd sepbe_G31
+docker compose up --build
+
+# Terminal 2 — frontend
+cd sepfe_G31
+docker compose up --build
+# or: npm run dev (if you prefer Vite dev server)
+```
+
+Frontend will be available at `http://localhost:3000`.
+
+---
 
 ## Available Scripts
 

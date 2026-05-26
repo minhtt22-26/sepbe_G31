@@ -5,12 +5,16 @@ import { AppModule } from './app.module'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'
 import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
+import helmet from 'helmet'
+import compression from 'compression'
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['log', 'error', 'warn'],
   })
 
+  app.use(helmet())
+  app.use(compression())
   app.useGlobalFilters(new HttpExceptionFilter())
 
   app.useGlobalInterceptors(new ResponseInterceptor())
