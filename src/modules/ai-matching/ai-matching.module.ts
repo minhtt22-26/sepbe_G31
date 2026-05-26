@@ -8,6 +8,7 @@ import { JobModule } from '../job/job.module'
 import { EmbeddingModule } from '../embedding/embedding.module'
 import { AuthModule } from '../auth/auth.module'
 import { ProvinceHelper } from 'src/common/helper/province.helper'
+import { RedisModule } from 'src/infrastructure/redis/redis.module'
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { ProvinceHelper } from 'src/common/helper/province.helper'
     forwardRef(() => UserModule),
     forwardRef(() => JobModule),
     EmbeddingModule,
+    RedisModule,
   ],
   providers: [
     AIMatchingService,

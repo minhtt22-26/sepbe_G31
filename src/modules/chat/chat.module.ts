@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common'
 import { ChatController } from './controller/chat.controller'
 import { ChatService } from './service/chat.service'
 import { ChatRepository } from './repositories/chat.repository'
+import { ChatGateway } from './gateway/chat.gateway'
 import { PrismaModule } from 'src/prisma.module'
 import { UserModule } from '../users/user.module'
 import { HelperModule } from 'src/common/helper/helper.module'
@@ -13,6 +14,7 @@ import { AuthModule } from '../auth/auth.module'
   providers: [
     ChatService,
     ChatRepository,
+    ChatGateway,
   ],
   exports: [ChatService],
 })

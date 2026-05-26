@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ForbiddenException,
+  forwardRef,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
@@ -13,6 +15,7 @@ import { ChatConversationResponseDto } from '../dtos/response/chat.conversation.
 import { ChatSendMessageRequestDto } from '../dtos/request/chat.send-message.request.dto'
 import { ChatMessageResponseDto } from '../dtos/response/chat.message.response.dto'
 import { ChatGetMessageRequestDto } from '../dtos/request/chat.get-message.request.dto'
+import { ChatGateway } from '../gateway/chat.gateway'
 
 @Injectable()
 export class ChatService {
@@ -20,6 +23,8 @@ export class ChatService {
     private readonly chatRepository: ChatRepository,
     private readonly userRepository: UserRepository,
     private readonly helperService: HelperService,
+    @Inject(forwardRef(() => ChatGateway))
+    private readonly chatGateway: ChatGateway,
   ) {}
 
   async getOrCreateConversation(
@@ -126,7 +131,7 @@ export class ChatService {
       dto.content,
     )
 
-    return {
+    const result: ChatMessageResponseDto = {
       id: message.id,
       conversationId: message.conversationId,
       content: message.content,
@@ -134,6 +139,10 @@ export class ChatService {
       senderId: message.senderId,
       createdAt: message.createdAt,
     }
+
+    this.chatGateway.broadcastMessage(conversationId, result)
+
+    return result
   }
 
   async getMessages(
