@@ -27,7 +27,7 @@ describe('ChatService', () => {
       searchMessages: jest.fn(),
       getMessages: jest.fn(),
       markMessagesAsRead: jest.fn(),
-    } as any
+    }
 
     userRepository = {
       findOneById: jest.fn(),
