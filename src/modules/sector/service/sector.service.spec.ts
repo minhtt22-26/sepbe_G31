@@ -2,10 +2,17 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { ConflictException, NotFoundException } from '@nestjs/common'
 import { SectorService } from './sector.service'
 import { SectorRepository } from '../repositories/sector.repository'
+import { REDIS_CLIENT } from 'src/infrastructure/redis/redis.provider'
 
 jest.mock('src/prisma.service', () => ({
     PrismaService: class { },
 }))
+
+const redisMock = {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue('OK'),
+    del: jest.fn().mockResolvedValue(1),
+}
 
 const sectorRepositoryMock = {
     findByName: jest.fn(),
@@ -28,6 +35,10 @@ describe('SectorService', () => {
                 {
                     provide: SectorRepository,
                     useValue: sectorRepositoryMock,
+                },
+                {
+                    provide: REDIS_CLIENT,
+                    useValue: redisMock,
                 },
             ],
         }).compile()

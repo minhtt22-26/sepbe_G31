@@ -2,10 +2,17 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { ConflictException, NotFoundException } from '@nestjs/common'
 import { OccupationService } from './occupation.service'
 import { OccupationRepository } from '../repositories/occupation.repository'
+import { REDIS_CLIENT } from 'src/infrastructure/redis/redis.provider'
 
 jest.mock('src/prisma.service', () => ({
     PrismaService: class { },
 }))
+
+const redisMock = {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue('OK'),
+    del: jest.fn().mockResolvedValue(1),
+}
 
 const occupationRepositoryMock = {
     isActiveSector: jest.fn(),
@@ -29,6 +36,10 @@ describe('OccupationService', () => {
                 {
                     provide: OccupationRepository,
                     useValue: occupationRepositoryMock,
+                },
+                {
+                    provide: REDIS_CLIENT,
+                    useValue: redisMock,
                 },
             ],
         }).compile()

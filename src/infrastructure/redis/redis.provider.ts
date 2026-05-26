@@ -18,7 +18,7 @@ export const redisProvider: Provider = {
 
     client.on('error', (err) => console.error('[Redis] Error:', err?.message))
 
-    // await client.connect()
+    await client.connect()
     return client
   },
   inject: [ConfigService],

@@ -15,6 +15,9 @@ import { JobService } from 'src/modules/job/service/job.service'
 import { EmbeddingService } from 'src/modules/embedding/service/embedding.service'
 import { EmbeddingTextBuilder } from 'src/modules/embedding/builder/embedding-text.builder'
 import { IMatchingConfig } from '../interfaces/ai-matching.interface'
+import { REDIS_CLIENT } from 'src/infrastructure/redis/redis.provider'
+
+type RedisClient = ReturnType<typeof import('redis').createClient>
 
 @Injectable()
 export class AIMatchingService {
@@ -30,7 +33,20 @@ export class AIMatchingService {
     private readonly embeddingService: EmbeddingService,
     private readonly aiMatchingRepository: AIMatchingRepository,
     private readonly embeddingTextBuilder: EmbeddingTextBuilder,
+    @Inject(REDIS_CLIENT) private readonly redis: RedisClient,
   ) {}
+
+  private async getCached<T>(key: string, ttlSeconds: number, fetcher: () => Promise<T>): Promise<T> {
+    const cached = await this.redis.get(key)
+    if (cached) return JSON.parse(cached) as T
+    const data = await fetcher()
+    await this.redis.set(key, JSON.stringify(data), { EX: ttlSeconds })
+    return data
+  }
+
+  private async invalidateCache(...keys: string[]): Promise<void> {
+    await Promise.all(keys.map(k => this.redis.del(k)))
+  }
 
   private getMinScoreThreshold(configs: IMatchingConfig[]): number {
     const thresholdConfig = configs.find((c) => c.key === 'MIN_SCORE_THRESHOLD')
@@ -343,7 +359,7 @@ export class AIMatchingService {
   }
 
   async getConfigs(): Promise<IMatchingConfig[]> {
-    return this.aiMatchingRepository.getConfigs()
+    return this.getCached('ai:configs', 300, () => this.aiMatchingRepository.getConfigs())
   }
 
   async updateConfigs(configs: IMatchingConfig[]): Promise<IMatchingConfig[]> {
@@ -371,6 +387,8 @@ export class AIMatchingService {
       )
     }
 
-    return this.aiMatchingRepository.updateConfigs(configs)
+    const result = await this.aiMatchingRepository.updateConfigs(configs)
+    await this.invalidateCache('ai:configs')
+    return result
   }
 }

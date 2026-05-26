@@ -1,15 +1,34 @@
 import {
     ConflictException,
+    Inject,
     Injectable,
     NotFoundException,
 } from '@nestjs/common'
 import { OccupationRepository } from '../repositories/occupation.repository'
 import { CreateOccupationRequest } from '../dtos/request/create-occupation.request'
 import { UpdateOccupationRequest } from '../dtos/request/update-occupation.request'
+import { REDIS_CLIENT } from 'src/infrastructure/redis/redis.provider'
+
+type RedisClient = ReturnType<typeof import('redis').createClient>
 
 @Injectable()
 export class OccupationService {
-    constructor(private readonly occupationRepository: OccupationRepository) { }
+    constructor(
+        private readonly occupationRepository: OccupationRepository,
+        @Inject(REDIS_CLIENT) private readonly redis: RedisClient,
+    ) { }
+
+    private async getCached<T>(key: string, ttlSeconds: number, fetcher: () => Promise<T>): Promise<T> {
+        const cached = await this.redis.get(key)
+        if (cached) return JSON.parse(cached) as T
+        const data = await fetcher()
+        await this.redis.set(key, JSON.stringify(data), { EX: ttlSeconds })
+        return data
+    }
+
+    private async invalidateCache(...keys: string[]): Promise<void> {
+        await Promise.all(keys.map(k => this.redis.del(k)))
+    }
 
     async create(body: CreateOccupationRequest) {
         const normalizedName = body.name.trim()
@@ -28,11 +47,13 @@ export class OccupationService {
             throw new ConflictException('Occupation name already exists in sector')
         }
 
-        return this.occupationRepository.create(normalizedName, body.sectorId)
+        const result = await this.occupationRepository.create(normalizedName, body.sectorId)
+        await this.invalidateCache('occupation:all', 'occupation:withSectors', `occupation:bySector:${body.sectorId}`)
+        return result
     }
 
     async findAll() {
-        return this.occupationRepository.findAll()
+        return this.getCached('occupation:all', 3600, () => this.occupationRepository.findAll())
     }
 
     async findOne(id: number) {
@@ -74,7 +95,9 @@ export class OccupationService {
             }
         }
 
-        return this.occupationRepository.update(id, targetName, targetSectorId)
+        const result = await this.occupationRepository.update(id, targetName, targetSectorId)
+        await this.invalidateCache('occupation:all', 'occupation:withSectors', `occupation:bySector:${targetSectorId}`)
+        return result
     }
 
     async remove(id: number) {
@@ -85,6 +108,7 @@ export class OccupationService {
         }
 
         await this.occupationRepository.softDelete(id)
+        await this.invalidateCache('occupation:all', 'occupation:withSectors', `occupation:bySector:${current.sectorId}`)
 
         return {
             success: true,
@@ -92,10 +116,10 @@ export class OccupationService {
     }
 
     async getSectorsWithOccupations() {
-        return this.occupationRepository.findAllSectorsWithOccupations()
+        return this.getCached('occupation:withSectors', 3600, () => this.occupationRepository.findAllSectorsWithOccupations())
     }
 
     async getOccupationsBySector(sectorId: number) {
-        return this.occupationRepository.findOccupationsBySector(sectorId)
+        return this.getCached(`occupation:bySector:${sectorId}`, 3600, () => this.occupationRepository.findOccupationsBySector(sectorId))
     }
 }

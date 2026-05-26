@@ -3,6 +3,7 @@ import { ChatService } from '../service/chat.service'
 import { ChatRepository } from '../repositories/chat.repository'
 import { UserRepository } from 'src/modules/users/repositories/user.repository'
 import { HelperService } from 'src/common/helper/service/helper.service'
+import { ChatGateway } from '../gateway/chat.gateway'
 import {
   BadRequestException,
   ForbiddenException,
@@ -43,6 +44,7 @@ describe('ChatService', () => {
         { provide: ChatRepository, useValue: chatRepository },
         { provide: UserRepository, useValue: userRepository },
         { provide: HelperService, useValue: helperService },
+        { provide: ChatGateway, useValue: { broadcastMessage: jest.fn() } },
       ],
     }).compile()
 
