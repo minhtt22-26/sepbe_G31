@@ -795,8 +795,12 @@ export class JobService {
       if (result.count > 0) {
         this.logger.log(`Auto-expired ${result.count} jobs`)
       }
-    } catch (error) {
-      this.logger.error('Error auto-expiring jobs', error)
+    } catch (error: any) {
+      if (error?.code === 'P1001' || error?.code === 'P1017') {
+        this.logger.warn('Auto-expire jobs cron skipped: database unreachable')
+        return
+      }
+      this.logger.error('Error auto-expiring jobs', error?.message)
     }
   }
 }

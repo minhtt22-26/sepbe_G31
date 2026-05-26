@@ -698,7 +698,7 @@ export class InterviewInvitationService {
 
     // Send notifications to workers (in background)
     this.sendNotificationsToWorkers(campaign).catch((error) => {
-      console.error('Error sending notifications:', error)
+      this.logger.error('Error sending notifications to workers', error?.message)
     })
 
     // Update to COMPLETED after finish sending
@@ -706,7 +706,7 @@ export class InterviewInvitationService {
       void this.repository
         .updateCampaignStatus(campaignId, CampaignStatus.COMPLETED)
         .catch((error) => {
-          console.error('Error updating campaign status to COMPLETED:', error)
+          this.logger.error('Error updating campaign status to COMPLETED', error?.message)
         })
     }, 5000) // Giả sử gửi hết trong 5 giây (thực tế nên dùng queue)
 
@@ -747,8 +747,8 @@ export class InterviewInvitationService {
 
         // TODO: Send chat message (optional)
         // await this.sendChatMessage(campaign.companyId, invitation.workerId, campaign.message)
-      } catch (error) {
-        console.error(`Error sending notification to worker ${invitation.workerId}:`, error)
+      } catch (error: any) {
+        this.logger.warn(`Failed to notify worker #${invitation.workerId}: ${error?.message}`)
       }
     }
   }
@@ -1305,9 +1305,8 @@ export class InterviewInvitationService {
         }
       } catch (error) {
         autoAddDebug.error = String(error)
-        console.error(
-          `[AUTO-ADD ERROR] Failed to auto-add worker #${workerId} to interview campaign:`,
-          error,
+        this.logger.error(
+          `Failed to auto-add worker #${workerId} to interview campaign: ${error?.message}`,
         )
       }
     }
@@ -1450,11 +1449,8 @@ export class InterviewInvitationService {
             link: `/interview-invitations?invitationId=${invitation.id}`,
           },
         })
-      } catch (error) {
-        console.error(
-          `Error sending cancellation notification to worker ${invitation.workerId}:`,
-          error,
-        )
+      } catch (error: any) {
+        this.logger.warn(`Failed to send cancellation notification to worker #${invitation.workerId}: ${error?.message}`)
       }
     }
 
