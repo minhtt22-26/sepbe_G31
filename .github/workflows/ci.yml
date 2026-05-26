@@ -40,7 +40,14 @@ jobs:
       - name: Unit tests + coverage
         run: npm run test:cov
 
-      - name: Upload coverage
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          fail_ci_if_error: false
+
+      - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         if: always()
         with:
