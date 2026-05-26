@@ -31,6 +31,7 @@ import { InterviewInvitationModule } from './modules/interview-invitation/interv
 import { APP_GUARD } from '@nestjs/core'
 import { UserStatusGuard } from './common/guards/user-status.guard'
 import { AuthUserMiddleware } from './common/middleware/auth-user.middleware'
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
 import { StatisticsModule } from './modules/statistics/statistics.module'
 import { SupportModule } from './modules/support/support.module'
 import { WalletModule } from './modules/wallet/wallet.module'
@@ -38,6 +39,9 @@ import { WalletModule } from './modules/wallet/wallet.module'
 @Module({
   imports: [
     ScheduleModule.forRoot(),
+    ThrottlerModule.forRoot([
+      { name: 'default', ttl: 60_000, limit: 100 },
+    ]),
     ConfigModule.forRoot({
       isGlobal: true,
       load: [
@@ -114,10 +118,8 @@ import { WalletModule } from './modules/wallet/wallet.module'
   ],
   controllers: [],
   providers: [
-    {
-      provide: APP_GUARD,
-      useClass: UserStatusGuard,
-    },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: UserStatusGuard },
   ],
 })
 export class AppModule implements NestModule {

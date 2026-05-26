@@ -38,16 +38,19 @@ import { UserInfoRequestDto } from '../dtos/request/user.info.request.dto'
 import { UserChangePasswordRequestDto } from '../dtos/request/user.change-passwrod.dto'
 import { WorkerProfileWithOccupation } from '../interfaces/worker-profile.interface'
 import { UserUpdateStatusRequestDto } from '../dtos/request/user.update-status.request.dto'
+import { Throttle } from '@nestjs/throttler'
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) { }
 
   @Post('sign-up')
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
   async signUp(@Body() body: UserSignUpRequestDto): Promise<void> {
     return this.userService.signUp(body)
   }
 
   @Post('login/credential')
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   async loginWithCredential(
     @Body() body: UserLoginRequestDto,
     // @Req() req: Request,
@@ -81,6 +84,7 @@ export class UserController {
   }
 
   @Post('forgot-password')
+  @Throttle({ default: { ttl: 60_000, limit: 3 } })
   async forgotPassword(
     @Body() body: ForgotPasswordRequestDto,
     //@Req() req: Request,
