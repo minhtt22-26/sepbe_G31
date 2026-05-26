@@ -70,12 +70,14 @@ The core feature is a two-stage AI matching engine using **Gemini Embeddings + p
 | AI — Embeddings | Google Gemini `gemini-embedding-001` (768-dim vectors) |
 | AI — LLM | Google Gemini `gemini-2.5-flash-lite` (JD section extraction) |
 | Queue | Bull + Redis (async email, payment, stats jobs) |
-| Real-time | Socket.io (chat + live notifications) |
+| Cache | Redis — sector, occupation, AI configs (TTL 3600 / 300 s) |
+| Real-time | Socket.io — chat messages broadcast + typing indicator (`typing` event) |
 | Auth | JWT access/refresh tokens + Google OAuth2 (Passport) |
 | File upload | Cloudinary |
 | Email | Nodemailer via Gmail SMTP |
 | Payment | SePay (bank transfer QR) |
 | Scheduler | `@nestjs/schedule` (cron: nightly stats, interview reminders) |
+| Security | Helmet (HTTP headers) · `@nestjs/throttler` rate limiting · gzip compression |
 | API docs | Swagger OpenAPI — available at `/api/docs` |
 | Deploy | Railway |
 
@@ -278,6 +280,73 @@ npm run test:e2e      # end-to-end tests
 | `email-queue` | Transactional emails (forgot password, interview reminders) | 3× exponential backoff |
 | `payment-queue` | SePay webhook — returns 200 immediately, processes DB update async | 5× exponential backoff + DLQ alert email |
 | `stats-queue` | Nightly admin stats pre-compute (cron `0 0 * * *`) | 3× exponential backoff |
+
+---
+
+## Real-time Features (Socket.io)
+
+The `/chat` WebSocket namespace handles two independent concerns:
+
+| Event (client → server) | Payload | Effect |
+|---|---|---|
+| `join_conversation` | `{ conversationId }` | Client joins the room `conv_<id>` |
+| `leave_conversation` | `{ conversationId }` | Client leaves the room |
+| `typing` | `{ conversationId, isTyping }` | Broadcast `typing` to room peers |
+
+| Event (server → client) | Payload | Trigger |
+|---|---|---|
+| `new_message` | `ChatMessageResponseDto` | `sendMessage` API call |
+| `typing` | `{ userId, isTyping }` | Peer typing event |
+
+> Chat messages are persisted via the REST API (`POST /chat/conversations/:id/messages`) and broadcast via Socket.io in the same request. Typing events are ephemeral — never stored.
+
+---
+
+## Redis Caching Strategy
+
+| Key | TTL | Invalidated on |
+|---|---|---|
+| `sector:all` | 3600 s | sector create / update / delete |
+| `occupation:all` | 3600 s | occupation create / update / delete |
+| `occupation:withSectors` | 3600 s | occupation create / update / delete |
+| `occupation:bySector:<id>` | 3600 s | occupation create / update / delete |
+| `ai:configs` | 300 s | AI config update |
+
+Cache-aside pattern: read from Redis first, fall through to Postgres on miss, write-back with TTL. All invalidation is eager (delete on mutation).
+
+---
+
+## Security & Performance
+
+| Feature | Implementation | Notes |
+|---|---|---|
+| HTTP security headers | `helmet()` global middleware | XSS, clickjacking, MIME sniff protection |
+| gzip compression | `compression()` global middleware | Reduces response payload size |
+| Rate limiting — global | 100 req / 60 s per IP | `@nestjs/throttler` global guard |
+| Rate limiting — auth | Sign-up: 10/min · Login: 5/min · Forgot-password: 3/min | Per-endpoint `@Throttle()` decorator |
+| Input validation | `ValidationPipe` (whitelist, transform) | class-validator on all DTOs |
+| CORS | Configurable via `CORS_ORIGIN` env | Comma-separated origins supported |
+| Graceful shutdown | `enableShutdownHooks()` | Drains in-flight requests before exit |
+
+---
+
+## Health Check
+
+`GET /api/health` — returns live status of all external dependencies.
+
+```json
+{
+  "status": "ok",
+  "timestamp": "2025-01-01T00:00:00.000Z",
+  "uptime": 3600,
+  "services": {
+    "database": "ok",
+    "redis": "ok"
+  }
+}
+```
+
+`status` is `"degraded"` (not `500`) when a dependency is down — allows load balancers to make routing decisions without false alerts.
 
 ---
 
