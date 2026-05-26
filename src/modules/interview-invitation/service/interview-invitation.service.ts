@@ -3,6 +3,7 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common'
 import { PrismaService } from 'src/prisma.service'
 import { InterviewInvitationRepository } from '../repositories/interview-invitation.repository'
@@ -23,6 +24,8 @@ import { WalletService } from 'src/modules/wallet/wallet.service'
 
 @Injectable()
 export class InterviewInvitationService {
+  private readonly logger = new Logger(InterviewInvitationService.name)
+
   constructor(
     private readonly repository: InterviewInvitationRepository,
     private readonly prisma: PrismaService,
@@ -110,8 +113,12 @@ export class InterviewInvitationService {
       await this.sendEmployerSlotReminders(1)
       await this.sendWorkerInvitationReminders(24)
       await this.sendWorkerInvitationReminders(1)
-    } catch (error) {
-      console.error('Error sending interview reminders:', error)
+    } catch (error: any) {
+      if (error?.code === 'P1001' || error?.code === 'P1017') {
+        this.logger.warn('Interview reminder cron skipped: database unreachable')
+        return
+      }
+      this.logger.error('Interview reminder cron failed', error?.message)
     }
   }
 
