@@ -21,6 +21,7 @@ import {
 } from '@nestjs/common'
 import { CloudinaryService } from 'src/infrastructure/cloudinary/cloudinary.service'
 import { AIMatchingService } from 'src/modules/ai-matching/service/ai-matching.service'
+import { EmailQueueService } from 'src/infrastructure/queue/email/service/email-queue.service'
 
 describe('UserService', () => {
   let service: UserService
@@ -87,6 +88,10 @@ describe('UserService', () => {
   const mockAIMatchingService = {
     buildWorkerProfileEmbedding: jest.fn(),
   }
+  const mockEmailQueueService = {
+    addSendEmailJob: jest.fn().mockResolvedValue({}),
+    getQueueStats: jest.fn(),
+  }
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -98,6 +103,7 @@ describe('UserService', () => {
         { provide: HelperService, useValue: mockHelperService },
         { provide: SessionService, useValue: mockSessionService },
         { provide: EmailService, useValue: mockEmailService },
+        { provide: EmailQueueService, useValue: mockEmailQueueService },
         { provide: CloudinaryService, useValue: mockCloudinaryService },
         { provide: AIMatchingService, useValue: mockAIMatchingService },
       ],
@@ -608,7 +614,7 @@ describe('UserService', () => {
         await service.forgotPassword({ email })
 
         expect(userRepository.createForgotPasswordToken).toHaveBeenCalled()
-        expect(mockEmailService.sendForgotPasswordEmail).toHaveBeenCalled()
+        expect(mockEmailQueueService.addSendEmailJob).toHaveBeenCalled()
       })
 
       it('Abnormal: should throw UnauthorizedException when email not found', async () => {
