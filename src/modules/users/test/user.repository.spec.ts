@@ -187,4 +187,52 @@ describe('UserRepository', () => {
     await repository.updateProfile(1, {})
     expect(mockPrismaService.workerProfile.upsert).toHaveBeenCalled()
   })
+
+  it('findUserWithUserNameOrEmail finds by unique input', async () => {
+    mockPrismaService.user.findUnique.mockResolvedValue({ id: 1, email: 'a@b.com' })
+    const result = await repository.findUserWithUserNameOrEmail({ email: 'a@b.com' })
+    expect(result?.email).toBe('a@b.com')
+  })
+
+  it('signUp creates user with hashed password', async () => {
+    mockPrismaService.user.create.mockResolvedValue({ id: 5 })
+    await repository.signUp(
+      { email: 'a@b.com', userName: 'abc', fullName: 'Test', phone: '0900', role: EnumUserRole.WORKER, password: 'pass' },
+      { passwordHash: 'hashed' },
+    )
+    expect(mockPrismaService.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ password: 'hashed' }) }),
+    )
+  })
+
+  it('updateLastActivity updates lastLoginAt', async () => {
+    mockHelperService.dateCreate.mockReturnValue(new Date('2025-01-01'))
+    mockPrismaService.user.update.mockResolvedValue({})
+    await repository.updateLastActivity(1)
+    expect(mockPrismaService.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 1 } }),
+    )
+  })
+
+  it('findLatestForgotPasswordRequest finds most recent token', async () => {
+    mockPrismaService.verificationToken.findFirst.mockResolvedValue({ id: 9 })
+    const result = await repository.findLatestForgotPasswordRequest(1)
+    expect(result?.id).toBe(9)
+  })
+
+  it('getUserList returns paginated users with filters', async () => {
+    mockPrismaService.user.findMany.mockResolvedValue([{ id: 1 }])
+    mockPrismaService.user.count.mockResolvedValue(5)
+    const result = await repository.getUserList({ page: 1, role: EnumUserRole.WORKER, status: EnumUserStatus.ACTIVE, fromDate: '2025-01-01', toDate: '2025-12-31' })
+    expect(result.users).toHaveLength(1)
+    expect(result.totalItems).toBe(5)
+  })
+
+  it('updateUserStatus updates user status', async () => {
+    mockPrismaService.user.update.mockResolvedValue({ id: 1, status: EnumUserStatus.BLOCKED })
+    await repository.updateUserStatus(1, EnumUserStatus.BLOCKED)
+    expect(mockPrismaService.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: EnumUserStatus.BLOCKED }) }),
+    )
+  })
 })
