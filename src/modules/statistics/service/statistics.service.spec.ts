@@ -65,7 +65,7 @@ describe('StatisticsService', () => {
       expect(mockStatisticsRepo.getDashboardStats).toHaveBeenCalledWith(5, query)
       expect(result).toEqual({ views: 100 })
     })
-    throwsWhenNoCompany(() => service.getDashboardStats(1, {} as any))
+    throwsWhenNoCompany(() => service.getDashboardStats(1, {}))
   })
 
   // ── getJobFunnelStats ─────────────────────────────────────────────────────

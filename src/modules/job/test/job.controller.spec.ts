@@ -149,7 +149,7 @@ describe('JobController', () => {
 
   it('search delegates to service', async () => {
     jobServiceMock.searchJobs.mockResolvedValue({ items: [], meta: {} })
-    await controller.search({} as any)
+    await controller.search({})
     expect(jobServiceMock.searchJobs).toHaveBeenCalled()
   })
 
@@ -179,12 +179,12 @@ describe('JobController', () => {
   it('getForEmployer delegates to service with companyId', async () => {
     companyServiceMock.findByOwnerId.mockResolvedValue(approvedCompany)
     jobServiceMock.getJobsByEmployer.mockResolvedValue({ items: [] })
-    await controller.getForEmployer(user, {} as any)
+    await controller.getForEmployer(user, {})
     expect(jobServiceMock.getJobsByEmployer).toHaveBeenCalledWith(5, expect.anything())
   })
 
   it('create throws when company not approved', async () => {
-    companyServiceMock.findByOwnerId.mockResolvedValue({ id: 5, status: 'PENDING' as any })
+    companyServiceMock.findByOwnerId.mockResolvedValue({ id: 5, status: 'PENDING' })
     await expect(controller.create(user, {} as any)).rejects.toThrow()
   })
 
@@ -197,7 +197,7 @@ describe('JobController', () => {
 
   it('getWishlist delegates to service', async () => {
     jobServiceMock.getWistlist.mockResolvedValue({ items: [] })
-    await controller.getWishlist({ page: 1, limit: 10, skip: 0 } as any, user)
+    await controller.getWishlist({ page: 1, limit: 10, skip: 0 }, user)
     expect(jobServiceMock.getWistlist).toHaveBeenCalledWith(1, 1, 10, 0)
   })
 
@@ -223,14 +223,14 @@ describe('JobController', () => {
   it('updateApplicationStatus delegates to service', async () => {
     companyServiceMock.findByOwnerId.mockResolvedValue(approvedCompany)
     jobServiceMock.updateApplicationStatus.mockResolvedValue({})
-    await controller.updateApplicationStatus(user, 10, { status: 'SUITABLE' as any })
+    await controller.updateApplicationStatus(user, 10, { status: 'SUITABLE' })
     expect(jobServiceMock.updateApplicationStatus).toHaveBeenCalledWith(10, 5, 'SUITABLE')
   })
 
   it('update delegates to service when company approved', async () => {
     companyServiceMock.findByOwnerId.mockResolvedValue(approvedCompany)
     jobServiceMock.updateJob.mockResolvedValue({ success: true })
-    await controller.update(user, 1, {} as any)
+    await controller.update(user, 1, {})
     expect(jobServiceMock.updateJob).toHaveBeenCalledWith(1, expect.anything(), 5)
   })
 

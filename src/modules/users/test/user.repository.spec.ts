@@ -1,6 +1,4 @@
 import { UserRepository } from '../repositories/user.repository'
-import { PrismaService } from 'src/prisma.service'
-import { HelperService } from 'src/common/helper/service/helper.service'
 import { EnumUserLoginWith, EnumUserRole, EnumUserStatus } from 'src/generated/prisma/enums'
 
 describe('UserRepository', () => {
@@ -24,8 +22,8 @@ describe('UserRepository', () => {
 
   beforeEach(() => {
     repository = new UserRepository(
-      mockPrismaService as unknown as PrismaService,
-      mockHelperService as unknown as HelperService,
+      mockPrismaService,
+      mockHelperService,
     )
   })
 
@@ -180,13 +178,13 @@ describe('UserRepository', () => {
 
   it('createProfile creates worker profile', async () => {
     mockPrismaService.workerProfile.create.mockResolvedValue({ id: 1 })
-    const result = await repository.createProfile(1, {} as any)
+    const result = await repository.createProfile(1, {})
     expect(result).toEqual({ id: 1 })
   })
 
   it('updateProfile upserts worker profile', async () => {
     mockPrismaService.workerProfile.upsert.mockResolvedValue({ id: 1 })
-    await repository.updateProfile(1, {} as any)
+    await repository.updateProfile(1, {})
     expect(mockPrismaService.workerProfile.upsert).toHaveBeenCalled()
   })
 })

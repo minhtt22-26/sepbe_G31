@@ -89,7 +89,7 @@ describe('AuthService', () => {
 
     it('uses seconds when miliseconds not set', () => {
       mockHelperService.dateDriff.mockReturnValueOnce({ seconds: 7200, miliseconds: 0 })
-      const result = service.refreshTokens(mockUser, 'old-refresh-token')
+      service.refreshTokens(mockUser, 'old-refresh-token')
       expect(mockAuthUtil.createRefreshTokens).toHaveBeenCalledWith(
         'jti-abc',
         expect.anything(),
