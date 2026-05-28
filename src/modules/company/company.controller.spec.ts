@@ -7,13 +7,26 @@ jest.mock('src/prisma.service', () => ({
   PrismaService: class {},
 }));
 
-const companyServiceMock = {
+const companyServiceMock: any = {
   create: jest.fn(),
   findAll: jest.fn(),
   findAllByStatus: jest.fn(),
   findOne: jest.fn(),
   update: jest.fn(),
   review: jest.fn(),
+  // extended
+  findByOwnerId: jest.fn(),
+  searchCompanies: jest.fn(),
+  findPendingUpdates: jest.fn(),
+  findPendingUpdateRequest: jest.fn(),
+  createReview: jest.fn(),
+  getReviewsByCompanyId: jest.fn(),
+  updateReview: jest.fn(),
+  deleteReview: jest.fn(),
+  reportReview: jest.fn(),
+  getReviewReports: jest.fn(),
+  updateReviewReportStatus: jest.fn(),
+  hideReviewByManager: jest.fn(),
 };
 
 describe('CompanyController', () => {
@@ -100,16 +113,74 @@ describe('CompanyController', () => {
   });
 
   it('updateStatus() should call service.review', async () => {
-    const body = {
-      status: CompanyStatus.APPROVED,
-    } as any;
-    const expected = { id: 3 };
-
-    companyServiceMock.review.mockResolvedValue(expected);
-
+    const body = { status: CompanyStatus.APPROVED } as any;
+    companyServiceMock.review.mockResolvedValue({ id: 3 });
     const result = await controller.updateStatus('3', body, { userId: 1 } as any);
-
-    expect(result).toBe(expected);
+    expect(result).toEqual({ id: 3 });
     expect(companyServiceMock.review).toHaveBeenCalledWith(3, body, 1);
+  });
+
+  it('findOne() throws BadRequestException for non-numeric id', () => {
+    expect(() => controller.findOne('abc')).toThrow('Invalid company id');
+  });
+
+  it('findByOwner delegates to service with ownerId', async () => {
+    companyServiceMock.findByOwnerId.mockResolvedValue({ id: 1 });
+    await controller.findByOwner({ userId: 5 });
+    expect(companyServiceMock.findByOwnerId).toHaveBeenCalledWith(5);
+  });
+
+  it('search delegates to service', async () => {
+    companyServiceMock.searchCompanies.mockResolvedValue({ items: [] });
+    await controller.search({} as any);
+    expect(companyServiceMock.searchCompanies).toHaveBeenCalled();
+  });
+
+  it('findPendingUpdates delegates to service', async () => {
+    companyServiceMock.findPendingUpdates.mockResolvedValue([]);
+    await controller.findPendingUpdates();
+    expect(companyServiceMock.findPendingUpdates).toHaveBeenCalled();
+  });
+
+  it('findPendingUpdateRequest passes numeric id', async () => {
+    companyServiceMock.findPendingUpdateRequest.mockResolvedValue({});
+    await controller.findPendingUpdateRequest('7');
+    expect(companyServiceMock.findPendingUpdateRequest).toHaveBeenCalledWith(7);
+  });
+
+  it('reviewAlias delegates to service', async () => {
+    companyServiceMock.review.mockResolvedValue({});
+    await controller.reviewAlias('1', {} as any, { userId: 1 } as any);
+    expect(companyServiceMock.review).toHaveBeenCalledWith(1, expect.anything(), 1);
+  });
+
+  it('createReview delegates to service', async () => {
+    companyServiceMock.createReview.mockResolvedValue({ id: 5 });
+    await controller.createReview(1, 2, { rating: 5 });
+    expect(companyServiceMock.createReview).toHaveBeenCalledWith(1, 2, { rating: 5 });
+  });
+
+  it('getReviews delegates to service', async () => {
+    companyServiceMock.getReviewsByCompanyId.mockResolvedValue([]);
+    await controller.getReviews(1);
+    expect(companyServiceMock.getReviewsByCompanyId).toHaveBeenCalledWith(1);
+  });
+
+  it('deleteReview delegates to service', async () => {
+    companyServiceMock.deleteReview.mockResolvedValue({});
+    await controller.deleteReview(5, 2);
+    expect(companyServiceMock.deleteReview).toHaveBeenCalledWith(5, 2);
+  });
+
+  it('getReviewReports with defaults', async () => {
+    companyServiceMock.getReviewReports.mockResolvedValue({ items: [] });
+    await controller.getReviewReports();
+    expect(companyServiceMock.getReviewReports).toHaveBeenCalledWith(undefined, 1, 50);
+  });
+
+  it('hideReview delegates to service', async () => {
+    companyServiceMock.hideReviewByManager.mockResolvedValue({});
+    await controller.hideReview(5);
+    expect(companyServiceMock.hideReviewByManager).toHaveBeenCalledWith(5);
   });
 });

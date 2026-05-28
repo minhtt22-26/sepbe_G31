@@ -270,4 +270,159 @@ describe('CompanyService', () => {
       }),
     });
   });
+
+  // ── findByOwnerId ────────────────────────────────────────────────────────
+
+  it('findByOwnerId should return company when found', async () => {
+    prismaMock.company.findFirst.mockResolvedValue({ id: 1, ownerId: 5 });
+    const result = await service.findByOwnerId(5);
+    expect(result).toEqual({ id: 1, ownerId: 5 });
+  });
+
+  it('findByOwnerId should throw NotFoundException when not found', async () => {
+    prismaMock.company.findFirst.mockResolvedValue(null);
+    await expect(service.findByOwnerId(99)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('findByOwnerId should throw ForbiddenException when ownerId mismatch', async () => {
+    prismaMock.company.findFirst.mockResolvedValue({ id: 1, ownerId: 99 });
+    await expect(service.findByOwnerId(5)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  // ── findPendingUpdates ────────────────────────────────────────────────────
+
+  it('findPendingUpdates should return companies in UPDATING status', async () => {
+    const expected = [{ id: 1, status: CompanyStatus.UPDATING }];
+    prismaMock.company.findMany.mockResolvedValue(expected);
+    const result = await service.findPendingUpdates();
+    expect(result).toBe(expected);
+    expect(prismaMock.company.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { status: CompanyStatus.UPDATING } }),
+    );
+  });
+
+  // ── findPendingUpdateRequest ──────────────────────────────────────────────
+
+  it('findPendingUpdateRequest should return current and proposed data', async () => {
+    const company = { id: 1 };
+    const updateRequest = { id: 10, payload: { name: 'New Name' } };
+    prismaMock.company.findUnique.mockResolvedValue(company);
+    (prismaMock as any).companyProfileUpdateRequest = { findFirst: jest.fn().mockResolvedValue(updateRequest) };
+    const result = await service.findPendingUpdateRequest(1);
+    expect(result.companyId).toBe(1);
+    expect(result.current).toBe(company);
+    expect(result.request).toBe(updateRequest);
+  });
+
+  // ── review with UPDATING status (reviewPendingUpdate) ────────────────────
+
+  it('review should call reviewPendingUpdate when company is in UPDATING status', async () => {
+    const company = { id: 1, ownerId: 5, status: CompanyStatus.UPDATING };
+    const pendingRequest = { id: 10, payload: { name: 'Updated Co' } };
+    prismaMock.company.findUnique.mockResolvedValue(company);
+    (prismaMock as any).companyProfileUpdateRequest = {
+      findFirst: jest.fn().mockResolvedValue(pendingRequest),
+      update: jest.fn(),
+    };
+    const updatedCompany = { id: 1, ownerId: 5 };
+    prismaMock.company.update.mockResolvedValue(updatedCompany);
+    prismaMock.notification.create.mockResolvedValue({});
+    (prismaMock as any).$transaction = jest.fn().mockResolvedValue([updatedCompany]);
+    (prismaMock as any).redisMock = redisMock;
+
+    const result = await service.review(1, { status: CompanyStatus.APPROVED } as any);
+    expect(result).toBe(updatedCompany);
+    expect(prismaMock.notification.create).toHaveBeenCalled();
+  });
+
+  // ── create with duplicate taxCode ─────────────────────────────────────────
+
+  it('create should throw BadRequestException when taxCode already registered', async () => {
+    prismaMock.company.findFirst.mockResolvedValue({ id: 99 });
+    await expect(
+      service.create({ name: 'Co', taxCode: 'DUPLICATE' } as any, {}, 1),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('create should succeed without taxCode check when taxCode not provided', async () => {
+    prismaMock.company.findFirst.mockResolvedValue(null);
+    cloudinaryMock.uploadFile.mockResolvedValue(null);
+    prismaMock.company.create.mockResolvedValue({ id: 5 });
+    prismaMock.user.findFirst.mockResolvedValue(null); // no manager
+    const result = await service.create({ name: 'Co' } as any, {}, 1);
+    expect(result).toEqual({ id: 5 });
+  });
+
+  // ── ensureCompanyApprovedForEmployerActions ───────────────────────────────
+
+  it('ensureCompanyApprovedForEmployerActions should return company when approved', async () => {
+    prismaMock.company.findFirst.mockResolvedValue({ id: 1, ownerId: 5, status: CompanyStatus.APPROVED });
+    const result = await service.ensureCompanyApprovedForEmployerActions(5);
+    expect(result).toEqual(expect.objectContaining({ status: CompanyStatus.APPROVED }));
+  });
+
+  it('ensureCompanyApprovedForEmployerActions should throw ForbiddenException when not approved', async () => {
+    prismaMock.company.findFirst.mockResolvedValue({ id: 1, ownerId: 5, status: CompanyStatus.PENDING });
+    await expect(service.ensureCompanyApprovedForEmployerActions(5)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  // ── searchCompanies ───────────────────────────────────────────────────────
+
+  it('searchCompanies should return paginated results with review stats', async () => {
+    const items = [{ id: 1, name: 'WorkLink' }];
+    companyRepositoryMock.searchCompaies.mockResolvedValue({ items, total: 1 });
+    (prismaMock as any).companyReview = {
+      groupBy: jest.fn().mockResolvedValue([
+        { companyId: 1, _avg: { rating: 4.5 }, _count: { _all: 10 } },
+      ]),
+    };
+    const result = await service.searchCompanies({ keyword: 'work', limit: 10, skip: 0, page: 1 } as any);
+    expect(result.items[0].reviewAvg).toBe(4.5);
+    expect(result.items[0].reviewCount).toBe(10);
+  });
+
+  it('searchCompanies should return empty when no items', async () => {
+    companyRepositoryMock.searchCompaies.mockResolvedValue({ items: [], total: 0 });
+    const result = await service.searchCompanies({ limit: 10, skip: 0, page: 1 } as any);
+    expect(result.items).toHaveLength(0);
+  });
+
+  // ── createReview ──────────────────────────────────────────────────────────
+
+  it('createReview should throw NotFoundException when company not found', async () => {
+    prismaMock.company.findUnique.mockResolvedValue(null);
+    await expect(service.createReview(99, 1, {})).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('createReview should throw BadRequestException when review already exists', async () => {
+    prismaMock.company.findUnique.mockResolvedValue({ id: 1 });
+    (prismaMock as any).companyReview = {
+      findUnique: jest.fn().mockResolvedValue({ id: 5 }),
+    };
+    await expect(service.createReview(1, 1, {})).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('createReview should create review when valid', async () => {
+    prismaMock.company.findUnique.mockResolvedValue({ id: 1 });
+    (prismaMock as any).companyReview = {
+      findUnique: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue({ id: 10 }),
+    };
+    const result = await service.createReview(1, 2, { rating: 5 });
+    expect(result).toEqual({ id: 10 });
+  });
+
+  // ── getReviewsByCompanyId ─────────────────────────────────────────────────
+
+  it('getReviewsByCompanyId should mask anonymous reviews', async () => {
+    (prismaMock as any).companyReview = {
+      findMany: jest.fn().mockResolvedValue([
+        { id: 1, isAnonymous: true, user: { fullName: 'Real Name', avatar: 'url' } },
+        { id: 2, isAnonymous: false, user: { fullName: 'Public Name', avatar: null } },
+      ]),
+    };
+    const result = await service.getReviewsByCompanyId(1);
+    expect(result[0].user.fullName).toBe('Anonymous');
+    expect(result[1].user.fullName).toBe('Public Name');
+  });
 });
