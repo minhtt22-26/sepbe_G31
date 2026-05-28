@@ -99,7 +99,7 @@ describe('SupportService', () => {
 
   describe('updateTicket', () => {
     it('updates ticket successfully', async () => {
-      const result = await service.updateTicket(10, { status: SupportTicketStatus.RESOLVED } as any)
+      const result = await service.updateTicket(10, { status: SupportTicketStatus.RESOLVED })
       expect(mockRepo.update).toHaveBeenCalledWith(
         10,
         expect.objectContaining({ status: SupportTicketStatus.RESOLVED }),
@@ -109,17 +109,17 @@ describe('SupportService', () => {
 
     it('throws NotFoundException when ticket not found', async () => {
       mockRepo.findById.mockResolvedValue(null)
-      await expect(service.updateTicket(999, {} as any)).rejects.toThrow(NotFoundException)
+      await expect(service.updateTicket(999, {})).rejects.toThrow(NotFoundException)
     })
 
     it('sets resolvedAt when status becomes RESOLVED', async () => {
-      await service.updateTicket(10, { status: SupportTicketStatus.RESOLVED } as any)
+      await service.updateTicket(10, { status: SupportTicketStatus.RESOLVED })
       const updateCall = mockRepo.update.mock.calls[0][1]
       expect(updateCall.resolvedAt).toBeInstanceOf(Date)
     })
 
     it('sets resolvedAt to null when status is not RESOLVED', async () => {
-      await service.updateTicket(10, { status: SupportTicketStatus.IN_PROGRESS } as any)
+      await service.updateTicket(10, { status: SupportTicketStatus.IN_PROGRESS })
       const updateCall = mockRepo.update.mock.calls[0][1]
       expect(updateCall.resolvedAt).toBeNull()
     })

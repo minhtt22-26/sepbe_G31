@@ -483,5 +483,5 @@ describe('WalletService', () => {
 // ─── Helper ──────────────────────────────────────────────────────────────────
 
 function buildServiceWithConfig(cfg: typeof CFG): WalletService {
-  return new WalletService(mockPrisma as any, cfg as any)
+  return new WalletService(mockPrisma, cfg)
 }

@@ -330,7 +330,7 @@ describe('CompanyService', () => {
     (prismaMock as any).$transaction = jest.fn().mockResolvedValue([updatedCompany]);
     (prismaMock as any).redisMock = redisMock;
 
-    const result = await service.review(1, { status: CompanyStatus.APPROVED } as any);
+    const result = await service.review(1, { status: CompanyStatus.APPROVED });
     expect(result).toBe(updatedCompany);
     expect(prismaMock.notification.create).toHaveBeenCalled();
   });
@@ -349,7 +349,7 @@ describe('CompanyService', () => {
     cloudinaryMock.uploadFile.mockResolvedValue(null);
     prismaMock.company.create.mockResolvedValue({ id: 5 });
     prismaMock.user.findFirst.mockResolvedValue(null); // no manager
-    const result = await service.create({ name: 'Co' } as any, {}, 1);
+    const result = await service.create({ name: 'Co' }, {}, 1);
     expect(result).toEqual({ id: 5 });
   });
 
@@ -376,14 +376,14 @@ describe('CompanyService', () => {
         { companyId: 1, _avg: { rating: 4.5 }, _count: { _all: 10 } },
       ]),
     };
-    const result = await service.searchCompanies({ keyword: 'work', limit: 10, skip: 0, page: 1 } as any);
+    const result = await service.searchCompanies({ keyword: 'work', limit: 10, skip: 0, page: 1 });
     expect(result.items[0].reviewAvg).toBe(4.5);
     expect(result.items[0].reviewCount).toBe(10);
   });
 
   it('searchCompanies should return empty when no items', async () => {
     companyRepositoryMock.searchCompaies.mockResolvedValue({ items: [], total: 0 });
-    const result = await service.searchCompanies({ limit: 10, skip: 0, page: 1 } as any);
+    const result = await service.searchCompanies({ limit: 10, skip: 0, page: 1 });
     expect(result.items).toHaveLength(0);
   });
 

@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { StatsQueueProcessor } from './stats-queue.processor'
 import { PrismaService } from 'src/prisma.service'
-import { JobStatus, JobApplicationStatus, PaymentStatus, EnumUserRole } from 'src/generated/prisma/enums'
 
 const mockPrisma = {
   user: { count: jest.fn() },

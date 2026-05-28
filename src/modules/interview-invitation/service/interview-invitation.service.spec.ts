@@ -10,7 +10,6 @@ import {
   CampaignStatus,
   EnumUserRole,
   InterviewInvitationStatus,
-  JobApplicationStatus,
   WalletTransactionType,
 } from 'src/generated/prisma/enums'
 
@@ -183,7 +182,7 @@ describe('InterviewInvitationService', () => {
     it('returns paginated campaigns', async () => {
       const campaign = makeCampaign()
       mockRepo.getCampaignsByCompany.mockResolvedValue({ campaigns: [campaign], total: 1 })
-      const result = await service.getCampaignsForCompany(1, { page: 1, limit: 10 } as any)
+      const result = await service.getCampaignsForCompany(1, { page: 1, limit: 10 })
       expect(result.total).toBe(1)
       expect(result.data[0].id).toBe(10)
       expect(result.data[0].slots).toHaveLength(1)
@@ -191,7 +190,7 @@ describe('InterviewInvitationService', () => {
 
     it('uses defaults when page/limit missing', async () => {
       mockRepo.getCampaignsByCompany.mockResolvedValue({ campaigns: [], total: 0 })
-      const result = await service.getCampaignsForCompany(1, {} as any)
+      const result = await service.getCampaignsForCompany(1, {})
       expect(result.page).toBe(1)
       expect(result.limit).toBe(10)
     })
@@ -592,10 +591,10 @@ describe('InterviewInvitationService', () => {
 
     it('processes ACCEPTED response with slot selection', async () => {
       mockRepo.getInvitationById.mockResolvedValue(makeInvitation())
-      const result = await service.respondToInvitation(1, 2, {
+      await service.respondToInvitation(1, 2, {
         status: InterviewInvitationStatus.ACCEPTED,
         selectedSlotId: 1,
-      } as any)
+      })
       expect(mockTx.interviewInvitation.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ status: InterviewInvitationStatus.ACCEPTED }),
@@ -610,9 +609,9 @@ describe('InterviewInvitationService', () => {
       mockTx.interviewInvitation.findUnique.mockResolvedValue(makeInvitation())
       mockTx.interviewInvitationSlot.updateMany.mockResolvedValue({ count: 1 })
 
-      const result = await service.respondToInvitation(1, 2, {
+      await service.respondToInvitation(1, 2, {
         status: InterviewInvitationStatus.REJECTED,
-      } as any)
+      })
       expect(mockTx.interviewInvitation.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ status: InterviewInvitationStatus.REJECTED }),

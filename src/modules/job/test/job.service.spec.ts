@@ -343,7 +343,7 @@ describe('JobService', () => {
     })
 
     it('boosts job and returns result', async () => {
-      const result = await service.createBoostCheckout(1, 1, { packageDays: 7 } as any)
+      const result = await service.createBoostCheckout(1, 1, { packageDays: 7 })
       expect(result.success).toBe(true)
       expect(result.data.packageDays).toBe(7)
     })
@@ -533,12 +533,12 @@ describe('JobService', () => {
     })
 
     it('rebuilds embedding when description changes', async () => {
-      await service.updateJob(1, { description: 'New desc' } as any, 1)
+      await service.updateJob(1, { description: 'New desc' }, 1)
       expect(aiMatchingServiceMock.buildJobEmbedding).toHaveBeenCalledWith(1)
     })
 
     it('does not rebuild embedding for non-content changes', async () => {
-      await service.updateJob(1, { quantity: 5 } as any, 1)
+      await service.updateJob(1, { quantity: 5 }, 1)
       expect(aiMatchingServiceMock.buildJobEmbedding).not.toHaveBeenCalled()
     })
   })

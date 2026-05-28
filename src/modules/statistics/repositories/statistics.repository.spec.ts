@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { StatisticsRepository } from './statistics.repository'
 import { PrismaService } from 'src/prisma.service'
-import { JobApplicationStatus, JobStatus, CampaignStatus, PaymentStatus } from 'src/generated/prisma/enums'
+import { JobApplicationStatus, JobStatus, PaymentStatus } from 'src/generated/prisma/enums'
 
 const mockPrisma = {
   job: {
@@ -107,7 +107,7 @@ describe('StatisticsRepository', () => {
         { status: JobApplicationStatus.UNSUITABLE, _count: { id: 2 } },
         { status: JobApplicationStatus.CANCELLED, _count: { id: 1 } },
       ])
-      const result = await repo.getDashboardStats(1, {} as any)
+      const result = await repo.getDashboardStats(1, {})
       expect(result.applied).toBe(10)
       expect(result.viewed).toBe(5)
       expect(result.suitable).toBe(3)
@@ -121,7 +121,7 @@ describe('StatisticsRepository', () => {
       const result = await repo.getDashboardStats(1, {
         from: '2025-01-01',
         to: '2025-01-03',
-      } as any)
+      })
       expect(result.timeline).toHaveLength(3)
       expect(result.timeline[0].period).toBe('2025-01-01')
     })
@@ -131,7 +131,7 @@ describe('StatisticsRepository', () => {
       mockPrisma.$queryRaw
         .mockResolvedValueOnce([{ period: '2025-01-01', count: 10 }]) // views
         .mockResolvedValueOnce([{ period: '2025-01-01', count: 5 }])  // apps
-      const result = await repo.getDashboardStats(1, { from: '2025-01-01', to: '2025-01-01' } as any)
+      const result = await repo.getDashboardStats(1, { from: '2025-01-01', to: '2025-01-01' })
       expect(result.timeline[0].views).toBe(10)
       expect(result.timeline[0].applications).toBe(5)
     })
