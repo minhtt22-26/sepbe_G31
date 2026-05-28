@@ -425,4 +425,129 @@ describe('CompanyService', () => {
     expect(result[0].user.fullName).toBe('Anonymous');
     expect(result[1].user.fullName).toBe('Public Name');
   });
+
+  // ── updateReview ──────────────────────────────────────────────────────────
+
+  it('updateReview should throw NotFoundException when review not found', async () => {
+    (prismaMock as any).companyReview = { findUnique: jest.fn().mockResolvedValue(null), update: jest.fn() };
+    await expect(service.updateReview(1, 1, {})).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('updateReview should throw ForbiddenException when not owner', async () => {
+    (prismaMock as any).companyReview = { findUnique: jest.fn().mockResolvedValue({ id: 1, userId: 99 }), update: jest.fn() };
+    await expect(service.updateReview(1, 1, {})).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('updateReview should update review when owner', async () => {
+    (prismaMock as any).companyReview = {
+      findUnique: jest.fn().mockResolvedValue({ id: 1, userId: 1 }),
+      update: jest.fn().mockResolvedValue({ id: 1, rating: 4 }),
+    };
+    const result = await service.updateReview(1, 1, { rating: 4 });
+    expect(result.rating).toBe(4);
+  });
+
+  // ── deleteReview ──────────────────────────────────────────────────────────
+
+  it('deleteReview should throw NotFoundException when review not found', async () => {
+    (prismaMock as any).companyReview = { findUnique: jest.fn().mockResolvedValue(null), delete: jest.fn() };
+    await expect(service.deleteReview(1, 1)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('deleteReview should throw ForbiddenException when not owner', async () => {
+    (prismaMock as any).companyReview = { findUnique: jest.fn().mockResolvedValue({ id: 1, userId: 99 }), delete: jest.fn() };
+    await expect(service.deleteReview(1, 1)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('deleteReview should delete when owner', async () => {
+    (prismaMock as any).companyReview = {
+      findUnique: jest.fn().mockResolvedValue({ id: 1, userId: 1 }),
+      delete: jest.fn().mockResolvedValue({ id: 1 }),
+    };
+    const result = await service.deleteReview(1, 1);
+    expect(result).toEqual({ id: 1 });
+  });
+
+  // ── reportReview ──────────────────────────────────────────────────────────
+
+  it('reportReview should throw NotFoundException when review not found', async () => {
+    (prismaMock as any).companyReview = { findUnique: jest.fn().mockResolvedValue(null) };
+    await expect(service.reportReview(1, 1, {})).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('reportReview should throw BadRequestException when reporting own review', async () => {
+    (prismaMock as any).companyReview = { findUnique: jest.fn().mockResolvedValue({ id: 1, userId: 1 }) };
+    await expect(service.reportReview(1, 1, {})).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('reportReview should throw when already reported', async () => {
+    (prismaMock as any).companyReview = { findUnique: jest.fn().mockResolvedValue({ id: 1, userId: 99, company: { id: 5, name: 'Co' } }) };
+    (prismaMock as any).companyReviewReport = { findUnique: jest.fn().mockResolvedValue({ id: 1 }) };
+    await expect(service.reportReview(1, 1, {})).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('reportReview should create report and notify managers', async () => {
+    (prismaMock as any).companyReview = {
+      findUnique: jest.fn().mockResolvedValue({ id: 1, userId: 99, company: { id: 5, name: 'WorkLink' } }),
+    };
+    (prismaMock as any).companyReviewReport = {
+      findUnique: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue({ id: 10 }),
+    };
+    prismaMock.user.findFirst.mockResolvedValue(null);
+    prismaMock.user.findMany = jest.fn().mockResolvedValue([{ id: 7 }]);
+    prismaMock.notification.create.mockResolvedValue({});
+    const result = await service.reportReview(1, 1, { reason: 'FRAUD' });
+    expect(result).toEqual({ id: 10 });
+  });
+
+  // ── hideReviewByManager ───────────────────────────────────────────────────
+
+  it('hideReviewByManager should throw NotFoundException when review not found', async () => {
+    (prismaMock as any).companyReview = { findUnique: jest.fn().mockResolvedValue(null) };
+    await expect(service.hideReviewByManager(1)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('hideReviewByManager should hide review', async () => {
+    (prismaMock as any).companyReview = {
+      findUnique: jest.fn().mockResolvedValue({ id: 1 }),
+      update: jest.fn().mockResolvedValue({ id: 1, status: 'DELETED' }),
+    };
+    const result = await service.hideReviewByManager(1);
+    expect(result.status).toBe('DELETED');
+  });
+
+  // ── getReviewReports ──────────────────────────────────────────────────────
+
+  it('getReviewReports should return paginated reports', async () => {
+    (prismaMock as any).companyReviewReport = {
+      findMany: jest.fn().mockResolvedValue([{ id: 1 }]),
+      count: jest.fn().mockResolvedValue(1),
+    };
+    prismaMock.$transaction = jest.fn().mockResolvedValue([[{ id: 1 }], 1]);
+    const result = await service.getReviewReports(undefined, 1, 10);
+    expect(result.data).toHaveLength(1);
+    expect(result.total).toBe(1);
+  });
+
+  // ── updateReviewReportStatus ──────────────────────────────────────────────
+
+  it('updateReviewReportStatus should throw NotFoundException when report not found', async () => {
+    (prismaMock as any).companyReviewReport = { findUnique: jest.fn().mockResolvedValue(null) };
+    await expect(service.updateReviewReportStatus(99, 'RESOLVED')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('updateReviewReportStatus should update and send notification on RESOLVED', async () => {
+    (prismaMock as any).companyReviewReport = {
+      findUnique: jest.fn().mockResolvedValue({
+        id: 1, reporterId: 3, managerNote: null,
+        review: { id: 1, company: { id: 5, name: 'WorkLink' } },
+      }),
+      update: jest.fn().mockResolvedValue({ id: 1, status: 'RESOLVED' }),
+    };
+    prismaMock.notification.create.mockResolvedValue({});
+    const result = await service.updateReviewReportStatus(1, 'RESOLVED', 'Approved');
+    expect(result.status).toBe('RESOLVED');
+    expect(prismaMock.notification.create).toHaveBeenCalled();
+  });
 });
