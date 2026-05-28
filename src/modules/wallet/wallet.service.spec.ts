@@ -478,6 +478,42 @@ describe('WalletService', () => {
       expect(result.meta.limit).toBe(100)
     })
   })
+
+  // ── getCompanyWallet ──────────────────────────────────────────────────────
+
+  describe('getCompanyWallet', () => {
+    it('delegates to ensureCompanyWallet', async () => {
+      mockPrisma.companyWallet.upsert.mockResolvedValue(mockWallet)
+      const result = await service.getCompanyWallet(1)
+      expect(result).toBe(mockWallet)
+    })
+  })
+
+  // ── getBoostPackagesForEmployer — fallback branch ────────────────────────
+
+  describe('getBoostPackagesForEmployer — extra branches', () => {
+    it('returns packages when hasFallbackDuration matches DB', async () => {
+      mockPrisma.paymentPackage.findMany.mockResolvedValue([
+        { id: 1, name: 'Goi 7 ngay', description: null, durationDays: 7, price: 50000, isDefault: true },
+      ])
+      mockPrisma.systemSetting.findUnique.mockResolvedValue(null)
+      const result = await service.getBoostPackagesForEmployer()
+      expect(result.some(p => p.durationDays === 7)).toBe(true)
+    })
+  })
+
+  // ── processTopupWebhookPayload — extra branches ──────────────────────────
+
+  describe('processTopupWebhookPayload — extra branches', () => {
+    it('returns gracefully when order found but wrong type', async () => {
+      mockPrisma.paymentOrder.findUnique.mockResolvedValue({
+        id: 42, orderType: OrderType.BOOST_JOB, status: PaymentStatus.PENDING,
+      })
+      const result = await service.processTopupWebhookPayload({ content: 'TOPUP42', transferAmount: 50000 })
+      expect(result.success).toBe(true)
+      expect(result.message).toContain('Không tìm thấy')
+    })
+  })
 })
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
