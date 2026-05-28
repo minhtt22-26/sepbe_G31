@@ -28,6 +28,8 @@ describe('UserController', () => {
     logout: jest.fn(),
     changePassword: jest.fn(),
     userDeleteAccount: jest.fn(),
+    getUserList: jest.fn(),
+    updateUserStatus: jest.fn(),
   }
 
   beforeEach(async () => {
@@ -208,6 +210,23 @@ describe('UserController', () => {
     it('userDeleteAccount: Abnormal: should handle service errors', async () => {
       mockUserService.userDeleteAccount.mockRejectedValue(new BadRequestException('Error'))
       await expect(controller.userDeleteAccount(1)).rejects.toThrow(BadRequestException)
+    })
+  })
+
+  describe('Admin endpoints', () => {
+    it('getUserList delegates to service with query', async () => {
+      const query: any = { page: 1, limit: 10 }
+      mockUserService.getUserList.mockResolvedValue({ users: [], totalItems: 0 })
+      const result = await controller.getUserList(query)
+      expect(mockUserService.getUserList).toHaveBeenCalledWith(query)
+      expect(result.users).toHaveLength(0)
+    })
+
+    it('updateUserStatus delegates to service', async () => {
+      mockUserService.updateUserStatus.mockResolvedValue({ id: 1, status: 'BLOCKED' })
+      const result = await controller.updateUserStatus(5, { status: 'BLOCKED' } as any)
+      expect(mockUserService.updateUserStatus).toHaveBeenCalledWith(5, 'BLOCKED')
+      expect(result).toBeDefined()
     })
   })
 })
