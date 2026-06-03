@@ -133,7 +133,7 @@ describe('WalletController', () => {
       await expect(controller.handleTopupWebhook('bad-key', {})).rejects.toThrow(UnauthorizedException)
     })
 
-    it('queues webhook job and returns success', async () => {
+    it('returns 200 immediately (fire-and-forget) and queues job', async () => {
       mockWalletService.validateWebhookAuthorization.mockReturnValue(true)
       mockPaymentQueueService.queueTopupWebhook.mockResolvedValue(undefined)
       const result = await controller.handleTopupWebhook('apikey valid-key', { content: 'TOPUP42' })
@@ -150,6 +150,13 @@ describe('WalletController', () => {
       expect(mockPaymentQueueService.queueTopupWebhook).toHaveBeenCalledWith(
         expect.objectContaining({ payload: {} }),
       )
+    })
+
+    it('still returns 200 even if queue throws', async () => {
+      mockWalletService.validateWebhookAuthorization.mockReturnValue(true)
+      mockPaymentQueueService.queueTopupWebhook.mockRejectedValue(new Error('Redis down'))
+      const result = await controller.handleTopupWebhook('apikey valid-key', {})
+      expect(result.success).toBe(true)
     })
   })
 
