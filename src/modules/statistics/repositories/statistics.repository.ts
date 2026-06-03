@@ -4,7 +4,6 @@ import {
   JobStatus,
   CampaignStatus,
 } from 'src/generated/prisma/enums'
-import { Prisma } from 'src/generated/prisma/client'
 import { PrismaService } from 'src/prisma.service'
 import { OverviewResponseDto } from '../dtos/response/overview.response.dto'
 import { JobStatusResponseDto } from '../dtos/response/job-status.response.dto'
@@ -13,11 +12,6 @@ import { DashboardStatsRequestDto } from '../dtos/request/dashboard-stats.reques
 export class StatisticsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Tính % thay đổi.
-   * Nếu trước đó = 0 và hiện tại > 0 → 100%
-   * Nếu cả hai = 0 → 0%
-   */
   private calcChangePercent(current: number, previous: number): number {
     if (previous === 0) return current > 0 ? 100 : 0
     return Math.round(((current - previous) / previous) * 1000) / 10
