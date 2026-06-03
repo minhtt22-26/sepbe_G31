@@ -142,14 +142,17 @@ export class WalletController {
       throw new UnauthorizedException('SePay webhook authorization không hợp lệ')
     }
 
-    this.logger.log('[WEBHOOK] Auth OK — queuing job (fire-and-forget)')
-    // Fire-and-forget: trả 200 ngay để SePay không timeout, queue chạy background
-    this.paymentQueueService.queueTopupWebhook({
-      gateway: 'SEPAY',
-      payload: body ?? {},
-    })
-      .then(() => this.logger.log('[WEBHOOK] Job queued successfully'))
-      .catch((err: Error) => this.logger.error(`[WEBHOOK] Failed to queue: ${err.message}`))
+    this.logger.log('[WEBHOOK] Auth OK — processing (fire-and-forget)')
+    // Xử lý trực tiếp (không qua Redis queue) để tránh timeout khi Redis chậm.
+    // processTopupWebhookPayload chỉ dùng Prisma nên không phụ thuộc Redis.
+    this.walletService.processTopupWebhookPayload(body ?? {})
+      .then((result) => this.logger.log(`[WEBHOOK] Done: ${result.message}`))
+      .catch((err: Error) => {
+        this.logger.error(`[WEBHOOK] Processing error: ${err.message}`)
+        // Fallback: thêm vào queue để retry sau nếu xử lý trực tiếp thất bại
+        this.paymentQueueService.queueTopupWebhook({ gateway: 'SEPAY', payload: body ?? {} })
+          .catch((qErr: Error) => this.logger.error(`[WEBHOOK] Queue fallback error: ${qErr.message}`))
+      })
 
     return { success: true, message: 'Webhook đã được tiếp nhận và đang xử lý' }
   }
