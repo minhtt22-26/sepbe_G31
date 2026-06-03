@@ -4,9 +4,8 @@ import { StatisticsService } from '../service/statistics.service'
 
 const mockService = {
   getOverview: jest.fn(),
-  getDashboardStats: jest.fn(),
-  getJobFunnelStats: jest.fn(),
-  getPaymentStats: jest.fn(),
+  getJobEngagementStatistic: jest.fn(),
+  getJobStatistic: jest.fn(),
   getJobStatus: jest.fn(),
 }
 
@@ -29,24 +28,17 @@ describe('StatisticsController', () => {
     expect(result.totalViews.value).toBe(10)
   })
 
-  it('getDashboardStats delegates to service with query', async () => {
-    mockService.getDashboardStats.mockResolvedValue({ applied: 5 })
+  it('getJobEngagementStatistic delegates to service with query', async () => {
+    mockService.getJobEngagementStatistic.mockResolvedValue({ applied: 5 })
     const query: any = { from: '2025-01-01', to: '2025-01-31' }
-    await controller.getDashboardStats(1, query)
-    expect(mockService.getDashboardStats).toHaveBeenCalledWith(1, query)
+    await controller.getJobEngagementStatistic(1, query)
+    expect(mockService.getJobEngagementStatistic).toHaveBeenCalledWith(1, query)
   })
 
-  it('getJobFunnelStats delegates to service with jobId', async () => {
-    mockService.getJobFunnelStats.mockResolvedValue({ applied: 3 })
-    await controller.getJobFunnelStats(1, 42)
-    expect(mockService.getJobFunnelStats).toHaveBeenCalledWith(1, 42)
-  })
-
-  it('getPaymentStats delegates to service with query', async () => {
-    mockService.getPaymentStats.mockResolvedValue({ totalSpent: 50000 })
-    const query: any = { from: '2025-01-01', to: '2025-01-31', groupBy: 'month' }
-    await controller.getPaymentStats(1, query)
-    expect(mockService.getPaymentStats).toHaveBeenCalledWith(1, query)
+  it('getJobStatistic delegates to service with jobId', async () => {
+    mockService.getJobStatistic.mockResolvedValue({ applied: 3 })
+    await controller.getJobStatistic(1, 42)
+    expect(mockService.getJobStatistic).toHaveBeenCalledWith(1, 42)
   })
 
   it('getJobStatus delegates to service', async () => {

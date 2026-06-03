@@ -6,9 +6,8 @@ import { CompanyService } from 'src/modules/company/company.service'
 
 const mockStatisticsRepo = {
   getOverview: jest.fn(),
-  getDashboardStats: jest.fn(),
-  getJobFunnelStats: jest.fn(),
-  getPaymentStats: jest.fn(),
+  getJobEngagementStatistic: jest.fn(),
+  getJobStatistic: jest.fn(),
   getJobStatus: jest.fn(),
 }
 
@@ -55,42 +54,29 @@ describe('StatisticsService', () => {
     throwsWhenNoCompany(() => service.getOverview(1))
   })
 
-  // ── getDashboardStats ─────────────────────────────────────────────────────
+  // ── getJobEngagementStatistic ─────────────────────────────────────────────
 
-  describe('getDashboardStats', () => {
+  describe('getJobEngagementStatistic', () => {
     it('delegates to repository with companyId and query', async () => {
-      mockStatisticsRepo.getDashboardStats.mockResolvedValue({ views: 100 })
+      mockStatisticsRepo.getJobEngagementStatistic.mockResolvedValue({ views: 100 })
       const query: any = { period: 'week' }
-      const result = await service.getDashboardStats(1, query)
-      expect(mockStatisticsRepo.getDashboardStats).toHaveBeenCalledWith(5, query)
+      const result = await service.getJobEngagementStatistic(1, query)
+      expect(mockStatisticsRepo.getJobEngagementStatistic).toHaveBeenCalledWith(5, query)
       expect(result).toEqual({ views: 100 })
     })
-    throwsWhenNoCompany(() => service.getDashboardStats(1, {}))
+    throwsWhenNoCompany(() => service.getJobEngagementStatistic(1, {} as any))
   })
 
-  // ── getJobFunnelStats ─────────────────────────────────────────────────────
+  // ── getJobStatistic ───────────────────────────────────────────────────────
 
-  describe('getJobFunnelStats', () => {
+  describe('getJobStatistic', () => {
     it('delegates to repository with companyId and jobId', async () => {
-      mockStatisticsRepo.getJobFunnelStats.mockResolvedValue({ applied: 20 })
-      const result = await service.getJobFunnelStats(1, 99)
-      expect(mockStatisticsRepo.getJobFunnelStats).toHaveBeenCalledWith(5, 99)
+      mockStatisticsRepo.getJobStatistic.mockResolvedValue({ applied: 20 })
+      const result = await service.getJobStatistic(1, 99)
+      expect(mockStatisticsRepo.getJobStatistic).toHaveBeenCalledWith(5, 99)
       expect(result).toEqual({ applied: 20 })
     })
-    throwsWhenNoCompany(() => service.getJobFunnelStats(1, 99))
-  })
-
-  // ── getPaymentStats ───────────────────────────────────────────────────────
-
-  describe('getPaymentStats', () => {
-    it('delegates to repository with ownerId and query', async () => {
-      mockStatisticsRepo.getPaymentStats.mockResolvedValue({ spent: 50000 })
-      const query: any = {}
-      const result = await service.getPaymentStats(1, query)
-      expect(mockStatisticsRepo.getPaymentStats).toHaveBeenCalledWith(1, query)
-      expect(result).toEqual({ spent: 50000 })
-    })
-    throwsWhenNoCompany(() => service.getPaymentStats(1, {} as any))
+    throwsWhenNoCompany(() => service.getJobStatistic(1, 99))
   })
 
   // ── getJobStatus ──────────────────────────────────────────────────────────

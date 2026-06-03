@@ -14,7 +14,6 @@ import {
   AuthRoleProtected,
 } from 'src/modules/auth/decorators/auth.jwt.decorator'
 import { EnumUserRole } from 'src/generated/prisma/enums'
-import { PaymentStatsRequestDto } from '../dtos/request/payment-stats.request.dto'
 import { DashboardStatsRequestDto } from '../dtos/request/dashboard-stats.request.dto'
 
 @Controller('statistics')
@@ -48,15 +47,6 @@ export class StatisticsController {
     @Param('jobId', ParseIntPipe) jobId: number,
   ) {
     return this.statisticService.getJobStatistic(userId, jobId)
-  }
-
-  @Get('employer/payments')
-  @AuthRoleProtected(EnumUserRole.EMPLOYER)
-  async getPaymentStatistic(
-    @AuthJwtPayload('userId') userId: number,
-    @Query() query: PaymentStatsRequestDto,
-  ) {
-    return this.statisticService.getPaymentStatistic(userId, query)
   }
 
   @Get('employer/job-status')

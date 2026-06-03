@@ -2,14 +2,11 @@ import { Injectable } from '@nestjs/common'
 import {
   JobApplicationStatus,
   JobStatus,
-  PaymentStatus,
   CampaignStatus,
 } from 'src/generated/prisma/enums'
 import { Prisma } from 'src/generated/prisma/client'
 import { PrismaService } from 'src/prisma.service'
 import { OverviewResponseDto } from '../dtos/response/overview.response.dto'
-import { PaymentStatsResponseDto } from '../dtos/response/payment-stats.response.dto'
-import { PaymentStatsRequestDto } from '../dtos/request/payment-stats.request.dto'
 import { JobStatusResponseDto } from '../dtos/response/job-status.response.dto'
 import { DashboardStatsRequestDto } from '../dtos/request/dashboard-stats.request.dto'
 @Injectable()
@@ -281,84 +278,6 @@ export class StatisticsRepository {
     }
 
     return funnel
-  }
-
-  async getPaymentStatistic(
-    ownerId: number,
-    query: PaymentStatsRequestDto,
-  ): Promise<PaymentStatsResponseDto> {
-    const { from, to, groupBy } = query
-    const page = query.page && query.page > 0 ? query.page : 1
-    const limit =
-      query.limit && query.limit > 0 ? Math.min(query.limit, 50) : 10
-    const skip = (page - 1) * limit
-    const groupByRaw = Prisma.sql([groupBy])
-
-    const totalSpent = await this.prisma.paymentOrder.aggregate({
-      where: {
-        userId: ownerId,
-        status: PaymentStatus.COMPLETED,
-      },
-      _sum: { amount: true },
-    })
-
-    const trends = await this.prisma.$queryRaw<any[]>`
-      SELECT
-        DATE_TRUNC(${groupByRaw}, "createdAt") AS period,
-        SUM(amount)::int AS amount
-      FROM "PaymentOrder"
-      WHERE "userId" = ${ownerId}
-        AND "status" = 'COMPLETED'
-        AND "createdAt" >= ${new Date(from)}
-        AND "createdAt" <= ${new Date(to)}
-      GROUP BY period
-      ORDER BY period ASC
-    `
-
-    const where = {
-      userId: ownerId,
-      status: PaymentStatus.COMPLETED,
-      createdAt: {
-        gte: new Date(from),
-        lte: new Date(to),
-      },
-    }
-
-    const [transactions, total] = await this.prisma.$transaction([
-      this.prisma.paymentOrder.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
-      }),
-      this.prisma.paymentOrder.count({ where }),
-    ])
-
-    return {
-      totalSpent: totalSpent._sum.amount || 0,
-      trends: trends.map((item) => ({
-        period: item.period.toISOString(),
-        amount: item.amount || 0,
-      })),
-      transactions: transactions.map((item) => ({
-        id: item.id,
-        orderType: item.orderType,
-        amount: item.amount,
-        currency: item.currency,
-        status: item.status,
-        paymentMethod: item.paymentMethod,
-        packageDays: null,
-        packageName: null,
-        transactionCode: item.transactionCode || `DH-${item.id}`,
-        createdAt: item.createdAt.toISOString(),
-      })),
-      meta: {
-        page,
-        limit,
-        total,
-        totalPage: Math.max(1, Math.ceil(total / limit)),
-      },
-    }
   }
 
   async getJobStatus(companyId: number): Promise<JobStatusResponseDto> {
