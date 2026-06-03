@@ -340,9 +340,9 @@ export class WalletService {
     }
 
     const orderId = this.extractOrderIdFromPayload(normalizedPayload)
-    this.logger.debug(`[PAYLOAD] extracted orderId=${orderId} from content="${normalizedPayload.content}" code="${normalizedPayload.code}"`)
+    this.logger.debug(`[PAYLOAD] extracted orderId=${orderId} from content="${String(normalizedPayload.content)}" code="${String(normalizedPayload.code)}"`)
     if (!orderId) {
-      this.logger.warn(`[PAYLOAD] Skipped — no valid orderId. prefix="${this.paymentCfg.sepayOrderPrefix}" content="${normalizedPayload.content}" code="${normalizedPayload.code}"`)
+      this.logger.warn(`[PAYLOAD] Skipped — no valid orderId. prefix="${this.paymentCfg.sepayOrderPrefix}" content="${String(normalizedPayload.content)}" code="${String(normalizedPayload.code)}"`)
       return { success: true, message: 'Bỏ qua giao dịch không chứa mã hợp lệ' }
     }
 

@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { BadRequestException, UnauthorizedException } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { WalletController } from './wallet.controller'
 import { WalletService } from './wallet.service'
 import { CompanyService } from '../company/company.service'
@@ -22,6 +23,10 @@ const mockPaymentQueueService = {
   queueTopupWebhook: jest.fn(),
 }
 
+const mockConfigService = {
+  get: jest.fn((key: string) => (key === 'NODE_ENV' ? 'development' : undefined)),
+}
+
 const company = { id: 5, name: 'WorkLink' }
 const user = { userId: 1 }
 
@@ -38,6 +43,7 @@ describe('WalletController', () => {
         { provide: WalletService, useValue: mockWalletService },
         { provide: CompanyService, useValue: mockCompanyService },
         { provide: PaymentQueueService, useValue: mockPaymentQueueService },
+        { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile()
 
@@ -144,6 +150,24 @@ describe('WalletController', () => {
       expect(mockPaymentQueueService.queueTopupWebhook).toHaveBeenCalledWith(
         expect.objectContaining({ payload: {} }),
       )
+    })
+  })
+
+  // ── devSimulateWebhook ────────────────────────────────────────────────────
+
+  describe('devSimulateWebhook', () => {
+    it('processes webhook payload for given orderId in development', async () => {
+      mockWalletService.processTopupWebhookPayload = jest.fn().mockResolvedValue({ success: true, message: 'ok' })
+      const result = await controller.devSimulateWebhook(42)
+      expect(mockWalletService.processTopupWebhookPayload).toHaveBeenCalledWith(
+        expect.objectContaining({ transferType: 'in' }),
+      )
+      expect(result.success).toBe(true)
+    })
+
+    it('throws BadRequestException when not in development', async () => {
+      mockConfigService.get.mockReturnValue('production')
+      await expect(controller.devSimulateWebhook(42)).rejects.toThrow(BadRequestException)
     })
   })
 })
