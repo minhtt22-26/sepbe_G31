@@ -54,7 +54,8 @@ export class WalletService {
   }
 
   validateWebhookAuthorization(authorizationHeader?: string): boolean {
-    if (!this.paymentCfg.sepayWebhookApiKey) {
+    const configuredKey = this.paymentCfg.sepayWebhookApiKey?.trim() ?? ''
+    if (!configuredKey) {
       return false
     }
 
@@ -63,8 +64,8 @@ export class WalletService {
     }
 
     const normalized = authorizationHeader.trim().toLowerCase()
-    const expected = `apikey ${this.paymentCfg.sepayWebhookApiKey}`.toLowerCase()
-    const expectedKey = this.paymentCfg.sepayWebhookApiKey.trim().toLowerCase()
+    const expected = `apikey ${configuredKey}`.toLowerCase()
+    const expectedKey = configuredKey.toLowerCase()
 
     return normalized === expected || normalized === expectedKey
   }
