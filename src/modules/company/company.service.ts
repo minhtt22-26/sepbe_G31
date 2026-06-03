@@ -500,6 +500,37 @@ export class CompanyService {
       return savedCompany
     }
 
+    if (company.status === CompanyStatus.REJECTED) {
+      const updatedCompany = await this.prisma.company.update({
+        where: { id },
+        data: {
+          ...updateData,
+          logoUrl,
+          businessLicenseUrl,
+          status: CompanyStatus.PENDING,
+          rejectionReason: null,
+        },
+      })
+
+      const manager = await this.prisma.user.findFirst({
+        where: { role: EnumUserRole.MANAGER },
+        select: { id: true },
+      })
+      if (manager) {
+        await this.prisma.notification.create({
+          data: {
+            userId: manager.id,
+            title: 'Công ty chờ duyệt lại',
+            message: `Công ty "${company.name}" đã cập nhật thông tin sau khi bị từ chối và đang chờ duyệt lại.`,
+            link: `/manager?companyId=${id}`,
+          },
+        })
+      }
+
+      await this.invalidateApprovedCompaniesCache()
+      return updatedCompany
+    }
+
     const updatedCompany = await this.prisma.company.update({
       where: { id },
       data: {

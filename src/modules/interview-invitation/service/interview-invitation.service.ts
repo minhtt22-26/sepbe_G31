@@ -493,6 +493,10 @@ export class InterviewInvitationService {
       throw new ForbiddenException('Bạn không có quyền cập nhật chiến dịch này')
     }
 
+    if (campaign.status === CampaignStatus.CANCELLED) {
+      throw new BadRequestException('Không thể cập nhật chiến dịch đã bị hủy')
+    }
+
     const updatedCampaign = await this.prisma.$transaction(async (tx) => {
       // 1. Cập nhật thông tin cơ bản
       await tx.interviewInvitationCampaign.update({
@@ -581,8 +585,16 @@ export class InterviewInvitationService {
           })
           affectedWorkerIds.push(invitation.workerId)
 
+          // Giảm bookedCount trên slot (chỉ khi slot chưa bị xóa)
+          if (!deletedSlotIds.includes(invitation.selectedSlotId)) {
+            await tx.interviewInvitationSlot.update({
+              where: { id: invitation.selectedSlotId },
+              data: { bookedCount: { decrement: 1 } },
+            })
+          }
+
           if (invitation.status === InterviewInvitationStatus.ACCEPTED) {
-            // Cập nhật lại count
+            // Cập nhật lại count campaign
             await tx.interviewInvitationCampaign.update({
               where: { id: campaignId },
               data: {
@@ -781,7 +793,7 @@ export class InterviewInvitationService {
           startAt: slot.startAt,
           endAt: slot.endAt,
           capacity: slot.capacity,
-          bookedCount: slot.bookedCount,
+          bookedCount: (slot as any)._count?.invitations ?? slot.bookedCount,
           location: slot.location,
           note: slot.note,
         })),
@@ -878,8 +890,8 @@ export class InterviewInvitationService {
             startAt: slot.startAt,
             endAt: slot.endAt,
             capacity: slot.capacity,
-            bookedCount: slot.bookedCount,
-            remainingSeats: Math.max(0, slot.capacity - slot.bookedCount),
+            bookedCount: (slot as any)._count?.invitations ?? slot.bookedCount,
+            remainingSeats: Math.max(0, slot.capacity - ((slot as any)._count?.invitations ?? slot.bookedCount)),
             location: slot.location,
             note: slot.note,
           })),

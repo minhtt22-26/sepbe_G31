@@ -11,21 +11,11 @@ export class SupportService {
 
   private async getSingleActiveManager() {
     const managers = await this.supportRepository.findActiveManagers()
-
+    // Return first available manager; if none exists use a placeholder so tickets
+    // can still be created and assigned later by any manager.
     if (managers.length === 0) {
-      throw new BadRequestException({
-        message:
-          'Không thể xử lý ticket vì chưa có manager đang hoạt động trong hệ thống',
-      })
+      return { fullName: 'Đội hỗ trợ' }
     }
-
-    if (managers.length > 1) {
-      throw new BadRequestException({
-        message:
-          'Không thể xử lý ticket vì hệ thống đang có nhiều hơn 1 manager đang hoạt động',
-      })
-    }
-
     return managers[0]
   }
 

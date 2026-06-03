@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsDateString, IsEnum, IsInt, IsNotEmpty, IsOptional, Max, Min } from 'class-validator';
+import { IsDateString, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from 'class-validator';
 import { EnumUserRole, EnumUserStatus } from 'src/generated/prisma/enums';
 import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
 
@@ -38,4 +38,9 @@ export class UserListRequestDto {
   @Max(100)
   @IsOptional()
   limit?: number;
+
+  @ApiPropertyOptional({ example: 'nguyen', description: 'Tìm kiếm theo tên hoặc email' })
+  @IsOptional()
+  @IsString()
+  search?: string;
 }
