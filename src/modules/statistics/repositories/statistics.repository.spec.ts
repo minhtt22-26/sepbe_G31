@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { StatisticsRepository } from './statistics.repository'
 import { PrismaService } from 'src/prisma.service'
-import { JobApplicationStatus, JobStatus, PaymentStatus } from 'src/generated/prisma/enums'
+import { JobApplicationStatus, JobStatus } from 'src/generated/prisma/enums'
 
 const mockPrisma = {
   job: {
