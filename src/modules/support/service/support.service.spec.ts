@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { BadRequestException, NotFoundException } from '@nestjs/common'
+import { NotFoundException } from '@nestjs/common'
 import { SupportService } from './support.service'
 import { SupportRepository } from '../repositories/support.repository'
 import { SupportTicketStatus } from 'src/generated/prisma/enums'
@@ -59,14 +59,20 @@ describe('SupportService', () => {
       expect(result).toBe(ticket)
     })
 
-    it('throws when no active manager exists', async () => {
+    it('uses placeholder assignee when no active manager exists', async () => {
       mockRepo.findActiveManagers.mockResolvedValue([])
-      await expect(service.createTicket(dto)).rejects.toThrow(BadRequestException)
+      await service.createTicket(dto)
+      expect(mockRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ assigneeName: 'Đội hỗ trợ' }),
+      )
     })
 
-    it('throws when more than one active manager exists', async () => {
+    it('uses first manager when more than one active manager exists', async () => {
       mockRepo.findActiveManagers.mockResolvedValue([manager, { id: 2, fullName: 'Manager B' }])
-      await expect(service.createTicket(dto)).rejects.toThrow(BadRequestException)
+      await service.createTicket(dto)
+      expect(mockRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ assigneeName: 'Manager A' }),
+      )
     })
 
     it('retries ticket code generation on collision', async () => {

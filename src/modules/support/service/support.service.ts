@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException } from '@nestjs/common'
 import { SupportTicketStatus } from 'src/generated/prisma/enums'
 import { CreateSupportTicketDto } from '../dtos/create-support-ticket.dto'
 import { SupportTicketListDto } from '../dtos/support-ticket-list.dto'
