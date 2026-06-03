@@ -9,7 +9,7 @@
     "node": "20.x"
   },
   "scripts": {
-    "prebuild": "npm run lint || echo lint failed, continue build",
+    "prebuild": "npm run lint",
     "build": "tsc -p tsconfig.build.json && nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" --max-warnings=0",
     "start": "nest start",

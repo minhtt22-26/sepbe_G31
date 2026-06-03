@@ -1186,30 +1186,16 @@ export class InterviewInvitationService {
     }
 
     // Auto-add worker to existing interview campaign (with slots) if this was a slot-less acceptance
-    let autoAddDebug: any = {}
     const isSlotLessAcceptance =
       dto.status === InterviewInvitationStatus.ACCEPTED &&
       updatedInvitation?.campaign?.jobId &&
       (updatedInvitation.campaign.slots || []).length === 0
-
-    autoAddDebug = {
-      dtoStatus: dto.status,
-      hasJobId: !!updatedInvitation?.campaign?.jobId,
-      jobId: updatedInvitation?.campaign?.jobId,
-      slotsLength: (updatedInvitation?.campaign?.slots || []).length,
-      isSlotLessAcceptance,
-      currentCampaignId: updatedInvitation?.campaign?.id,
-    }
-    console.log('[AUTO-ADD DEBUG] Step 1 - Checking:', autoAddDebug)
 
     if (isSlotLessAcceptance) {
       try {
         const jobId = updatedInvitation.campaign.jobId
         const companyId = updatedInvitation.campaign.companyId || invitation.campaign.companyId
         const currentCampaignId = updatedInvitation.campaign.id
-
-        autoAddDebug.step2 = { jobId, companyId, currentCampaignId }
-        console.log('[AUTO-ADD DEBUG] Step 2 - Search params:', autoAddDebug.step2)
 
         // Find an active campaign WITH slots for the same job (exclude current slot-less campaign)
         const activeCampaignWithSlots = await this.prisma.interviewInvitationCampaign.findFirst({
@@ -1233,11 +1219,6 @@ export class InterviewInvitationService {
           },
         })
 
-        autoAddDebug.step3 = activeCampaignWithSlots
-          ? { id: activeCampaignWithSlots.id, status: activeCampaignWithSlots.status, slotsCount: activeCampaignWithSlots.slots.length }
-          : 'NOT_FOUND'
-        console.log('[AUTO-ADD DEBUG] Step 3 - Found campaign:', autoAddDebug.step3)
-
         if (activeCampaignWithSlots) {
           // Check if worker already has an active invitation in that campaign
           const alreadyInvited = await this.prisma.interviewInvitation.findFirst({
@@ -1250,9 +1231,6 @@ export class InterviewInvitationService {
             },
             select: { id: true },
           })
-
-          autoAddDebug.step4 = { alreadyInvited: !!alreadyInvited }
-          console.log('[AUTO-ADD DEBUG] Step 4 - Already invited:', !!alreadyInvited)
 
           if (!alreadyInvited) {
             const job = await this.prisma.job.findUnique({
@@ -1287,7 +1265,6 @@ export class InterviewInvitationService {
                 },
               })
 
-              autoAddDebug.step5 = { success: true, newInvitationId: newInv.id, campaignId: activeCampaignWithSlots.id }
               return newInv
             })
 
@@ -1297,17 +1274,11 @@ export class InterviewInvitationService {
           }
         }
       } catch (error) {
-        autoAddDebug.error = String(error)
         console.error(
           `[AUTO-ADD ERROR] Failed to auto-add worker #${workerId} to interview campaign:`,
           error,
         )
       }
-    }
-
-    // Temporarily attach debug info to response
-    if (updatedInvitation) {
-      updatedInvitation._autoAddDebug = autoAddDebug
     }
 
     return updatedInvitation

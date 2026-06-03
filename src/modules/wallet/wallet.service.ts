@@ -55,7 +55,7 @@ export class WalletService {
 
   validateWebhookAuthorization(authorizationHeader?: string): boolean {
     if (!this.paymentCfg.sepayWebhookApiKey) {
-      return true
+      return false
     }
 
     if (!authorizationHeader) {
@@ -458,31 +458,35 @@ export class WalletService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      const wallet = await tx.companyWallet.upsert({
+      // Ensure wallet row exists before atomic update
+      await tx.companyWallet.upsert({
         where: { companyId: params.companyId },
         update: {},
         create: { companyId: params.companyId },
       })
 
-      if (wallet.balancePoint < params.cost) {
+      // Atomic deduction — single UPDATE with WHERE prevents race conditions
+      const [wallet] = await tx.$queryRaw<{ id: number; balancePoint: number }[]>`
+        UPDATE "CompanyWallet"
+        SET
+          "balancePoint"    = "balancePoint" - ${params.cost},
+          "totalSpentPoint" = "totalSpentPoint" + ${params.cost},
+          "updatedAt"       = now()
+        WHERE "companyId" = ${params.companyId}
+          AND "balancePoint" >= ${params.cost}
+        RETURNING id, "balancePoint"
+      `
+
+      if (!wallet) {
         throw new BadRequestException('Số dư point không đủ')
       }
-
-      const nextBalance = wallet.balancePoint - params.cost
-      await tx.companyWallet.update({
-        where: { id: wallet.id },
-        data: {
-          balancePoint: nextBalance,
-          totalSpentPoint: { increment: params.cost },
-        },
-      })
 
       await tx.walletTransaction.create({
         data: {
           walletId: wallet.id,
           type: params.type,
           pointDelta: -params.cost,
-          balanceAfter: nextBalance,
+          balanceAfter: wallet.balancePoint,
           referenceType: params.referenceType,
           referenceId: params.referenceId,
           metadata: (params.metadata ?? undefined) as any,

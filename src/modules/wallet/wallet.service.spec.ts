@@ -36,6 +36,7 @@ const mockTx = {
   paymentOrder: { update: jest.fn() },
   walletTransaction: { create: jest.fn() },
   notification: { create: jest.fn() },
+  $queryRaw: jest.fn(),
 }
 
 const mockPrisma = {
@@ -75,9 +76,9 @@ describe('WalletService', () => {
   // ── validateWebhookAuthorization ──────────────────────────────────────────
 
   describe('validateWebhookAuthorization', () => {
-    it('returns true when no api key configured', () => {
+    it('returns false when no api key configured', () => {
       const svc = buildServiceWithConfig({ ...CFG, sepayWebhookApiKey: '' })
-      expect(svc.validateWebhookAuthorization()).toBe(true)
+      expect(svc.validateWebhookAuthorization()).toBe(false)
     })
 
     it('returns false when header is missing', () => {
@@ -413,22 +414,19 @@ describe('WalletService', () => {
     }
 
     beforeEach(() => {
-      mockTx.companyWallet.upsert.mockResolvedValue(mockWallet) // balancePoint: 100000
-      mockTx.companyWallet.update.mockResolvedValue({})
+      mockTx.companyWallet.upsert.mockResolvedValue(mockWallet)
+      mockTx.$queryRaw.mockResolvedValue([{ id: mockWallet.id, balancePoint: 50000 }])
       mockTx.walletTransaction.create.mockResolvedValue({})
     })
 
     it('deducts points when balance is sufficient', async () => {
       await service.deductPoints(baseParams)
-      expect(mockTx.companyWallet.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ balancePoint: 50000 }),
-        }),
-      )
+      expect(mockTx.$queryRaw).toHaveBeenCalled()
+      expect(mockTx.walletTransaction.create).toHaveBeenCalled()
     })
 
     it('throws BadRequestException when balance is insufficient', async () => {
-      mockTx.companyWallet.upsert.mockResolvedValue({ ...mockWallet, balancePoint: 10000 })
+      mockTx.$queryRaw.mockResolvedValue([]) // no rows updated = insufficient balance
       await expect(service.deductPoints(baseParams)).rejects.toThrow(BadRequestException)
     })
 

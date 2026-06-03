@@ -496,6 +496,7 @@ model Job {
   @@index([province])
   @@index([district])
   @@index([isBoosted])
+  @@index([isBoosted, status, occupationId])
 }
 
 model JobReport {
@@ -544,6 +545,7 @@ model JobApplication {
 
   @@unique([jobId, userId])
   @@index([jobId])
+  @@index([userId])
   @@index([status])
 }
 
