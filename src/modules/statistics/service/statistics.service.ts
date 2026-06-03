@@ -18,28 +18,28 @@ export class StatisticsService {
     }
     return this.statisticsRepository.getOverview(company.id)
   }
-  async getDashboardStats(ownerId: number, query: DashboardStatsRequestDto) {
+  async getJobEngagementStatistic(ownerId: number, query: DashboardStatsRequestDto) {
     const company = await this.companyService.findByOwnerId(ownerId)
     if (!company) {
       throw new NotFoundException('Bạn chưa sở hữu công ty nào')
     }
-    return this.statisticsRepository.getDashboardStats(company.id, query)
+    return this.statisticsRepository.getJobEngagementStatistic(company.id, query)
   }
 
-  async getJobFunnelStats(ownerId: number, jobId: number) {
+  async getJobStatistic(ownerId: number, jobId: number) {
     const company = await this.companyService.findByOwnerId(ownerId)
     if (!company) {
       throw new NotFoundException('Bạn chưa sở hữu công ty nào')
     }
-    return this.statisticsRepository.getJobFunnelStats(company.id, jobId)
+    return this.statisticsRepository.getJobStatistic(company.id, jobId)
   }
 
-  async getPaymentStats(ownerId: number, query: PaymentStatsRequestDto) {
+  async getPaymentStatistic(ownerId: number, query: PaymentStatsRequestDto) {
     const company = await this.companyService.findByOwnerId(ownerId)
     if (!company) {
       throw new NotFoundException('Bạn chưa sở hữu công ty nào')
     }
-    return this.statisticsRepository.getPaymentStats(ownerId, query)
+    return this.statisticsRepository.getPaymentStatistic(ownerId, query)
   }
 
   async getJobStatus(ownerId: number) {

@@ -28,35 +28,35 @@ export class StatisticsController {
     return this.statisticService.getOverview(userId)
   }
 
-  @Get('employer/dashboard-stats')
+  @Get('employer/job-engagement')
   @ApiOperation({
-    summary: 'Thống kê tổng quát cho dashboard (Biểu đồ & Funnel tổng)',
+    summary: 'Thống kê lượt xem & ứng tuyển cho dashboard (Biểu đồ & Funnel tổng)',
   })
   @AuthRoleProtected(EnumUserRole.EMPLOYER)
-  async getDashboardStats(
+  async getJobEngagementStatistic(
     @AuthJwtPayload('userId') userId: number,
     @Query() query: DashboardStatsRequestDto,
   ) {
-    return this.statisticService.getDashboardStats(userId, query)
+    return this.statisticService.getJobEngagementStatistic(userId, query)
   }
 
-  @Get('employer/jobs/:jobId/funnel')
-  @ApiOperation({ summary: 'Thống kê chi tiết funnel cho từng công việc' })
+  @Get('employer/jobs/:jobId/statistic')
+  @ApiOperation({ summary: 'Thống kê chi tiết funnel ứng tuyển cho từng công việc' })
   @AuthRoleProtected(EnumUserRole.EMPLOYER)
-  async getJobFunnelStats(
+  async getJobStatistic(
     @AuthJwtPayload('userId') userId: number,
     @Param('jobId', ParseIntPipe) jobId: number,
   ) {
-    return this.statisticService.getJobFunnelStats(userId, jobId)
+    return this.statisticService.getJobStatistic(userId, jobId)
   }
 
   @Get('employer/payments')
   @AuthRoleProtected(EnumUserRole.EMPLOYER)
-  async getPaymentStats(
+  async getPaymentStatistic(
     @AuthJwtPayload('userId') userId: number,
     @Query() query: PaymentStatsRequestDto,
   ) {
-    return this.statisticService.getPaymentStats(userId, query)
+    return this.statisticService.getPaymentStatistic(userId, query)
   }
 
   @Get('employer/job-status')

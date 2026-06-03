@@ -433,7 +433,7 @@ model Sector {
 model Occupation {
   id        Int          @id @default(autoincrement())
   sectorId  Int
-  name      String // Công nhân lắp ráp, Công nhân may, Đứng máy ép nhựa
+  name      String       @unique
   status    SectorStatus @default(ACTIVE)
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt

@@ -186,6 +186,41 @@ export class JobRepository {
     return { items, total }
   }
 
+  async getNewestJobs(limit: number, offset: number) {
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.job.findMany({
+        where: { status: JobStatus.PUBLISHED },
+        orderBy: [{ createdAt: 'desc' }],
+        take: limit,
+        skip: offset,
+        include: {
+          company: {
+            select: {
+              id: true,
+              name: true,
+              logoUrl: true,
+            },
+          },
+          occupation: {
+            select: {
+              id: true,
+              name: true,
+              sector: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.job.count({ where: { status: JobStatus.PUBLISHED } }),
+    ])
+
+    return { items, total }
+  }
+
   async deactivateExpiredBoosts() {
     return this.prisma.job.updateMany({
       where: {

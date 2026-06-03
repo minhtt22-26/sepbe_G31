@@ -87,6 +87,22 @@ export class JobController {
     )
   }
 
+  @Get('newest')
+  @ApiOperation({ summary: 'Get newest published jobs' })
+  @ApiResponse({
+    status: 200,
+    description: 'Newest jobs retrieved successfully',
+  })
+  async getNewestJobs(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.jobService.getNewestJobs(
+      Number(page) || 1,
+      Number(limit) || 12,
+    )
+  }
+
   @Get('boost/packages')
   @AuthJwtAccessProtected()
   @AuthRoleProtected(EnumUserRole.EMPLOYER)
