@@ -64,7 +64,7 @@ describe('StatisticsService', () => {
       expect(mockStatisticsRepo.getJobEngagementStatistic).toHaveBeenCalledWith(5, query)
       expect(result).toEqual({ views: 100 })
     })
-    throwsWhenNoCompany(() => service.getJobEngagementStatistic(1, {} as any))
+    throwsWhenNoCompany(() => service.getJobEngagementStatistic(1, {}))
   })
 
   // ── getJobStatistic ───────────────────────────────────────────────────────
