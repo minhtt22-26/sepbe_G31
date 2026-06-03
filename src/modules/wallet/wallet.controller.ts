@@ -142,12 +142,15 @@ export class WalletController {
       throw new UnauthorizedException('SePay webhook authorization không hợp lệ')
     }
 
-    this.logger.log('[WEBHOOK] Auth OK — queuing job')
-    await this.paymentQueueService.queueTopupWebhook({
+    this.logger.log('[WEBHOOK] Auth OK — queuing job (fire-and-forget)')
+    // Fire-and-forget: trả 200 ngay để SePay không timeout, queue chạy background
+    this.paymentQueueService.queueTopupWebhook({
       gateway: 'SEPAY',
       payload: body ?? {},
     })
-    this.logger.log('[WEBHOOK] Job queued successfully')
+      .then(() => this.logger.log('[WEBHOOK] Job queued successfully'))
+      .catch((err: Error) => this.logger.error(`[WEBHOOK] Failed to queue: ${err.message}`))
+
     return { success: true, message: 'Webhook đã được tiếp nhận và đang xử lý' }
   }
 
