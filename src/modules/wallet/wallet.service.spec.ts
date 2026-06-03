@@ -76,9 +76,9 @@ describe('WalletService', () => {
   // ── validateWebhookAuthorization ──────────────────────────────────────────
 
   describe('validateWebhookAuthorization', () => {
-    it('returns false when no api key configured', () => {
+    it('returns true when no api key configured (consistent with boost-job handler)', () => {
       const svc = buildServiceWithConfig({ ...CFG, sepayWebhookApiKey: '' })
-      expect(svc.validateWebhookAuthorization()).toBe(false)
+      expect(svc.validateWebhookAuthorization()).toBe(true)
     })
 
     it('returns false when header is missing', () => {

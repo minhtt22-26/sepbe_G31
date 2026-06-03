@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common'
 import type { ConfigType } from '@nestjs/config'
@@ -16,6 +17,8 @@ import {
 
 @Injectable()
 export class WalletService {
+  private readonly logger = new Logger(WalletService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     @Inject(paymentConfig.KEY)
@@ -56,7 +59,7 @@ export class WalletService {
   validateWebhookAuthorization(authorizationHeader?: string): boolean {
     const configuredKey = this.paymentCfg.sepayWebhookApiKey?.trim() ?? ''
     if (!configuredKey) {
-      return false
+      return true  // consistent với BOOST JOB handler: không có key → cho qua
     }
 
     if (!authorizationHeader) {
@@ -313,6 +316,8 @@ export class WalletService {
     message: string
     data?: { paymentOrderId: number; companyId: number; pointAmount: number }
   }> {
+    this.logger.debug(`[PAYLOAD] raw: ${JSON.stringify(payload)}`)
+
     if (!payload || typeof payload !== 'object') {
       throw new BadRequestException('Payload webhook không hợp lệ')
     }
@@ -328,20 +333,27 @@ export class WalletService {
         : typeof normalizedPayload.transfer_type === 'string'
           ? normalizedPayload.transfer_type.toLowerCase()
           : ''
+    this.logger.debug(`[PAYLOAD] transferType="${transferType}"`)
     if (transferType && !transferType.startsWith('in')) {
+      this.logger.warn(`[PAYLOAD] Skipped — not incoming transfer (transferType="${transferType}")`)
       return { success: true, message: 'Bỏ qua giao dịch không phải tiền vào' }
     }
 
     const orderId = this.extractOrderIdFromPayload(normalizedPayload)
+    this.logger.debug(`[PAYLOAD] extracted orderId=${orderId} from content="${normalizedPayload.content}" code="${normalizedPayload.code}"`)
     if (!orderId) {
+      this.logger.warn(`[PAYLOAD] Skipped — no valid orderId. prefix="${this.paymentCfg.sepayOrderPrefix}" content="${normalizedPayload.content}" code="${normalizedPayload.code}"`)
       return { success: true, message: 'Bỏ qua giao dịch không chứa mã hợp lệ' }
     }
 
     const order = await this.prisma.paymentOrder.findUnique({ where: { id: orderId } })
+    this.logger.debug(`[PAYLOAD] order #${orderId}: ${order ? `type=${order.orderType} status=${order.status} amount=${order.amount}` : 'NOT FOUND'}`)
     if (!order || order.orderType !== OrderType.TOPUP_WALLET) {
+      this.logger.warn(`[PAYLOAD] Skipped — order #${orderId} not found or wrong type`)
       return { success: true, message: 'Không tìm thấy order nạp ví tương ứng' }
     }
     if (order.status === PaymentStatus.COMPLETED) {
+      this.logger.warn(`[PAYLOAD] Skipped — order #${orderId} already completed`)
       return { success: true, message: 'Order đã xử lý trước đó' }
     }
 
@@ -352,7 +364,9 @@ export class WalletService {
         normalizedPayload.amount_in ??
         0,
     )
+    this.logger.debug(`[PAYLOAD] transferAmount=${transferAmount} vs order.amount=${order.amount}`)
     if (!Number.isFinite(transferAmount) || transferAmount < order.amount) {
+      this.logger.warn(`[PAYLOAD] Skipped — transferAmount=${transferAmount} < order.amount=${order.amount}`)
       return { success: true, message: 'Số tiền chưa đủ để nạp point' }
     }
 
@@ -425,6 +439,7 @@ export class WalletService {
       })
     })
 
+    this.logger.log(`[PAYLOAD] ✓ Topup SUCCESS — order #${order.id} company #${companyId} +${pointAmount} points`)
     return {
       success: true,
       message: 'Nạp point thành công',
