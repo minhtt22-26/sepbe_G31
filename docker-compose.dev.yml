@@ -1,4 +1,5 @@
 services:
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
   db:
     image: pgvector/pgvector:pg16
     container_name: sep-db
@@ -10,13 +11,14 @@ services:
     ports:
       - '5432:5432'
     volumes:
-      - sep_db_data_dev:/var/lib/postgresql/data
+      - sep_db_data:/var/lib/postgresql/data
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 5s
       timeout: 5s
       retries: 10
 
+  # ── Redis ───────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: sep-redis
@@ -31,19 +33,20 @@ services:
       timeout: 3s
       retries: 10
 
+  # ── NestJS Backend (dev / hotfix — hot reload) ──────────────────────────────
   backend:
     image: node:20-alpine
-    container_name: sep-backend
+    container_name: sep-backend-dev
     working_dir: /app
-    volumes:
-      - .:/app
-      - backend_node_modules:/app/node_modules
     command: >
       sh -c "npm install &&
              npx prisma migrate deploy &&
              npm run start:dev"
     ports:
       - '4000:4000'
+    volumes:
+      - .:/app
+      - sep_node_modules:/app/node_modules
     env_file:
       - .env
     environment:
@@ -51,6 +54,7 @@ services:
       REDIS_URL: redis://redis:6379
       NODE_ENV: development
       CHOKIDAR_USEPOLLING: 'true'
+      WATCHPACK_POLLING: 'true'
     depends_on:
       db:
         condition: service_healthy
@@ -58,6 +62,6 @@ services:
         condition: service_healthy
 
 volumes:
-  sep_db_data_dev:
+  sep_db_data:
   sep_redis_data:
-  backend_node_modules:
+  sep_node_modules:
