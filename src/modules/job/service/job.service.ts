@@ -150,6 +150,28 @@ export class JobService {
     }
   }
 
+  async getNewestJobs(page = 1, limit = 12) {
+    const safePage = page > 0 ? page : 1
+    const safeLimit = Math.min(Math.max(limit, 1), 50)
+    const skip = (safePage - 1) * safeLimit
+
+    const { items, total } = await this.jobRepository.getNewestJobs(
+      safeLimit,
+      skip,
+    )
+
+    return {
+      success: true,
+      items,
+      meta: {
+        page: safePage,
+        limit: safeLimit,
+        total,
+        totalPage: Math.ceil(total / safeLimit),
+      },
+    }
+  }
+
   async getBoostPackages() {
     const items = await this.walletService.getBoostPackagesForEmployer()
 

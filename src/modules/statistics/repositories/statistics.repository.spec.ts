@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { StatisticsRepository } from './statistics.repository'
 import { PrismaService } from 'src/prisma.service'
-import { JobApplicationStatus, JobStatus, PaymentStatus } from 'src/generated/prisma/enums'
+import { JobApplicationStatus, JobStatus } from 'src/generated/prisma/enums'
 
 const mockPrisma = {
   job: {
@@ -15,11 +15,6 @@ const mockPrisma = {
     groupBy: jest.fn(),
   },
   interviewInvitationCampaign: { findMany: jest.fn() },
-  paymentOrder: {
-    aggregate: jest.fn(),
-    findMany: jest.fn(),
-    count: jest.fn(),
-  },
   $queryRaw: jest.fn(),
   $transaction: jest.fn(),
 }
@@ -96,29 +91,17 @@ describe('StatisticsRepository', () => {
     })
   })
 
-  // ── getDashboardStats ─────────────────────────────────────────────────────
+  // ── getJobEngagementStatistic ─────────────────────────────────────────────
 
-  describe('getDashboardStats', () => {
-    it('returns dashboard stats without timeline when no date range', async () => {
-      mockPrisma.jobApplication.groupBy.mockResolvedValue([
-        { status: JobApplicationStatus.APPLIED, _count: { id: 10 } },
-        { status: JobApplicationStatus.VIEWED, _count: { id: 5 } },
-        { status: JobApplicationStatus.SUITABLE, _count: { id: 3 } },
-        { status: JobApplicationStatus.UNSUITABLE, _count: { id: 2 } },
-        { status: JobApplicationStatus.CANCELLED, _count: { id: 1 } },
-      ])
-      const result = await repo.getDashboardStats(1, {})
-      expect(result.applied).toBe(10)
-      expect(result.viewed).toBe(5)
-      expect(result.suitable).toBe(3)
-      expect(result.total).toBe(21)
+  describe('getJobEngagementStatistic', () => {
+    it('returns empty timeline when no date range', async () => {
+      const result = await repo.getJobEngagementStatistic(1, {})
       expect(result.timeline).toHaveLength(0)
     })
 
     it('builds timeline when date range provided', async () => {
-      mockPrisma.jobApplication.groupBy.mockResolvedValue([])
       mockPrisma.$queryRaw.mockResolvedValue([])
-      const result = await repo.getDashboardStats(1, {
+      const result = await repo.getJobEngagementStatistic(1, {
         from: '2025-01-01',
         to: '2025-01-03',
       })
@@ -127,84 +110,27 @@ describe('StatisticsRepository', () => {
     })
 
     it('merges view and application counts into timeline', async () => {
-      mockPrisma.jobApplication.groupBy.mockResolvedValue([])
       mockPrisma.$queryRaw
         .mockResolvedValueOnce([{ period: '2025-01-01', count: 10 }]) // views
         .mockResolvedValueOnce([{ period: '2025-01-01', count: 5 }])  // apps
-      const result = await repo.getDashboardStats(1, { from: '2025-01-01', to: '2025-01-01' })
+      const result = await repo.getJobEngagementStatistic(1, { from: '2025-01-01', to: '2025-01-01' })
       expect(result.timeline[0].views).toBe(10)
       expect(result.timeline[0].applications).toBe(5)
     })
   })
 
-  // ── getJobFunnelStats ─────────────────────────────────────────────────────
+  // ── getJobStatistic ───────────────────────────────────────────────────────
 
-  describe('getJobFunnelStats', () => {
+  describe('getJobStatistic', () => {
     it('returns funnel stats correctly', async () => {
       mockPrisma.jobApplication.groupBy.mockResolvedValue([
         { status: JobApplicationStatus.APPLIED, _count: { id: 20 } },
         { status: JobApplicationStatus.SUITABLE, _count: { id: 8 } },
       ])
-      const result = await repo.getJobFunnelStats(1, 42)
+      const result = await repo.getJobStatistic(1, 42)
       expect(result.applied).toBe(20)
       expect(result.suitable).toBe(8)
       expect(result.total).toBe(28)
-    })
-  })
-
-  // ── getPaymentStats ───────────────────────────────────────────────────────
-
-  describe('getPaymentStats', () => {
-    beforeEach(() => {
-      mockPrisma.paymentOrder.aggregate.mockResolvedValue({ _sum: { amount: 500000 } })
-      mockPrisma.$queryRaw.mockResolvedValue([{ period: new Date('2025-01-01'), amount: 100000 }])
-      mockPrisma.paymentOrder.findMany.mockResolvedValue([
-        {
-          id: 1,
-          orderType: 'TOPUP_WALLET',
-          amount: 100000,
-          currency: 'VND',
-          status: PaymentStatus.COMPLETED,
-          paymentMethod: 'SEPAY',
-          transactionCode: 'TX001',
-          createdAt: new Date('2025-01-15'),
-        },
-      ])
-      mockPrisma.paymentOrder.count.mockResolvedValue(1)
-      mockPrisma.$transaction.mockResolvedValue([
-        [{ id: 1, orderType: 'TOPUP_WALLET', amount: 100000, currency: 'VND', status: PaymentStatus.COMPLETED, paymentMethod: 'SEPAY', transactionCode: 'TX001', createdAt: new Date('2025-01-15') }],
-        1,
-      ])
-    })
-
-    it('returns payment stats with correct shape', async () => {
-      const result = await repo.getPaymentStats(1, {
-        from: '2025-01-01',
-        to: '2025-01-31',
-        groupBy: 'month',
-        page: 1,
-        limit: 10,
-      } as any)
-      expect(result).toHaveProperty('totalSpent')
-      expect(result).toHaveProperty('trends')
-      expect(result).toHaveProperty('transactions')
-      expect(result).toHaveProperty('meta')
-      expect(result.totalSpent).toBe(500000)
-    })
-
-    it('uses fallback transactionCode when null', async () => {
-      mockPrisma.$transaction.mockResolvedValue([
-        [{ id: 5, orderType: 'BOOST_JOB', amount: 50000, currency: 'VND', status: PaymentStatus.COMPLETED, paymentMethod: 'SEPAY', transactionCode: null, createdAt: new Date() }],
-        1,
-      ])
-      const result = await repo.getPaymentStats(1, { from: '2025-01-01', to: '2025-01-31', groupBy: 'month' } as any)
-      expect(result.transactions[0].transactionCode).toBe('DH-5')
-    })
-
-    it('clamps limit to 50 max', async () => {
-      await repo.getPaymentStats(1, { from: '2025-01-01', to: '2025-01-31', groupBy: 'day', limit: 999 } as any)
-      // Should not throw and should use limit=50 internally
-      expect(mockPrisma.$transaction).toHaveBeenCalled()
     })
   })
 

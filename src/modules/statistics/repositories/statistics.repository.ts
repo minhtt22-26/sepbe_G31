@@ -2,25 +2,16 @@ import { Injectable } from '@nestjs/common'
 import {
   JobApplicationStatus,
   JobStatus,
-  PaymentStatus,
   CampaignStatus,
 } from 'src/generated/prisma/enums'
-import { Prisma } from 'src/generated/prisma/client'
 import { PrismaService } from 'src/prisma.service'
 import { OverviewResponseDto } from '../dtos/response/overview.response.dto'
-import { PaymentStatsResponseDto } from '../dtos/response/payment-stats.response.dto'
-import { PaymentStatsRequestDto } from '../dtos/request/payment-stats.request.dto'
 import { JobStatusResponseDto } from '../dtos/response/job-status.response.dto'
 import { DashboardStatsRequestDto } from '../dtos/request/dashboard-stats.request.dto'
 @Injectable()
 export class StatisticsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Tính % thay đổi.
-   * Nếu trước đó = 0 và hiện tại > 0 → 100%
-   * Nếu cả hai = 0 → 0%
-   */
   private calcChangePercent(current: number, previous: number): number {
     if (previous === 0) return current > 0 ? 100 : 0
     return Math.round(((current - previous) / previous) * 1000) / 10
@@ -190,118 +181,65 @@ export class StatisticsRepository {
     }
   }
 
-  async getDashboardStats(
+  async getJobEngagementStatistic(
     companyId: number,
     query: DashboardStatsRequestDto,
-  ): Promise<any> {
+  ): Promise<{ timeline: { period: string; views: number; applications: number }[] }> {
     const { from, to } = query
 
-    let startDate: Date | undefined = undefined
-    let endDate: Date | undefined = undefined
-
-    if (from) {
-      startDate = new Date(from)
-      startDate.setHours(0, 0, 0, 0)
-    }
-    if (to) {
-      endDate = new Date(to)
-      endDate.setHours(23, 59, 59, 999)
+    if (!from || !to) {
+      return { timeline: [] }
     }
 
-    const result = await this.prisma.jobApplication.groupBy({
-      by: ['status'],
-      where: {
-        job: { companyId },
-        ...(startDate || endDate
-          ? {
-              createdAt: {
-                ...(startDate ? { gte: startDate } : {}),
-                ...(endDate ? { lte: endDate } : {}),
-              },
-            }
-          : {}),
-      },
-      _count: { id: true },
-    })
+    const startDate = new Date(from)
+    startDate.setHours(0, 0, 0, 0)
 
-    const stats: any = {
-      applied: 0,
-      viewed: 0,
-      suitable: 0,
-      unsuitable: 0,
-      cancelled: 0,
-      total: 0,
-      timeline: [] as { period: string; views: number; applications: number }[],
-    }
+    const endDate = new Date(to)
+    endDate.setHours(23, 59, 59, 999)
 
-    for (const item of result) {
-      stats.total += item._count.id
-      if (item.status === JobApplicationStatus.APPLIED)
-        stats.applied = item._count.id
-      else if (item.status === JobApplicationStatus.VIEWED)
-        stats.viewed = item._count.id
-      else if (item.status === JobApplicationStatus.SUITABLE)
-        stats.suitable = item._count.id
-      else if (item.status === JobApplicationStatus.UNSUITABLE)
-        stats.unsuitable = item._count.id
-      else if (item.status === JobApplicationStatus.CANCELLED)
-        stats.cancelled = item._count.id
-    }
-
-    // Timeline calculation
-    if (startDate && endDate) {
-      const viewsRaw = await this.prisma.$queryRaw<any[]>`
+    const [viewsRaw, appsRaw] = await Promise.all([
+      this.prisma.$queryRaw<{ period: string; count: number }[]>`
         SELECT TO_CHAR("createdAt" AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD') as period, COUNT(id)::int as count
         FROM "JobView"
         WHERE "createdAt" >= ${startDate} AND "createdAt" <= ${endDate}
           AND "jobId" IN (SELECT id FROM "Job" WHERE "companyId" = ${companyId})
         GROUP BY period
-      `
-
-      const appsRaw = await this.prisma.$queryRaw<any[]>`
+      `,
+      this.prisma.$queryRaw<{ period: string; count: number }[]>`
         SELECT TO_CHAR("createdAt" AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD') as period, COUNT(id)::int as count
         FROM "JobApplication"
         WHERE "createdAt" >= ${startDate} AND "createdAt" <= ${endDate}
           AND "jobId" IN (SELECT id FROM "Job" WHERE "companyId" = ${companyId})
         GROUP BY period
-      `
+      `,
+    ])
 
-      const timelineMap = new Map<
-        string,
-        { period: string; views: number; applications: number }
-      >()
+    const timelineMap = new Map<string, { period: string; views: number; applications: number }>()
 
-      const currDate = new Date(startDate)
-      while (currDate <= endDate) {
-        // Sử dụng định dạng YYYY-MM-DD theo giờ địa phương để tránh lệch múi giờ
-        const year = currDate.getFullYear()
-        const month = String(currDate.getMonth() + 1).padStart(2, '0')
-        const day = String(currDate.getDate()).padStart(2, '0')
-        const dateStr = `${year}-${month}-${day}`
-
-        timelineMap.set(dateStr, { period: dateStr, views: 0, applications: 0 })
-        currDate.setDate(currDate.getDate() + 1)
-      }
-
-      viewsRaw.forEach((v) => {
-        if (timelineMap.has(v.period)) {
-          timelineMap.get(v.period)!.views = v.count || 0
-        }
-      })
-
-      appsRaw.forEach((a) => {
-        if (timelineMap.has(a.period)) {
-          timelineMap.get(a.period)!.applications = a.count || 0
-        }
-      })
-
-      stats.timeline = Array.from(timelineMap.values())
+    const currDate = new Date(startDate)
+    while (currDate <= endDate) {
+      const year = currDate.getFullYear()
+      const month = String(currDate.getMonth() + 1).padStart(2, '0')
+      const day = String(currDate.getDate()).padStart(2, '0')
+      const dateStr = `${year}-${month}-${day}`
+      timelineMap.set(dateStr, { period: dateStr, views: 0, applications: 0 })
+      currDate.setDate(currDate.getDate() + 1)
     }
 
-    return stats
+    viewsRaw.forEach((v) => {
+      const entry = timelineMap.get(v.period)
+      if (entry) entry.views = v.count || 0
+    })
+
+    appsRaw.forEach((a) => {
+      const entry = timelineMap.get(a.period)
+      if (entry) entry.applications = a.count || 0
+    })
+
+    return { timeline: Array.from(timelineMap.values()) }
   }
 
-  async getJobFunnelStats(companyId: number, jobId: number): Promise<any> {
+  async getJobStatistic(companyId: number, jobId: number): Promise<any> {
     const result = await this.prisma.jobApplication.groupBy({
       by: ['status'],
       where: {
@@ -334,84 +272,6 @@ export class StatisticsRepository {
     }
 
     return funnel
-  }
-
-  async getPaymentStats(
-    ownerId: number,
-    query: PaymentStatsRequestDto,
-  ): Promise<PaymentStatsResponseDto> {
-    const { from, to, groupBy } = query
-    const page = query.page && query.page > 0 ? query.page : 1
-    const limit =
-      query.limit && query.limit > 0 ? Math.min(query.limit, 50) : 10
-    const skip = (page - 1) * limit
-    const groupByRaw = Prisma.sql([groupBy])
-
-    const totalSpent = await this.prisma.paymentOrder.aggregate({
-      where: {
-        userId: ownerId,
-        status: PaymentStatus.COMPLETED,
-      },
-      _sum: { amount: true },
-    })
-
-    const trends = await this.prisma.$queryRaw<any[]>`
-      SELECT
-        DATE_TRUNC(${groupByRaw}, "createdAt") AS period,
-        SUM(amount)::int AS amount
-      FROM "PaymentOrder"
-      WHERE "userId" = ${ownerId}
-        AND "status" = 'COMPLETED'
-        AND "createdAt" >= ${new Date(from)}
-        AND "createdAt" <= ${new Date(to)}
-      GROUP BY period
-      ORDER BY period ASC
-    `
-
-    const where = {
-      userId: ownerId,
-      status: PaymentStatus.COMPLETED,
-      createdAt: {
-        gte: new Date(from),
-        lte: new Date(to),
-      },
-    }
-
-    const [transactions, total] = await this.prisma.$transaction([
-      this.prisma.paymentOrder.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
-      }),
-      this.prisma.paymentOrder.count({ where }),
-    ])
-
-    return {
-      totalSpent: totalSpent._sum.amount || 0,
-      trends: trends.map((item) => ({
-        period: item.period.toISOString(),
-        amount: item.amount || 0,
-      })),
-      transactions: transactions.map((item) => ({
-        id: item.id,
-        orderType: item.orderType,
-        amount: item.amount,
-        currency: item.currency,
-        status: item.status,
-        paymentMethod: item.paymentMethod,
-        packageDays: null,
-        packageName: null,
-        transactionCode: item.transactionCode || `DH-${item.id}`,
-        createdAt: item.createdAt.toISOString(),
-      })),
-      meta: {
-        page,
-        limit,
-        total,
-        totalPage: Math.max(1, Math.ceil(total / limit)),
-      },
-    }
   }
 
   async getJobStatus(companyId: number): Promise<JobStatusResponseDto> {
