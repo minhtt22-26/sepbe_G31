@@ -271,7 +271,7 @@ export class UserRepository {
   }
 
   async getUserList(filters: UserListRequestDto) {
-    const { page, role, status, fromDate, toDate } = filters
+    const { page, role, status, fromDate, toDate, search } = filters
     const rawLimit = filters.limit ?? 10
     const limit = Math.min(Math.max(1, rawLimit), 100)
     const skip = (page - 1) * limit
@@ -297,6 +297,16 @@ export class UserRepository {
         createdAtFilter.lte = new Date(toDate)
       }
       andConditions.push({ createdAt: createdAtFilter })
+    }
+
+    if (search) {
+      const keyword = search.trim()
+      andConditions.push({
+        OR: [
+          { fullName: { contains: keyword, mode: 'insensitive' } },
+          { email: { contains: keyword, mode: 'insensitive' } },
+        ],
+      })
     }
 
     const where: Prisma.UserWhereInput = { AND: andConditions }

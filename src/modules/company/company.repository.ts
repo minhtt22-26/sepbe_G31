@@ -26,7 +26,11 @@ export class CompanyRepository {
             },
           },
           _count: {
-            select: { jobs: true },
+            select: {
+              jobs: {
+                where: { status: 'PUBLISHED' },
+              },
+            },
           },
         },
       }),

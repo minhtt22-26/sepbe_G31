@@ -60,6 +60,11 @@ export class InterviewInvitationRepository implements IInterviewInvitationReposi
         include: {
           slots: {
             orderBy: { startAt: 'asc' },
+            include: {
+              _count: {
+                select: { invitations: true },
+              },
+            },
           },
         },
       }),
@@ -111,6 +116,11 @@ export class InterviewInvitationRepository implements IInterviewInvitationReposi
               company: true,
               slots: {
                 orderBy: { startAt: 'asc' },
+                include: {
+                  _count: {
+                    select: { invitations: true },
+                  },
+                },
               },
             },
           },
