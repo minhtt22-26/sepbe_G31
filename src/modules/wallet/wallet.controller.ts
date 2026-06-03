@@ -5,12 +5,14 @@ import {
   Get,
   Headers,
   HttpCode,
+  Logger,
   Param,
   ParseIntPipe,
   Post,
   Query,
   UnauthorizedException,
 } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { ApiBearerAuth, ApiBody, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { WalletService } from './wallet.service'
 import { CompanyService } from '../company/company.service'
@@ -25,10 +27,13 @@ import { PaymentQueueService } from 'src/infrastructure/queue/payment/service/pa
 @ApiTags('Wallet')
 @Controller('wallet')
 export class WalletController {
+  private readonly logger = new Logger(WalletController.name)
+
   constructor(
     private readonly walletService: WalletService,
     private readonly companyService: CompanyService,
     private readonly paymentQueueService: PaymentQueueService,
+    private readonly configService: ConfigService,
   ) {}
 
   @Get('me')
@@ -130,13 +135,37 @@ export class WalletController {
     @Headers('authorization') authorization?: string,
     @Body() body?: Record<string, unknown>,
   ) {
+    this.logger.log(`[WEBHOOK] Received — auth: "${authorization ?? '(none)'}" body: ${JSON.stringify(body)}`)
+
     if (!this.walletService.validateWebhookAuthorization(authorization)) {
+      this.logger.warn(`[WEBHOOK] Auth FAILED — received header: "${authorization ?? '(none)'}"`)
       throw new UnauthorizedException('SePay webhook authorization không hợp lệ')
     }
+
+    this.logger.log('[WEBHOOK] Auth OK — queuing job')
     await this.paymentQueueService.queueTopupWebhook({
       gateway: 'SEPAY',
       payload: body ?? {},
     })
+    this.logger.log('[WEBHOOK] Job queued successfully')
     return { success: true, message: 'Webhook đã được tiếp nhận và đang xử lý' }
+  }
+
+  @Post('topup/dev-simulate/:orderId')
+  @HttpCode(200)
+  @ApiOperation({ summary: '[DEV ONLY] Giả lập webhook thanh toán thành công cho orderId' })
+  async devSimulateWebhook(@Param('orderId', ParseIntPipe) orderId: number) {
+    if (this.configService.get('NODE_ENV') !== 'development') {
+      throw new BadRequestException('Endpoint này chỉ dùng trong môi trường development')
+    }
+    this.logger.warn(`[DEV-SIMULATE] Giả lập webhook cho orderId=${orderId}`)
+    const result = await this.walletService.processTopupWebhookPayload({
+      content: `DEV_SIMULATE SEVQR${orderId}`,
+      transferType: 'in',
+      transferAmount: 999999999,
+      referenceCode: `DEV-SIM-${orderId}`,
+    })
+    this.logger.warn(`[DEV-SIMULATE] Kết quả: ${JSON.stringify(result)}`)
+    return result
   }
 }
