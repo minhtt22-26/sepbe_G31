@@ -1,0 +1,63 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: sep-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sepbe
+    ports:
+      - '5432:5432'
+    volumes:
+      - sep_db_data_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: sep-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - sep_redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    image: node:20-alpine
+    container_name: sep-backend
+    working_dir: /app
+    volumes:
+      - .:/app
+      - backend_node_modules:/app/node_modules
+    command: >
+      sh -c "npm install &&
+             npx prisma migrate deploy &&
+             npm run start:dev"
+    ports:
+      - '4000:4000'
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/sepbe
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: development
+      CHOKIDAR_USEPOLLING: 'true'
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  sep_db_data_dev:
+  sep_redis_data:
+  backend_node_modules:

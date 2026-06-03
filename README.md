@@ -136,90 +136,36 @@ prisma/
 
 ---
 
-## Prerequisites
+## Quick Start — Local Development
 
-- Node.js 20+
-- Docker Desktop (for local Postgres + Redis)
-- Gmail account with App Password enabled
-- Gemini API key (free tier supports this project)
-
-## Environment Setup
+> `.env` đã có sẵn credentials. Chỉ cần install và chạy.
 
 ```bash
-cp .env.example .env
-```
-
-Fill required values in `.env`:
-
-```env
-# Core
-NODE_ENV=production
-APP_PORT=4000
-DATABASE_URL=postgresql://...
-REDIS_URL=redis://...
-
-# JWT
-AUTH_JWT_ACCESS_SECRET=
-AUTH_JWT_REFRESH_SECRET=
-
-# Email (Gmail SMTP — use App Password, not account password)
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_USER=youremail@gmail.com
-EMAIL_PASSWORD=xxxx xxxx xxxx xxxx
-
-# Cloudinary
-CLOUDINARY_NAME=
-CLOUDINARY_KEY=
-CLOUDINARY_SECRET=
-
-# Google OAuth
-AUTH_SOCIAL_GOOGLE_CLIENT_ID=
-AUTH_SOCIAL_GOOGLE_CLIENT_SECRET=
-
-# SePay
-SEPAY_BANK_CODE=
-SEPAY_ACCOUNT_NUMBER=
-SEPAY_WEBHOOK_API_KEY=
-
-# Gemini AI
-GEMINI_API_KEY=
-GEMINI_EMBEDDING_MODEL=gemini-embedding-001
-GEMINI_LLM_MODEL=gemini-2.5-flash-lite
-GEMINI_LLM_TEMPERATURE=0
-```
-
-## Running the Project
-
-### Option A — Local development (recommended)
-
-Spin up PostgreSQL (with pgvector) + Redis via Docker, then run NestJS natively for hot-reload:
-
-```bash
-# 1. Start database + cache
-docker compose up -d db redis
-
-# 2. Install dependencies & prepare DB
 npm install
-npx prisma migrate dev
-
-# 3. Start dev server
 npm run start:dev
 ```
 
-URLs:
 - API: `http://localhost:4000/api`
-- Swagger UI: `http://localhost:4000/api/docs`
+- Swagger: `http://localhost:4000/api/docs`
+
+DB dùng **Supabase** (cloud), Redis dùng **Railway** (cloud) — không cần Docker local.
 
 ---
 
-### Option B — Full Docker (production-like)
+## Docker
 
-Runs the entire backend stack (PostgreSQL + Redis + NestJS) in containers. Migrations run automatically on startup via `start.sh`.
+### Dev (hot reload)
+
+Mount source code, tự reload khi sửa file:
 
 ```bash
-cp .env.example .env   # fill in GEMINI_API_KEY, Cloudinary, SePay, etc.
+docker compose -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.dev.yml logs -f backend
+```
 
+### Production-like
+
+```bash
 docker compose up --build
 ```
 
@@ -227,33 +173,12 @@ docker compose up --build
 |---|---|---|
 | PostgreSQL 16 + pgvector | `sep-db` | `5432` |
 | Redis 7 | `sep-redis` | `6379` |
-| NestJS backend | `sep-backend` | `4000` |
-
-Stop & clean up:
+| NestJS | `sep-backend` | `4000` |
 
 ```bash
-docker compose down          # stop containers (keep volumes)
-docker compose down -v       # stop + delete database volumes
+docker compose down      # stop (giữ volume)
+docker compose down -v   # stop + xóa DB data
 ```
-
----
-
-### Option C — Backend + Frontend together
-
-Run both stacks in their own repos simultaneously:
-
-```bash
-# Terminal 1 — backend
-cd sepbe_G31
-docker compose up --build
-
-# Terminal 2 — frontend
-cd sepfe_G31
-docker compose up --build
-# or: npm run dev (if you prefer Vite dev server)
-```
-
-Frontend will be available at `http://localhost:3000`.
 
 ---
 
