@@ -133,27 +133,33 @@ describe('WalletController', () => {
       await expect(controller.handleTopupWebhook('bad-key', {})).rejects.toThrow(UnauthorizedException)
     })
 
-    it('returns 200 immediately (fire-and-forget) and queues job', async () => {
+    it('returns 200 immediately and processes payload directly', async () => {
       mockWalletService.validateWebhookAuthorization.mockReturnValue(true)
-      mockPaymentQueueService.queueTopupWebhook.mockResolvedValue(undefined)
-      const result = await controller.handleTopupWebhook('apikey valid-key', { content: 'TOPUP42' })
-      expect(mockPaymentQueueService.queueTopupWebhook).toHaveBeenCalledWith(
-        expect.objectContaining({ gateway: 'SEPAY' }),
-      )
+      mockWalletService.processTopupWebhookPayload = jest.fn().mockResolvedValue({ success: true, message: 'ok' })
+      const result = await controller.handleTopupWebhook('apikey valid-key', { content: 'SEVQR42' })
+      expect(mockWalletService.processTopupWebhookPayload).toHaveBeenCalled()
       expect(result.success).toBe(true)
     })
 
     it('uses empty object when body is undefined', async () => {
       mockWalletService.validateWebhookAuthorization.mockReturnValue(true)
-      mockPaymentQueueService.queueTopupWebhook.mockResolvedValue(undefined)
-      await controller.handleTopupWebhook('apikey key')
-      expect(mockPaymentQueueService.queueTopupWebhook).toHaveBeenCalledWith(
-        expect.objectContaining({ payload: {} }),
-      )
+      mockWalletService.processTopupWebhookPayload = jest.fn().mockResolvedValue({ success: true, message: 'ok' })
+      const result = await controller.handleTopupWebhook('apikey key')
+      expect(mockWalletService.processTopupWebhookPayload).toHaveBeenCalledWith({})
+      expect(result.success).toBe(true)
     })
 
-    it('still returns 200 even if queue throws', async () => {
+    it('falls back to queue if direct processing throws', async () => {
       mockWalletService.validateWebhookAuthorization.mockReturnValue(true)
+      mockWalletService.processTopupWebhookPayload = jest.fn().mockRejectedValue(new Error('DB error'))
+      mockPaymentQueueService.queueTopupWebhook.mockResolvedValue(undefined)
+      const result = await controller.handleTopupWebhook('apikey valid-key', {})
+      expect(result.success).toBe(true)
+    })
+
+    it('still returns 200 even if both processing and queue fail', async () => {
+      mockWalletService.validateWebhookAuthorization.mockReturnValue(true)
+      mockWalletService.processTopupWebhookPayload = jest.fn().mockRejectedValue(new Error('DB error'))
       mockPaymentQueueService.queueTopupWebhook.mockRejectedValue(new Error('Redis down'))
       const result = await controller.handleTopupWebhook('apikey valid-key', {})
       expect(result.success).toBe(true)
