@@ -258,6 +258,15 @@ export class UserService {
       })
     }
 
+    if (dto.phone) {
+      const existingUserWithPhone = await this.userRepository.findUserWithByPhone(dto.phone)
+      if (existingUserWithPhone && existingUserWithPhone.id !== userId) {
+        throw new BadRequestException({
+          message: 'Số điện thoại đã được sử dụng bởi tài khoản khác',
+        })
+      }
+    }
+
     let avatarUrl = dto.avatar
     if (file) {
       const uploadResult = await this.cloudinaryService.uploadFile(

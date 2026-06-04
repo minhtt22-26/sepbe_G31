@@ -32,6 +32,7 @@ describe('UserService', () => {
   const mockUserRepository = {
     findUserWithByEmail: jest.fn(),
     findUserWithByUserName: jest.fn(),
+    findUserWithByPhone: jest.fn(),
     signUp: jest.fn(),
     findUserWithUserNameOrEmail: jest.fn(),
     increasePasswordAttempt: jest.fn(),
@@ -706,6 +707,10 @@ describe('UserService', () => {
     })
 
     describe('updateInfoUser', () => {
+      beforeEach(() => {
+        mockUserRepository.findUserWithByPhone.mockResolvedValue(null)
+      })
+
       it('Normal: should call repository updateInfoUser', async () => {
         const dto = { fullName: 'New' } as any
         mockUserRepository.findOneById.mockResolvedValue({ id: 1 })
@@ -718,6 +723,23 @@ describe('UserService', () => {
         await expect(
           service.updateInfoUser(1, { fullName: 'New' } as any),
         ).rejects.toThrow(NotFoundException)
+      })
+
+      it('Abnormal: should throw BadRequestException when phone is already used by another user', async () => {
+        const dto = { phone: '0901234567' } as any
+        mockUserRepository.findOneById.mockResolvedValue({ id: 1 })
+        mockUserRepository.findUserWithByPhone.mockResolvedValue({ id: 2, phone: '0901234567' })
+        await expect(
+          service.updateInfoUser(1, dto),
+        ).rejects.toThrow(BadRequestException)
+      })
+
+      it('Normal: should update successfully when phone belongs to the current user', async () => {
+        const dto = { phone: '0901234567' } as any
+        mockUserRepository.findOneById.mockResolvedValue({ id: 1 })
+        mockUserRepository.findUserWithByPhone.mockResolvedValue({ id: 1, phone: '0901234567' })
+        await service.updateInfoUser(1, dto)
+        expect(userRepository.updateInfoUser).toHaveBeenCalledWith(1, dto)
       })
 
       it('Boundary: should handle repository error', async () => {

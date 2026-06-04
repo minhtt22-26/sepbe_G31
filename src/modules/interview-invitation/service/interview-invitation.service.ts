@@ -381,13 +381,6 @@ export class InterviewInvitationService {
             campaign: {
               companyId,
               jobId,
-              status: {
-                in: [
-                  CampaignStatus.DRAFT,
-                  CampaignStatus.SCHEDULED,
-                  CampaignStatus.IN_PROGRESS,
-                ],
-              },
             },
             status: {
               in: [
@@ -1131,8 +1124,8 @@ export class InterviewInvitationService {
           },
         })
 
-        // If this is a slot-less invitation (Job Invitation), automatically create/update JobApplication to SUITABLE
-        if (isSlotLess && result.campaign.jobId) {
+        // Automatically create/update JobApplication to SUITABLE when candidate accepts the invitation
+        if (result.campaign.jobId) {
           await tx.jobApplication.upsert({
             where: {
               jobId_userId: {
@@ -1141,13 +1134,13 @@ export class InterviewInvitationService {
               },
             },
             update: {
-              status: 'SUITABLE',
+              status: JobApplicationStatus.SUITABLE,
               updatedAt: new Date(),
             },
             create: {
               jobId: result.campaign.jobId,
               userId: workerId,
-              status: 'SUITABLE',
+              status: JobApplicationStatus.SUITABLE,
             },
           })
         }

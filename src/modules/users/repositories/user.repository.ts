@@ -36,6 +36,12 @@ export class UserRepository {
     })
   }
 
+  async findUserWithByPhone(phone: string): Promise<User | null> {
+    return this.prisma.user.findUnique({
+      where: { phone },
+    })
+  }
+
   async findUserWithUserNameOrEmail(
     where: Prisma.UserWhereUniqueInput,
   ): Promise<User | null> {
