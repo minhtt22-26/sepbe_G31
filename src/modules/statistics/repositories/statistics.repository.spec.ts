@@ -9,12 +9,19 @@ const mockPrisma = {
     count: jest.fn(),
     groupBy: jest.fn(),
   },
+  jobView: {
+    count: jest.fn(),
+  },
   jobApplication: {
     count: jest.fn(),
     findMany: jest.fn(),
     groupBy: jest.fn(),
   },
   interviewInvitationCampaign: { findMany: jest.fn() },
+  interviewInvitation: {
+    findMany: jest.fn(),
+    count: jest.fn(),
+  },
   $queryRaw: jest.fn(),
   $transaction: jest.fn(),
 }
@@ -41,8 +48,9 @@ describe('StatisticsRepository', () => {
 
   describe('getOverview', () => {
     beforeEach(() => {
-      mockPrisma.job.aggregate.mockResolvedValue({ _sum: { viewCount: 500 } })
+      mockPrisma.jobView.count.mockResolvedValue(500)
       mockPrisma.jobApplication.count.mockResolvedValue(20)
+      mockPrisma.interviewInvitation.count.mockResolvedValue(10)
       mockPrisma.job.count.mockResolvedValue(5)
       mockPrisma.jobApplication.findMany.mockResolvedValue([])
     })
@@ -58,16 +66,17 @@ describe('StatisticsRepository', () => {
     })
 
     it('calculates changePercent correctly when previous is 0', async () => {
-      mockPrisma.job.aggregate
-        .mockResolvedValueOnce({ _sum: { viewCount: 100 } }) // current
-        .mockResolvedValueOnce({ _sum: { viewCount: 0 } })   // previous = 0
+      mockPrisma.jobView.count
+        .mockResolvedValueOnce(100) // current
+        .mockResolvedValueOnce(0)   // previous = 0
       const result = await repo.getOverview(1)
       expect(result.totalViews.changePercent).toBe(100)
     })
 
     it('calculates changePercent as 0 when both current and previous are 0', async () => {
-      mockPrisma.job.aggregate.mockResolvedValue({ _sum: { viewCount: 0 } })
+      mockPrisma.jobView.count.mockResolvedValue(0)
       mockPrisma.jobApplication.count.mockResolvedValue(0)
+      mockPrisma.interviewInvitation.count.mockResolvedValue(0)
       const result = await repo.getOverview(1)
       expect(result.totalViews.changePercent).toBe(0)
     })
@@ -127,10 +136,18 @@ describe('StatisticsRepository', () => {
         { status: JobApplicationStatus.APPLIED, _count: { id: 20 } },
         { status: JobApplicationStatus.SUITABLE, _count: { id: 8 } },
       ])
+      mockPrisma.interviewInvitation.findMany.mockResolvedValue([
+        { status: 'ACCEPTED' },
+        { status: 'ACCEPTED' },
+        { status: 'PENDING' },
+      ])
       const result = await repo.getJobStatistic(1, 42)
-      expect(result.applied).toBe(20)
-      expect(result.suitable).toBe(8)
-      expect(result.total).toBe(28)
+      expect(result.direct.applied).toBe(20)
+      expect(result.direct.suitable).toBe(8)
+      expect(result.direct.total).toBe(28)
+      expect(result.ai.sent).toBe(3)
+      expect(result.ai.accepted).toBe(2)
+      expect(result.ai.pending).toBe(1)
     })
   })
 

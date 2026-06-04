@@ -3,6 +3,7 @@ import {
   JobApplicationStatus,
   JobStatus,
   CampaignStatus,
+  InterviewInvitationStatus,
 } from 'src/generated/prisma/enums'
 import { PrismaService } from 'src/prisma.service'
 import { OverviewResponseDto } from '../dtos/response/overview.response.dto'
@@ -34,33 +35,94 @@ export class StatisticsRepository {
     startOfCurrentWeek.setHours(0, 0, 0, 0)
 
     const [viewsCurrent, viewsPreviousMonth] = await Promise.all([
-      this.prisma.job.aggregate({
-        where: { companyId, status: { not: JobStatus.DELETED } },
-        _sum: { viewCount: true },
-      }),
-      this.prisma.job.aggregate({
+      this.prisma.jobView.count({
         where: {
-          companyId,
-          status: { not: JobStatus.DELETED },
-          createdAt: { lt: startOfCurrentMonth },
+          job: { companyId, status: { not: JobStatus.DELETED } },
+          createdAt: { gte: startOfCurrentMonth },
         },
-        _sum: { viewCount: true },
+      }),
+      this.prisma.jobView.count({
+        where: {
+          job: { companyId, status: { not: JobStatus.DELETED } },
+          createdAt: {
+            gte: startOfPreviousMonth,
+            lt: startOfCurrentMonth,
+          },
+        },
       }),
     ])
 
-    const totalViewsCurrent = viewsCurrent._sum.viewCount ?? 0
-    const totalViewsPrevious = viewsPreviousMonth._sum.viewCount ?? 0
+    const totalViewsCurrent = viewsCurrent
+    const totalViewsPrevious = viewsPreviousMonth
 
-    const [appsCurrentMonth, appsPreviousMonth] = await Promise.all([
+    const [
+      appsCurrentMonth,
+      appsPreviousMonth,
+      suitableCurrentMonth,
+      suitablePreviousMonth,
+      aiSentCurrentMonth,
+      aiSentPreviousMonth,
+      aiAcceptedCurrentMonth,
+      aiAcceptedPreviousMonth,
+    ] = await Promise.all([
       this.prisma.jobApplication.count({
         where: {
-          job: { companyId },
+          job: { companyId, status: { not: JobStatus.DELETED } },
+          createdAt: { gte: startOfCurrentMonth },
+        },
+      }),
+      this.prisma.jobApplication.count({
+        where: {
+          job: { companyId, status: { not: JobStatus.DELETED } },
+          createdAt: {
+            gte: startOfPreviousMonth,
+            lt: startOfCurrentMonth,
+          },
+        },
+      }),
+      this.prisma.jobApplication.count({
+        where: {
+          job: { companyId, status: { not: JobStatus.DELETED } },
+          status: JobApplicationStatus.SUITABLE,
           updatedAt: { gte: startOfCurrentMonth },
         },
       }),
       this.prisma.jobApplication.count({
         where: {
-          job: { companyId },
+          job: { companyId, status: { not: JobStatus.DELETED } },
+          status: JobApplicationStatus.SUITABLE,
+          updatedAt: {
+            gte: startOfPreviousMonth,
+            lt: startOfCurrentMonth,
+          },
+        },
+      }),
+      this.prisma.interviewInvitation.count({
+        where: {
+          campaign: { companyId, jobId: { not: null } },
+          createdAt: { gte: startOfCurrentMonth },
+        },
+      }),
+      this.prisma.interviewInvitation.count({
+        where: {
+          campaign: { companyId, jobId: { not: null } },
+          createdAt: {
+            gte: startOfPreviousMonth,
+            lt: startOfCurrentMonth,
+          },
+        },
+      }),
+      this.prisma.interviewInvitation.count({
+        where: {
+          campaign: { companyId, jobId: { not: null } },
+          status: InterviewInvitationStatus.ACCEPTED,
+          updatedAt: { gte: startOfCurrentMonth },
+        },
+      }),
+      this.prisma.interviewInvitation.count({
+        where: {
+          campaign: { companyId, jobId: { not: null } },
+          status: InterviewInvitationStatus.ACCEPTED,
           updatedAt: {
             gte: startOfPreviousMonth,
             lt: startOfCurrentMonth,
@@ -69,34 +131,18 @@ export class StatisticsRepository {
       }),
     ])
 
-    const [suitableCurrentMonth, suitablePreviousMonth] = await Promise.all([
-      this.prisma.jobApplication.count({
-        where: {
-          job: { companyId },
-          status: JobApplicationStatus.SUITABLE,
-          updatedAt: { gte: startOfCurrentMonth },
-        },
-      }),
-      this.prisma.jobApplication.count({
-        where: {
-          job: { companyId },
-          status: JobApplicationStatus.SUITABLE,
-          updatedAt: {
-            gte: startOfPreviousMonth,
-            lt: startOfCurrentMonth,
-          },
-        },
-      }),
-    ])
+    const totalInteractionsCurrent = appsCurrentMonth + aiSentCurrentMonth
+    const totalConversionsCurrent = suitableCurrentMonth + aiAcceptedCurrentMonth
 
-    const conversionCurrent =
-      appsCurrentMonth > 0
-        ? Math.round((suitableCurrentMonth / appsCurrentMonth) * 1000) / 10
-        : 0
-    const conversionPrevious =
-      appsPreviousMonth > 0
-        ? Math.round((suitablePreviousMonth / appsPreviousMonth) * 1000) / 10
-        : 0
+    const totalInteractionsPrevious = appsPreviousMonth + aiSentPreviousMonth
+    const totalConversionsPrevious = suitablePreviousMonth + aiAcceptedPreviousMonth
+
+    const conversionCurrent = totalInteractionsCurrent > 0
+      ? Math.round((totalConversionsCurrent / totalInteractionsCurrent) * 1000) / 10
+      : 0
+    const conversionPrevious = totalInteractionsPrevious > 0
+      ? Math.round((totalConversionsPrevious / totalInteractionsPrevious) * 1000) / 10
+      : 0
 
     const [activeJobsCurrent, activeJobsAtStartOfMonth, newJobsThisWeek] =
       await Promise.all([
@@ -240,15 +286,28 @@ export class StatisticsRepository {
   }
 
   async getJobStatistic(companyId: number, jobId: number): Promise<any> {
-    const result = await this.prisma.jobApplication.groupBy({
-      by: ['status'],
-      where: {
-        job: { id: jobId, companyId },
-      },
-      _count: { id: true },
-    })
+    const [directResult, aiInvitations] = await Promise.all([
+      this.prisma.jobApplication.groupBy({
+        by: ['status'],
+        where: {
+          job: { id: jobId, companyId },
+        },
+        _count: { id: true },
+      }),
+      this.prisma.interviewInvitation.findMany({
+        where: {
+          campaign: {
+            jobId,
+            companyId,
+          },
+        },
+        select: {
+          status: true,
+        },
+      }),
+    ])
 
-    const funnel: any = {
+    const direct = {
       applied: 0,
       viewed: 0,
       suitable: 0,
@@ -257,21 +316,41 @@ export class StatisticsRepository {
       total: 0,
     }
 
-    for (const item of result) {
-      funnel.total += item._count.id
+    for (const item of directResult) {
+      direct.total += item._count.id
       if (item.status === JobApplicationStatus.APPLIED)
-        funnel.applied = item._count.id
+        direct.applied = item._count.id
       else if (item.status === JobApplicationStatus.VIEWED)
-        funnel.viewed = item._count.id
+        direct.viewed = item._count.id
       else if (item.status === JobApplicationStatus.SUITABLE)
-        funnel.suitable = item._count.id
+        direct.suitable = item._count.id
       else if (item.status === JobApplicationStatus.UNSUITABLE)
-        funnel.unsuitable = item._count.id
+        direct.unsuitable = item._count.id
       else if (item.status === JobApplicationStatus.CANCELLED)
-        funnel.cancelled = item._count.id
+        direct.cancelled = item._count.id
     }
 
-    return funnel
+    const ai = {
+      sent: aiInvitations.length,
+      accepted: 0,
+      rejected: 0,
+      pending: 0,
+    }
+
+    for (const invite of aiInvitations) {
+      if (invite.status === InterviewInvitationStatus.ACCEPTED) {
+        ai.accepted++
+      } else if (invite.status === InterviewInvitationStatus.REJECTED) {
+        ai.rejected++
+      } else if (invite.status === InterviewInvitationStatus.PENDING) {
+        ai.pending++
+      }
+    }
+
+    return {
+      direct,
+      ai,
+    }
   }
 
   async getJobStatus(companyId: number): Promise<JobStatusResponseDto> {
