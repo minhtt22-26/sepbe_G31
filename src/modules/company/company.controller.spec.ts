@@ -175,7 +175,15 @@ describe('CompanyController', () => {
   it('getReviewReports with defaults', async () => {
     companyServiceMock.getReviewReports.mockResolvedValue({ items: [] });
     await controller.getReviewReports();
-    expect(companyServiceMock.getReviewReports).toHaveBeenCalledWith(undefined, 1, 50);
+    expect(companyServiceMock.getReviewReports).toHaveBeenCalledWith(
+      undefined,
+      1,
+      50,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    );
   });
 
   it('hideReview delegates to service', async () => {
