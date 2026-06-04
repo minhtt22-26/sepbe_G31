@@ -30,7 +30,7 @@ const mockPrisma: any = {
   user: { findMany: jest.fn() },
   interviewInvitation: { findMany: jest.fn(), findFirst: jest.fn() },
   interviewInvitationSlot: { findFirst: jest.fn() },
-  interviewInvitationCampaign: { findFirst: jest.fn() },
+  interviewInvitationCampaign: { findFirst: jest.fn(), findMany: jest.fn() },
   $transaction: jest.fn(),
   $executeRaw: jest.fn(),
 }
@@ -174,12 +174,14 @@ describe('JobRepository', () => {
   describe('getJobsByCompanyId', () => {
     it('adds take/skip when limit and skip are provided', async () => {
       mockPrisma.$transaction.mockResolvedValue([[{ id: 1 }], 1])
+      mockPrisma.interviewInvitationCampaign.findMany.mockResolvedValue([])
       await repo.getJobsByCompanyId({ companyId: 1, limit: 10, skip: 0 })
       expect(mockPrisma.$transaction).toHaveBeenCalled()
     })
 
     it('omits take/skip when not provided', async () => {
       mockPrisma.$transaction.mockResolvedValue([[], 0])
+      mockPrisma.interviewInvitationCampaign.findMany.mockResolvedValue([])
       await repo.getJobsByCompanyId({ companyId: 1 })
       expect(mockPrisma.$transaction).toHaveBeenCalled()
     })
