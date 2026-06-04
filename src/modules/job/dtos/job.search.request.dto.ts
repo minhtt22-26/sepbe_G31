@@ -56,7 +56,14 @@ export class JobSearchDto {
   @IsEnum(EnumShift)
   workingShift?: EnumShift;
 
-  @ApiPropertyOptional({ description: "ID ngành nghề", example: 2, minimum: 1 })
+  @ApiPropertyOptional({ description: "ID lĩnh vực / ngành nghề", example: 1, minimum: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  sectorId?: number;
+
+  @ApiPropertyOptional({ description: "ID nghề nghiệp", example: 2, minimum: 1 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()

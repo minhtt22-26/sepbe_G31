@@ -80,7 +80,7 @@ export class WalletController {
   @AuthJwtAccessProtected()
   @AuthRoleProtected(EnumUserRole.EMPLOYER)
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Tạo QR nạp point vào ví' })
+  @ApiOperation({ summary: 'Tạo QR nạp điểm vào ví' })
   async createTopupCheckout(
     @AuthJwtPayload() user: any,
     @Body() body: { amount: number },
@@ -103,7 +103,7 @@ export class WalletController {
   @AuthJwtAccessProtected()
   @AuthRoleProtected(EnumUserRole.EMPLOYER)
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Kiểm tra trạng thái đơn nạp point' })
+  @ApiOperation({ summary: 'Kiểm tra trạng thái đơn nạp điểm' })
   async getTopupOrderStatus(
     @AuthJwtPayload() user: any,
     @Param('orderId', ParseIntPipe) orderId: number,

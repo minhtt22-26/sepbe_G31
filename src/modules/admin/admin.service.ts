@@ -16,7 +16,7 @@ export class AdminService {
 
   private validateDurationByOrderType(orderType: OrderType, durationDays?: number | null) {
     if (orderType === OrderType.BOOST_JOB && !durationDays) {
-      throw new BadRequestException('Goi BOOST_JOB bat buoc co durationDays');
+      throw new BadRequestException('Gói đẩy tin bắt buộc có số ngày hiệu lực');
     }
   }
 
@@ -95,7 +95,7 @@ export class AdminService {
         throw new BadRequestException(`Giá trị ${key} không hợp lệ`)
       }
       if (key === 'BOOST_JOB_DURATION_DAYS' && value < 1) {
-        throw new BadRequestException('Thời gian boost phải lớn hơn hoặc bằng 1 ngày')
+        throw new BadRequestException('Thời gian đẩy tin phải lớn hơn hoặc bằng 1 ngày')
       }
     }
 

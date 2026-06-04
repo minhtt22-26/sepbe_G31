@@ -62,6 +62,7 @@ export class JobService {
     // const ageMin = q.ageMin
     // const ageMax = q.ageMax
     const workingShift = q.workingShift
+    const sectorId = q.sectorId
     const occupationId = q.occupationId
     const companyId = q.companyId
     const page = q.page || 1
@@ -84,6 +85,8 @@ export class JobService {
     }
     if (occupationId) {
       where.occupationId = { equals: Number(occupationId) }
+    } else if (sectorId) {
+      where.occupation = { sectorId: Number(sectorId) }
     }
     if (companyId) {
       where.companyId = { equals: Number(companyId) }
@@ -188,11 +191,11 @@ export class JobService {
   ) {
     const job = await this.jobRepository.findJobById(jobId)
     if (!job || job.companyId !== companyId) {
-      throw new NotFoundException('Job not found or unauthorized')
+      throw new NotFoundException('Không tìm thấy tin tuyển dụng hoặc bạn không có quyền')
     }
 
     if (job.status !== JobStatus.PUBLISHED) {
-      throw new BadRequestException('Only published jobs can be boosted')
+      throw new BadRequestException('Chỉ tin đã xuất bản mới được đẩy nổi bật')
     }
 
     const selectedPackage = await this.walletService.resolveBoostPackage(
@@ -228,7 +231,7 @@ export class JobService {
         pointCost,
         boostExpiredAt: result.boostExpiredAt,
       },
-      message: 'Đã trừ point và kích hoạt boost cho tin tuyển dụng.',
+      message: 'Đã trừ điểm và kích hoạt đẩy tin nổi bật cho tin tuyển dụng.',
     }
   }
 
@@ -239,7 +242,7 @@ export class JobService {
     }
 
     if (job.status === JobStatus.PUBLISHED) {
-      throw new BadRequestException('Job has already been published')
+      throw new BadRequestException('Tin tuyển dụng đã được xuất bản')
     }
 
     const pointCost = await this.walletService.getPointCost(
@@ -262,7 +265,7 @@ export class JobService {
         jobId: published.id,
         pointCost,
       },
-      message: 'Đã trừ point và xuất bản tin tuyển dụng.',
+      message: 'Đã trừ điểm và xuất bản tin tuyển dụng.',
     }
   }
 
@@ -278,7 +281,7 @@ export class JobService {
     return {
       success: true,
       message:
-        'Luồng webhook SePay cho job/boost đã ngưng. Hệ thống hiện thanh toán bằng point.',
+        'Luồng webhook SePay cho đẩy tin đã ngưng. Hệ thống hiện thanh toán bằng điểm.',
     }
   }
 
@@ -296,7 +299,7 @@ export class JobService {
     return {
       success: false,
       message:
-        'Endpoint xác nhận payment boost đã ngưng trong chế độ point-only. Hãy dùng thao tác boost bằng point.',
+        'Xác nhận thanh toán đẩy tin đã ngưng. Hãy dùng thao tác đẩy tin bằng điểm.',
     }
   }
 
@@ -338,21 +341,21 @@ export class JobService {
 
     const existing = await this.jobRepository.findSavedJob(userId, jobId)
     if (existing) {
-      return { success: true, message: 'Job already saved' }
+      return { success: true, message: 'Tin đã được lưu trước đó' }
     }
 
     await this.jobRepository.saveJob(userId, jobId)
-    return { success: true, message: 'Job saved successfully' }
+    return { success: true, message: 'Đã lưu tin tuyển dụng' }
   }
 
   async unSaveJob(userId: number, jobId: number) {
     const existing = await this.jobRepository.findSavedJob(userId, jobId)
     if (!existing) {
-      return { success: true, message: 'Job not saved yet' }
+      return { success: true, message: 'Tin chưa được lưu' }
     }
 
     await this.jobRepository.unSaveJob(userId, jobId)
-    return { success: true, message: 'Job unsaved successfully' }
+    return { success: true, message: 'Đã bỏ lưu tin tuyển dụng' }
   }
 
   async createJob(dto: CreateJobRequest, companyId: number) {
@@ -450,7 +453,7 @@ export class JobService {
             pointCost,
           },
         },
-        message: 'Đã tạo và xuất bản tin bằng point thành công.',
+        message: 'Đã tạo và xuất bản tin bằng điểm thành công.',
       }
     } catch (error) {
       const errorMessage =
