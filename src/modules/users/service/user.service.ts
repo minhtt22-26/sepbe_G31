@@ -381,29 +381,11 @@ export class UserService {
       forgotPassword.expiredAt,
     )
 
-    const username = user.fullName ?? 'User'
-    const html = `
-      <h1>Khôi phục mật khẩu</h1>
-      <p>Hi ${username},</p>
-      <p>Bạn đã yêu cầu khôi phục mật khẩu. Vui lòng click vào liên kết bên dưới:</p>
-      <a href="${forgotPassword.link}" style="
-        display: inline-block;
-        padding: 12px 24px;
-        background-color: #007bff;
-        color: white;
-        text-decoration: none;
-        border-radius: 4px;
-      ">Khôi phục mật khẩu</a>
-      <p>Liên kết này sẽ hết hạn sau 15 phút.</p>
-      <p>Nếu bạn không yêu cầu điều này, vui lòng bỏ qua email này.</p>
-    `
-    this.emailQueueService.addSendEmailJob({
-      to: user.email!,
-      subject: 'Khôi phục mật khẩu của bạn',
-      html,
-    }).catch((err: Error) => {
-      console.error(`[FORGOT-PASSWORD] Failed to queue email for ${user.email}: ${err?.message}`)
-    })
+    await this.emailService.sendForgotPasswordEmail(
+      user.email!,
+      forgotPassword.link,
+      user.fullName,
+    )
   }
 
   async resetPassword(
