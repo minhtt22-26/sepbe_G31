@@ -137,7 +137,7 @@ export class JobRepository {
         await tx.notification.create({
           data: {
             userId: existingJob.company.ownerId,
-            title: 'Boost job thành công',
+            title: 'Đẩy tin nổi bật thành công',
             message: `(${params.durationDays} ngày) ${existingJob.title}`,
             link: '/employer',
           },

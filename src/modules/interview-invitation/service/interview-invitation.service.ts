@@ -31,6 +31,25 @@ export class InterviewInvitationService {
     private readonly walletService: WalletService,
   ) { }
 
+  private isCampaignExpired(expiresAt: Date | string | null | undefined): boolean {
+    if (!expiresAt) return false
+    const deadline = new Date(expiresAt)
+    return !Number.isNaN(deadline.getTime()) && deadline.getTime() < Date.now()
+  }
+
+  private resolveWorkerInvitationStatus(
+    status: InterviewInvitationStatus,
+    expiresAt: Date | string | null | undefined,
+  ): InterviewInvitationStatus {
+    if (
+      status === InterviewInvitationStatus.PENDING &&
+      this.isCampaignExpired(expiresAt)
+    ) {
+      return InterviewInvitationStatus.EXPIRED
+    }
+    return status
+  }
+
   private formatSlotSummary(slot: {
     startAt: Date
     endAt: Date
@@ -620,7 +639,7 @@ export class InterviewInvitationService {
             data: {
               userId: invitation.workerId,
               title: `Thay đổi ca phỏng vấn: ${jobTitle}`,
-              message: `Ca phỏng vấn bạn đã chọn cho vị trí "${jobTitle}" vừa có sự thay đổi về thời gian/địa điểm hoặc đã bị hủy. Vui lòng vào ứng dụng để xem lịch mới và chọn lại ca phỏng vấn phù hợp nhé!`,
+              message: `Ca phỏng vấn bạn đã chọn cho vị trí "${jobTitle}" vừa có thay đổi về thời gian hoặc đã bị hủy. Vui lòng vào ứng dụng để xem lịch mới và chọn lại ca phỏng vấn phù hợp nhé!`,
               link: `/interview-invitations?invitationId=${invitation.id}`,
             },
           })
@@ -901,9 +920,13 @@ export class InterviewInvitationService {
             id: i.campaign.company.id,
             name: i.campaign.company.name,
             logoUrl: i.campaign.company.logoUrl,
+            ownerId: i.campaign.company.ownerId,
           }
           : null,
-        status: i.status,
+        status: this.resolveWorkerInvitationStatus(
+          i.status,
+          i.campaign.expiresAt,
+        ),
         selectedSlot: i.selectedSlot
           ? {
             id: i.selectedSlot.id,
@@ -920,6 +943,7 @@ export class InterviewInvitationService {
       page,
       limit,
       total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
     }
   }
 
@@ -935,6 +959,19 @@ export class InterviewInvitationService {
 
     if (invitation.workerId !== workerId) {
       throw new ForbiddenException('Bạn không có quyền phản hồi lời mời này')
+    }
+
+    const campaignExpired = this.isCampaignExpired(invitation.campaign?.expiresAt)
+    if (campaignExpired) {
+      if (invitation.status === InterviewInvitationStatus.PENDING) {
+        throw new BadRequestException('Đã quá hạn phản hồi hoặc chọn giờ')
+      }
+      if (
+        invitation.status === InterviewInvitationStatus.REJECTED &&
+        dto.status === InterviewInvitationStatus.ACCEPTED
+      ) {
+        throw new BadRequestException('Đã quá hạn phản hồi hoặc chọn giờ')
+      }
     }
 
     if (

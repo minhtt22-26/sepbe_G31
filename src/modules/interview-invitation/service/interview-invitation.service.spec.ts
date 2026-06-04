@@ -249,6 +249,24 @@ describe('InterviewInvitationService', () => {
       expect(result.data[0].id).toBe(1)
       expect(result.data[0].campaign.slots[0].remainingSeats).toBe(5)
     })
+
+    it('returns EXPIRED when PENDING invitation is past expiresAt', async () => {
+      const inv = makeInvitation({
+        status: InterviewInvitationStatus.PENDING,
+        campaign: {
+          id: 10,
+          title: 'Dev Interview',
+          message: 'Mời phỏng vấn',
+          jobId: 5,
+          companyId: 1,
+          expiresAt: new Date('2020-01-01'),
+          slots: [makeSlot()],
+        },
+      })
+      mockRepo.getInvitationsByWorker.mockResolvedValue({ invitations: [inv], total: 1 })
+      const result = await service.getInvitationsForWorker(2, 1, 10)
+      expect(result.data[0].status).toBe(InterviewInvitationStatus.EXPIRED)
+    })
   })
 
   // ── getCampaignStats ──────────────────────────────────────────────────────
@@ -581,6 +599,24 @@ describe('InterviewInvitationService', () => {
       ).rejects.toThrow(ForbiddenException)
     })
 
+    it('throws BadRequestException when PENDING invitation is past expiresAt', async () => {
+      mockRepo.getInvitationById.mockResolvedValue(
+        makeInvitation({
+          status: InterviewInvitationStatus.PENDING,
+          campaign: {
+            ...makeInvitation().campaign,
+            expiresAt: new Date('2020-01-01'),
+          },
+        }),
+      )
+      await expect(
+        service.respondToInvitation(1, 2, {
+          status: InterviewInvitationStatus.ACCEPTED,
+          selectedSlotId: 1,
+        } as any),
+      ).rejects.toThrow('Đã quá hạn phản hồi hoặc chọn giờ')
+    })
+
     it('throws BadRequestException when accepting without slot for a slotted campaign', async () => {
       mockRepo.getInvitationById.mockResolvedValue(makeInvitation())
       mockPrisma.interviewInvitationSlot.count.mockResolvedValue(2)
@@ -730,5 +766,6 @@ describe('InterviewInvitationService', () => {
       await service.updateCampaign(10, 1, { title: 'Updated', slots: [] })
       expect(mockPrisma.$transaction).toHaveBeenCalled()
     })
+
   })
 })

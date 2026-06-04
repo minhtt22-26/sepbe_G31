@@ -200,8 +200,8 @@ export class WalletService {
     if (!hasFallbackDuration) {
       mappedPackages.unshift({
         id: 0,
-        name: `Goi boost ${normalizedFallbackDays} ngay`,
-        description: 'Goi mac dinh theo cau hinh point he thong.',
+        name: `Gói đẩy tin ${normalizedFallbackDays} ngày`,
+        description: 'Gói mặc định theo cấu hình điểm hệ thống.',
         durationDays: normalizedFallbackDays,
         price: normalizedFallbackPrice,
         isDefault: !mappedPackages.some((item) => item.isDefault),
@@ -215,8 +215,8 @@ export class WalletService {
     return [
       {
         id: 0,
-        name: `Goi boost ${normalizedFallbackDays} ngay`,
-        description: 'Goi mac dinh theo cau hinh point he thong.',
+        name: `Gói đẩy tin ${normalizedFallbackDays} ngày`,
+        description: 'Gói mặc định theo cấu hình điểm hệ thống.',
         durationDays: normalizedFallbackDays,
         price: normalizedFallbackPrice,
         isDefault: true,
@@ -227,7 +227,7 @@ export class WalletService {
   async resolveBoostPackage(packageDays?: number) {
     const packages = await this.getBoostPackagesForEmployer()
     if (!packages.length) {
-      throw new BadRequestException('Khong tim thay goi boost hop le')
+      throw new BadRequestException('Không tìm thấy gói đẩy tin hợp lệ')
     }
 
     if (packageDays !== undefined && packageDays !== null) {
@@ -235,7 +235,9 @@ export class WalletService {
         (item) => Number(item.durationDays) === Number(packageDays),
       )
       if (!matched) {
-        throw new BadRequestException('Goi boost da chon khong ton tai hoac da ngung hoat dong')
+        throw new BadRequestException(
+          'Gói đẩy tin đã chọn không tồn tại hoặc đã ngừng hoạt động',
+        )
       }
       return matched
     }
@@ -291,7 +293,7 @@ export class WalletService {
     })
 
     if (!order || order.orderType !== OrderType.TOPUP_WALLET) {
-      throw new BadRequestException('Không tìm thấy đơn nạp point')
+      throw new BadRequestException('Không tìm thấy đơn nạp điểm')
     }
 
     if (order.userId !== userId || order.targetId !== companyId) {
@@ -367,7 +369,7 @@ export class WalletService {
     this.logger.debug(`[PAYLOAD] transferAmount=${transferAmount} vs order.amount=${order.amount}`)
     if (!Number.isFinite(transferAmount) || transferAmount < order.amount) {
       this.logger.warn(`[PAYLOAD] Skipped — transferAmount=${transferAmount} < order.amount=${order.amount}`)
-      return { success: true, message: 'Số tiền chưa đủ để nạp point' }
+      return { success: true, message: 'Số tiền chưa đủ để nạp điểm' }
     }
 
     const transactionCode =
@@ -432,8 +434,8 @@ export class WalletService {
       await tx.notification.create({
         data: {
           userId: order.userId,
-          title: 'Thanh toán nạp point thành công',
-          message: `Đã cộng ${pointAmount.toLocaleString('vi-VN')} point vào ví của bạn.`,
+          title: 'Thanh toán nạp điểm thành công',
+          message: `Đã cộng ${pointAmount.toLocaleString('vi-VN')} điểm vào ví của bạn.`,
           link: '/employer/wallet?walletTopupSuccess=1',
         },
       })
@@ -442,7 +444,7 @@ export class WalletService {
     this.logger.log(`[PAYLOAD] ✓ Topup SUCCESS — order #${order.id} company #${companyId} +${pointAmount} points`)
     return {
       success: true,
-      message: 'Nạp point thành công',
+      message: 'Nạp điểm thành công',
       data: {
         paymentOrderId: order.id,
         companyId,
@@ -494,7 +496,7 @@ export class WalletService {
       `
 
       if (!wallet) {
-        throw new BadRequestException('Số dư point không đủ')
+        throw new BadRequestException('Số dư điểm không đủ')
       }
 
       await tx.walletTransaction.create({

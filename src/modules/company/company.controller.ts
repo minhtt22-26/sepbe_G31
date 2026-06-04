@@ -265,11 +265,19 @@ export class CompanyController {
     @Query('status') status?: ReportStatus,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('companyName') companyName?: string,
+    @Query('reporterName') reporterName?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
   ) {
     return this.companyService.getReviewReports(
       status,
       Number(page) || 1,
       Number(limit) || 50,
+      companyName,
+      reporterName,
+      fromDate,
+      toDate,
     )
   }
 

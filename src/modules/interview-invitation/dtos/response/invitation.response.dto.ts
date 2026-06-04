@@ -10,6 +10,9 @@ class CompanyInfoDto {
 
   @ApiProperty({ required: false })
   logoUrl?: string
+
+  @ApiProperty({ example: 12, description: 'User ID của nhà tuyển dụng (để mở chat)' })
+  ownerId?: number
 }
 
 class CampaignInfoDto {

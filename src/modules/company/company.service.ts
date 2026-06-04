@@ -171,12 +171,17 @@ export class CompanyService {
       throw new BadRequestException('Invalid status')
     }
 
-    if (body.status === CompanyStatus.REJECTED && !body.rejectionReason) {
-      throw new BadRequestException('Rejection reason is required')
+    const rejectionReason = body.rejectionReason?.trim()
+    if (body.status === CompanyStatus.REJECTED && !rejectionReason) {
+      throw new BadRequestException('Vui lòng nhập lý do từ chối')
     }
 
     if (company.status === CompanyStatus.UPDATING) {
-      return this.reviewPendingUpdate(id, body, managerId)
+      return this.reviewPendingUpdate(
+        id,
+        { ...body, rejectionReason },
+        managerId,
+      )
     }
 
     const updatedCompany = await this.prisma.company.update({
@@ -184,7 +189,7 @@ export class CompanyService {
       data: {
         status: body.status,
         rejectionReason:
-          body.status === CompanyStatus.REJECTED ? body.rejectionReason : null,
+          body.status === CompanyStatus.REJECTED ? rejectionReason : null,
       },
     })
 
@@ -196,7 +201,7 @@ export class CompanyService {
         : 'Công ty bị từ chối'
     const message =
       body.status === CompanyStatus.REJECTED
-        ? body.rejectionReason || 'Công ty đã bị từ chối'
+        ? rejectionReason || 'Công ty đã bị từ chối'
         : 'Công ty của bạn đã được duyệt'
 
     await this.prisma.notification.create({
@@ -774,8 +779,37 @@ export class CompanyService {
     status: 'PENDING' | 'RESOLVED' | 'REJECTED' | undefined,
     page = 1,
     limit = 50,
+    companyName?: string,
+    reporterName?: string,
+    fromDate?: string,
+    toDate?: string,
   ) {
-    const where = status ? { status } : {}
+    const where: Record<string, unknown> = status ? { status } : {}
+    if (companyName?.trim()) {
+      where.review = {
+        company: { name: { contains: companyName.trim(), mode: 'insensitive' } },
+      }
+    }
+    if (reporterName?.trim()) {
+      where.reporter = {
+        fullName: { contains: reporterName.trim(), mode: 'insensitive' },
+      }
+    }
+    if (fromDate || toDate) {
+      where.createdAt = {}
+      if (fromDate) {
+        const from = new Date(`${fromDate}T00:00:00.000Z`)
+        if (!Number.isNaN(from.getTime())) {
+          ;(where.createdAt as Record<string, Date>).gte = from
+        }
+      }
+      if (toDate) {
+        const to = new Date(`${toDate}T23:59:59.999Z`)
+        if (!Number.isNaN(to.getTime())) {
+          ;(where.createdAt as Record<string, Date>).lte = to
+        }
+      }
+    }
     const safePage = Math.max(1, Number(page) || 1)
     const safeLimit = Math.min(Math.max(1, Number(limit) || 50), 100)
 
