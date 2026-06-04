@@ -421,8 +421,11 @@ export class InterviewInvitationService {
     let effectiveDeadline = expiresAt ? new Date(expiresAt) : null
 
     if (!isSlotLess) {
+      const now = new Date()
+      const futureSlots = slots.filter((slot) => new Date(slot.endAt ?? slot.startAt).getTime() > now.getTime())
+      const referenceSlots = futureSlots.length > 0 ? futureSlots : slots
       const earliestSlotStart = new Date(
-        Math.min(...slots.map((slot) => new Date(slot.startAt).getTime())),
+        Math.min(...referenceSlots.map((slot) => new Date(slot.startAt).getTime())),
       )
       const fallbackDeadline = new Date(earliestSlotStart.getTime() - 24 * 60 * 60 * 1000)
       effectiveDeadline = effectiveDeadline || fallbackDeadline
@@ -431,8 +434,8 @@ export class InterviewInvitationService {
         throw new BadRequestException('Hạn đổi lịch không hợp lệ')
       }
 
-      if (effectiveDeadline.getTime() >= earliestSlotStart.getTime()) {
-        throw new BadRequestException('Hạn đổi lịch phải trước ca phỏng vấn sớm nhất')
+      if (futureSlots.length > 0 && effectiveDeadline.getTime() >= earliestSlotStart.getTime()) {
+        throw new BadRequestException('Hạn đổi lịch phải trước ca phỏng vấn sớm nhất chưa diễn ra')
       }
     }
 
@@ -867,20 +870,21 @@ export class InterviewInvitationService {
       }
     })
 
+    const now = new Date()
     const pendingInterviewCount = await this.prisma.interviewInvitation.count({
       where: {
         workerId,
         status: InterviewInvitationStatus.PENDING,
         campaign: {
           slots: {
-            some: {}
+            some: { startAt: { gt: now } }, // ít nhất 1 ca chưa qua
           },
           OR: [
-            { expiresAt: { gt: new Date() } },
-            { expiresAt: null }
-          ]
-        }
-      }
+            { expiresAt: { gt: now } },
+            { expiresAt: null },
+          ],
+        },
+      },
     })
 
     return {
@@ -1060,6 +1064,10 @@ export class InterviewInvitationService {
               new Date() >= invitation.campaign.expiresAt
             ) {
               throw new BadRequestException('Đã quá hạn đổi lịch phỏng vấn')
+            }
+
+            if (new Date(slot.startAt) <= new Date()) {
+              throw new BadRequestException('Ca phỏng vấn này đã diễn ra rồi, vui lòng chọn ca khác')
             }
 
             if (slot.bookedCount >= slot.capacity) {

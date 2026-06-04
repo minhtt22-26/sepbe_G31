@@ -296,7 +296,11 @@ export class JobRepository {
           select: { id: true, name: true },
         },
         _count: {
-          select: { applications: true },
+          select: {
+            applications: {
+              where: { status: JobApplicationStatus.SUITABLE },
+            },
+          },
         },
       },
     }
@@ -311,7 +315,39 @@ export class JobRepository {
       this.prisma.job.count({ where }),
     ])
 
-    return { items, total }
+    const jobIds = items.map((item: any) => item.id)
+
+    const campaigns = await this.prisma.interviewInvitationCampaign.findMany({
+      where: { jobId: { in: jobIds } },
+      select: {
+        jobId: true,
+        _count: {
+          select: {
+            invitations: {
+              where: {
+                status: InterviewInvitationStatus.ACCEPTED,
+                selectedSlotId: { not: null },
+              },
+            },
+          },
+        },
+      },
+    })
+
+    const invitationCountByJob = new Map<number, number>()
+    for (const campaign of campaigns) {
+      if (campaign.jobId) {
+        const current = invitationCountByJob.get(campaign.jobId) ?? 0
+        invitationCountByJob.set(campaign.jobId, current + campaign._count.invitations)
+      }
+    }
+
+    const itemsWithSuitableCount = items.map((item: any) => ({
+      ...item,
+      suitableCount: (item._count?.applications ?? 0) + (invitationCountByJob.get(item.id) ?? 0),
+    }))
+
+    return { items: itemsWithSuitableCount, total }
   }
 
   async getActiveBoostPackages() {
@@ -684,10 +720,12 @@ export class JobRepository {
                   gender: true,
                   birthYear: true,
                   province: true,
+                  ward: true,
                   experienceYear: true,
                   expectedSalary: true,
                   shift: true,
                   bio: true,
+                  desiredJobText: true,
                   occupation: {
                     select: {
                       name: true,
