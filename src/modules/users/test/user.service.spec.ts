@@ -614,7 +614,7 @@ describe('UserService', () => {
         await service.forgotPassword({ email })
 
         expect(userRepository.createForgotPasswordToken).toHaveBeenCalled()
-        expect(mockEmailQueueService.addSendEmailJob).toHaveBeenCalled()
+        expect(mockEmailService.sendForgotPasswordEmail).toHaveBeenCalled()
       })
 
       it('Abnormal: should throw UnauthorizedException when email not found', async () => {
