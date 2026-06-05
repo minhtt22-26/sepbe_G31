@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger'
+import { Transform } from 'class-transformer'
 import {
   IsEmail,
   IsOptional,
@@ -40,11 +41,14 @@ export class UserInfoRequestDto {
 
   @ApiProperty({
     example: 'example@gmail.com',
-    description: 'Email address',
+    description: 'Email address (gửi chuỗi rỗng để xoá email)',
     required: false,
+    nullable: true,
   })
+  // Chuỗi rỗng -> null để cho phép xoá email; @IsOptional sẽ bỏ qua @IsEmail khi null
+  @Transform(({ value }) => (value === '' ? null : value))
   @IsOptional()
   @IsEmail()
   @MaxLength(255)
-  email?: string
+  email?: string | null
 }
