@@ -258,11 +258,22 @@ export class UserService {
       })
     }
 
+    if (dto.email) {
+      const existingUserWithEmail = await this.userRepository.findUserWithByEmail(dto.email)
+      if (existingUserWithEmail && existingUserWithEmail.id !== userId) {
+        throw new BadRequestException({
+          message: 'Email đã được sử dụng bởi tài khoản khác',
+          field: 'email',
+        })
+      }
+    }
+
     if (dto.phone) {
       const existingUserWithPhone = await this.userRepository.findUserWithByPhone(dto.phone)
       if (existingUserWithPhone && existingUserWithPhone.id !== userId) {
         throw new BadRequestException({
           message: 'Số điện thoại đã được sử dụng bởi tài khoản khác',
+          field: 'phone',
         })
       }
     }
