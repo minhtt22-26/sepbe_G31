@@ -173,7 +173,7 @@ describe('JobService - Boost Features (Point-Only Flow)', () => {
       const result = await service.confirmBoostPayment(1, 5, { paymentOrderId: 100 })
 
       expect(result.success).toBe(false)
-      expect(result.message).toContain('Endpoint xác nhận payment boost đã ngưng')
+      expect(result.message).toContain('đẩy tin bằng điểm')
     })
   })
 
@@ -182,7 +182,7 @@ describe('JobService - Boost Features (Point-Only Flow)', () => {
       const result = await service.handleSepayWebhook('some-header', {})
 
       expect(result.success).toBe(true)
-      expect(result.message).toContain('Luồng webhook SePay cho job/boost đã ngưng')
+      expect(result.message).toContain('thanh toán bằng điểm')
     })
   })
 

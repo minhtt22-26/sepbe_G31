@@ -297,9 +297,7 @@ export class JobRepository {
         },
         _count: {
           select: {
-            applications: {
-              where: { status: JobApplicationStatus.SUITABLE },
-            },
+            applications: true, // Tổng số người ứng tuyển (tất cả các trạng thái)
           },
         },
       },
@@ -317,37 +315,30 @@ export class JobRepository {
 
     const jobIds = items.map((item: any) => item.id)
 
-    const campaigns = await this.prisma.interviewInvitationCampaign.findMany({
-      where: { jobId: { in: jobIds } },
-      select: {
-        jobId: true,
-        _count: {
-          select: {
-            invitations: {
-              where: {
-                status: InterviewInvitationStatus.ACCEPTED,
-                selectedSlotId: { not: null },
-              },
-            },
-          },
-        },
+    // Đếm số lượng ứng tuyển có trạng thái SUITABLE cho từng Job
+    const suitableAppCounts = await this.prisma.jobApplication.groupBy({
+      by: ['jobId'],
+      where: {
+        jobId: { in: jobIds },
+        status: JobApplicationStatus.SUITABLE,
+      },
+      _count: {
+        id: true,
       },
     })
 
-    const invitationCountByJob = new Map<number, number>()
-    for (const campaign of campaigns) {
-      if (campaign.jobId) {
-        const current = invitationCountByJob.get(campaign.jobId) ?? 0
-        invitationCountByJob.set(campaign.jobId, current + campaign._count.invitations)
-      }
+    const suitableAppCountMap = new Map<number, number>()
+    for (const row of suitableAppCounts) {
+      suitableAppCountMap.set(row.jobId, row._count.id)
     }
 
-    const itemsWithSuitableCount = items.map((item: any) => ({
+    const itemsWithStats = items.map((item: any) => ({
       ...item,
-      suitableCount: (item._count?.applications ?? 0) + (invitationCountByJob.get(item.id) ?? 0),
+      applicantsCount: item._count?.applications ?? 0,
+      suitableCount: suitableAppCountMap.get(item.id) ?? 0,
     }))
 
-    return { items: itemsWithSuitableCount, total }
+    return { items: itemsWithStats, total }
   }
 
   async getActiveBoostPackages() {

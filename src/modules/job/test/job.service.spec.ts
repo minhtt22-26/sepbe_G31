@@ -442,7 +442,7 @@ describe('JobService', () => {
       jobRepositoryMock.findJobById.mockResolvedValue({ id: 1 })
       jobRepositoryMock.findSavedJob.mockResolvedValue({ id: 5 })
       const result = await service.saveJob(1, 1)
-      expect(result.message).toContain('already saved')
+      expect(result.message).toContain('đã được lưu')
     })
 
     it('saves job and returns success', async () => {
@@ -460,7 +460,7 @@ describe('JobService', () => {
     it('returns not saved message when job not in wishlist', async () => {
       jobRepositoryMock.findSavedJob.mockResolvedValue(null)
       const result = await service.unSaveJob(1, 1)
-      expect(result.message).toContain('not saved')
+      expect(result.message).toContain('chưa được lưu')
     })
 
     it('removes saved job and returns success', async () => {

@@ -21,7 +21,7 @@ const mockPrisma: any = {
   occupation: { findUnique: jest.fn() },
   job: { create: jest.fn(), update: jest.fn(), updateMany: jest.fn(), findUnique: jest.fn(), findMany: jest.fn(), count: jest.fn() },
   company: { findUnique: jest.fn(), update: jest.fn() },
-  jobApplication: { update: jest.fn(), findUnique: jest.fn(), findMany: jest.fn(), count: jest.fn() },
+  jobApplication: { update: jest.fn(), findUnique: jest.fn(), findMany: jest.fn(), count: jest.fn(), groupBy: jest.fn() },
   jobView: { create: jest.fn(), findFirst: jest.fn() },
   paymentPackage: { findMany: jest.fn(), findFirst: jest.fn() },
   savedJob: { create: jest.fn(), delete: jest.fn(), findUnique: jest.fn(), findMany: jest.fn(), count: jest.fn() },
@@ -175,6 +175,7 @@ describe('JobRepository', () => {
     it('adds take/skip when limit and skip are provided', async () => {
       mockPrisma.$transaction.mockResolvedValue([[{ id: 1 }], 1])
       mockPrisma.interviewInvitationCampaign.findMany.mockResolvedValue([])
+      mockPrisma.jobApplication.groupBy.mockResolvedValue([])
       await repo.getJobsByCompanyId({ companyId: 1, limit: 10, skip: 0 })
       expect(mockPrisma.$transaction).toHaveBeenCalled()
     })
@@ -182,6 +183,7 @@ describe('JobRepository', () => {
     it('omits take/skip when not provided', async () => {
       mockPrisma.$transaction.mockResolvedValue([[], 0])
       mockPrisma.interviewInvitationCampaign.findMany.mockResolvedValue([])
+      mockPrisma.jobApplication.groupBy.mockResolvedValue([])
       await repo.getJobsByCompanyId({ companyId: 1 })
       expect(mockPrisma.$transaction).toHaveBeenCalled()
     })
