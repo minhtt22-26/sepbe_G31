@@ -36,7 +36,11 @@ export class AIMatchingService {
     @Inject(REDIS_CLIENT) private readonly redis: RedisClient,
   ) {}
 
-  private async getCached<T>(key: string, ttlSeconds: number, fetcher: () => Promise<T>): Promise<T> {
+  private async getCached<T>(
+    key: string,
+    ttlSeconds: number,
+    fetcher: () => Promise<T>,
+  ): Promise<T> {
     const cached = await this.redis.get(key)
     if (cached) return JSON.parse(cached) as T
     const data = await fetcher()
@@ -45,7 +49,7 @@ export class AIMatchingService {
   }
 
   private async invalidateCache(...keys: string[]): Promise<void> {
-    await Promise.all(keys.map(k => this.redis.del(k)))
+    await Promise.all(keys.map((k) => this.redis.del(k)))
   }
 
   private getMinScoreThreshold(configs: IMatchingConfig[]): number {
@@ -107,12 +111,20 @@ export class AIMatchingService {
       )
 
       const isSameOccupation = workerProfile.occupationId === job.occupationId
+      const isSameSector =
+        workerProfile.occupation?.sectorId === job.sectorId
 
-      // Nếu cùng ngành nghề, skillScore nằm trong khoảng 0.8 - 1.0 (ưu tiên cao nhất)
-      // Nếu khác ngành nghề, skillScore nằm trong khoảng 0.0 - 0.5 (giảm độ ưu tiên)
-      const refinedSkillScore = isSameOccupation
-        ? 0.8 + job.skillScore * 0.2
-        : job.skillScore * 0.5
+      let refinedSkillScore = 0
+      if (isSameOccupation) {
+        // 1. Cùng nghề cụ thể (0.8 - 1.0)
+        refinedSkillScore = 0.8 + job.skillScore * 0.2
+      } else if (isSameSector) {
+        // 2. Khác nghề nhưng chung ngành lớn (0.2 - 0.5)
+        refinedSkillScore = 0.2 + job.skillScore * 0.3
+      } else {
+        // 3. Khác ngành lớn hoàn toàn (0.0 - 0.1)
+        refinedSkillScore = job.skillScore * 0.1
+      }
 
       let finalScore = this.scoringService.calculateFinalScore(
         {
@@ -272,7 +284,7 @@ export class AIMatchingService {
     const rawWorkers = await this.aiMatchingRepository.findMatchedWorkers(
       embeddings.reqEmbedding,
       embeddings.benefitEmbedding,
-      jobId
+      jobId,
     )
 
     const results = rawWorkers.map((worker) => {
@@ -306,9 +318,19 @@ export class AIMatchingService {
       )
 
       const isSameOccupation = worker.occupationId === job.occupationId
-      const refinedSkillScore = isSameOccupation
-        ? 0.8 + worker.skillScore * 0.2
-        : worker.skillScore * 0.5
+      const isSameSector = worker.sectorId === job.occupation?.sector?.id
+
+      let refinedSkillScore = 0
+      if (isSameOccupation) {
+        // 1. Cùng nghề cụ thể (0.8 - 1.0)
+        refinedSkillScore = 0.8 + worker.skillScore * 0.2
+      } else if (isSameSector) {
+        // 2. Khác nghề nhưng chung ngành lớn (0.2 - 0.5)
+        refinedSkillScore = 0.2 + worker.skillScore * 0.3
+      } else {
+        // 3. Khác ngành lớn hoàn toàn (0.0 - 0.1)
+        refinedSkillScore = worker.skillScore * 0.1
+      }
 
       const finalScore = this.scoringService.calculateFinalScore(
         {
@@ -359,7 +381,9 @@ export class AIMatchingService {
   }
 
   async getConfigs(): Promise<IMatchingConfig[]> {
-    return this.getCached('ai:configs', 300, () => this.aiMatchingRepository.getConfigs())
+    return this.getCached('ai:configs', 300, () =>
+      this.aiMatchingRepository.getConfigs(),
+    )
   }
 
   async updateConfigs(configs: IMatchingConfig[]): Promise<IMatchingConfig[]> {
