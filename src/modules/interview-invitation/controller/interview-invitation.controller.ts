@@ -70,6 +70,23 @@ export class InterviewInvitationController {
   }
 
   /**
+   * Employer: Gửi lại chiến dịch mời phỏng vấn
+   */
+  @Post('campaigns/:campaignId/resend')
+  @AuthJwtAccessProtected()
+  @AuthRoleProtected(EnumUserRole.EMPLOYER)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Gửi lại chiến dịch mời phỏng vấn cho các ứng viên chưa phản hồi' })
+  @ApiResponse({ status: 200, description: 'Chiến dịch được gửi lại thành công' })
+  async resendCampaign(
+    @AuthJwtPayload() user: any,
+    @Param('campaignId', ParseIntPipe) campaignId: number,
+  ) {
+    const company = await this.companyService.findByOwnerId(user.userId)
+    return this.interviewInvitationService.resendCampaign(campaignId, company.id)
+  }
+
+  /**
    * Employer: Sửa chiến dịch mời phỏng vấn
    */
   @Put('campaigns/:campaignId')

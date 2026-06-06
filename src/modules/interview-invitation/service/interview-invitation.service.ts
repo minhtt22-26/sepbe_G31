@@ -359,6 +359,7 @@ export class InterviewInvitationService {
       }
     }
 
+    const isSlotLess = !slots || slots.length === 0
     let jobTitle: string | null = null
     if (jobId) {
       const job = await this.prisma.job.findFirst({
@@ -381,6 +382,7 @@ export class InterviewInvitationService {
             campaign: {
               companyId,
               jobId,
+              slots: isSlotLess ? { none: {} } : { some: {} },
             },
             status: {
               in: [
@@ -410,7 +412,6 @@ export class InterviewInvitationService {
 
     }
 
-    const isSlotLess = !slots || slots.length === 0
     let effectiveDeadline = expiresAt ? new Date(expiresAt) : null
 
     if (!isSlotLess) {
@@ -1627,4 +1628,66 @@ export class InterviewInvitationService {
       })),
     }
   }
+
+  /**
+   * Gửi lại thông báo cho các ứng viên chưa phản hồi (PENDING) trong chiến dịch
+   */
+  async resendCampaign(campaignId: number, companyId: number) {
+    const campaign = await this.repository.getCampaignById(campaignId)
+
+    if (!campaign) {
+      throw new NotFoundException('Chiến dịch không tồn tại')
+    }
+
+    if (campaign.companyId !== companyId) {
+      throw new ForbiddenException('Bạn không có quyền gửi lại chiến dịch này')
+    }
+
+    if (![CampaignStatus.IN_PROGRESS, CampaignStatus.COMPLETED].includes(campaign.status as any)) {
+      throw new BadRequestException(
+        `Không thể gửi lại chiến dịch ở trạng thái ${campaign.status}. Chỉ có thể gửi lại chiến dịch đã được gửi trước đó.`,
+      )
+    }
+
+    const pendingInvitations = (campaign.invitations || []).filter(
+      (invite) => invite.status === InterviewInvitationStatus.PENDING,
+    )
+
+    if (pendingInvitations.length === 0) {
+      throw new BadRequestException('Không có ứng viên nào đang chờ phản hồi để gửi lại')
+    }
+
+    // Lấy tiêu đề công việc
+    let jobTitle = campaign.title
+    if (campaign.jobId) {
+      const job = await this.prisma.job.findUnique({ where: { id: campaign.jobId }, select: { title: true } })
+      jobTitle = job?.title || campaign.title
+    }
+
+    for (const invitation of pendingInvitations) {
+      try {
+        const isSlotLessCampaign = !campaign.slots || campaign.slots.length === 0
+        const notifTitle = isSlotLessCampaign
+          ? `[Gửi lại] Đề xuất việc làm: ${jobTitle}`
+          : `[Gửi lại] Mời phỏng vấn: ${jobTitle}`
+        const notifLink = isSlotLessCampaign
+          ? `/job-invitations?invitationId=${invitation.id}`
+          : `/interview-invitations?invitationId=${invitation.id}`
+
+        await this.prisma.notification.create({
+          data: {
+            userId: invitation.workerId,
+            title: notifTitle,
+            message: campaign.message,
+            link: notifLink,
+          },
+        })
+      } catch (error) {
+        console.error(`Error resending notification to worker ${invitation.workerId}:`, error)
+      }
+    }
+
+    return { success: true, resentCount: pendingInvitations.length }
+  }
 }
+

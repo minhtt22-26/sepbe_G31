@@ -14,6 +14,7 @@ export interface IRawMatchedJob {
   expiredAt: Date | null
   occupationId: number
   occupationName: string
+  sectorId: number
   companyId: number
   companyName: string
   logoUrl: string | null
@@ -56,6 +57,7 @@ export interface IRawMatchedWorker {
   phone: string | null
   occupationId: number | null
   occupationName: string | null
+  sectorId: number | null
   province: string | null
   ward: string | null
   expectedSalary: number | null
