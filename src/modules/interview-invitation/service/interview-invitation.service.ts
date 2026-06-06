@@ -14,12 +14,10 @@ import {
   EnumUserRole,
   InterviewInvitationStatus,
   JobApplicationStatus,
-  WalletTransactionType,
 } from 'src/generated/prisma/enums'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { NotificationsService } from 'src/modules/notifications/notifications.service'
 import { ChatService } from 'src/modules/chat/service/chat.service'
-import { WalletService } from 'src/modules/wallet/wallet.service'
 
 @Injectable()
 export class InterviewInvitationService {
@@ -28,7 +26,6 @@ export class InterviewInvitationService {
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly chatService: ChatService,
-    private readonly walletService: WalletService,
   ) { }
 
   private isCampaignExpired(expiresAt: Date | string | null | undefined): boolean {
@@ -696,23 +693,6 @@ export class InterviewInvitationService {
     if (workerCount <= 0) {
       throw new BadRequestException('Không có ứng viên hợp lệ để gửi lời mời')
     }
-
-    const unitCost = await this.walletService.getPointCost(
-      'AI_INVITE_POINT_COST_PER_WORKER',
-      1000,
-    )
-    const totalCost = unitCost * workerCount
-    await this.walletService.deductPoints({
-      companyId,
-      cost: totalCost,
-      type: WalletTransactionType.AI_INVITE,
-      referenceType: 'INTERVIEW_CAMPAIGN',
-      referenceId: campaignId,
-      metadata: {
-        workerCount,
-        unitCost,
-      },
-    })
 
     // Update campaign status to IN_PROGRESS
     await this.repository.updateCampaignStatus(campaignId, CampaignStatus.IN_PROGRESS)
