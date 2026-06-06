@@ -65,12 +65,10 @@ export class WorkerProfileRequestDto {
   @ApiPropertyOptional({ example: 'Tôi có kinh nghiệm làm việc trong ngành may mặc 2 năm' })
   @IsOptional()
   @IsString()
-  @Length(10, 300)
   bio?: string
 
   @ApiPropertyOptional({ example: 'Muốn tìm công việc gần nhà, ca sáng, lương ổn định' })
   @IsOptional()
   @IsString()
-  @Length(10, 300)
   desiredJobText?: string
 }
